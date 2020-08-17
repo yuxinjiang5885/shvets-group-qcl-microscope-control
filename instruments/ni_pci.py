@@ -11,7 +11,7 @@ Created 2020-Aug-17
 import os
 import platform
 import numpy as np
-from lib.nidaqMultipleAI import MultiChannelAnalogInput as MChAI
+from nidaqMultipleAI import MultiChannelAnalogInput as MChAI
 pci_ch_x = b'Dev1/ai0'
 pci_ch_y = b'Dev1/ai1'
 
