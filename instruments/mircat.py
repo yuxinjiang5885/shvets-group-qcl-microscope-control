@@ -1,0 +1,249 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+'''
+mircat
+Giovanni Sartorello (srtgnn@gmail.com)
+Control MIRcat QCL laser via VISA.
+Created 2019-Mar-12 for Python 3.7.2
+'''
+
+import inspect, os, sys, time
+from ctypes import (byref, CDLL, c_bool, c_float, c_uint, c_uint8, c_uint16,
+                    c_uint32)
+from inspect import currentframe, getfile
+from os.path import abspath, join, split, realpath
+from timeit import default_timer as timer
+# Look for modules in "instruments", https://stackoverflow.com/a/6098238
+mDir = realpath(abspath(split(getfile(currentframe()))[0]))
+if mDir not in sys.path:
+    sys.path.append(mDir)
+# Look for modules in "daylight"
+mSubdir = realpath(abspath(join(split(getfile(currentframe()))[0],'daylight')))
+if mSubdir not in sys.path:
+    sys.path.append(mSubdir)
+from daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_MICRONS
+from daylight.MIRcatSDKHelpers import ArmAndWaitForTemp
+# Import Daylight's MIRcat DLL
+SDK_NAME = 'MIRcatSDK.dll'
+sdkPath = os.path.join(mSubdir, SDK_NAME)
+SDK = CDLL(sdkPath)
+
+
+class laser():
+    '''Control MIRcat QCL laser.'''
+
+    def __init__(self):
+        '''Initialize laser.'''
+        # Get API info and connect
+        self.get_api_info(silent=False)
+        self.connect()
+        # Get number of installed QCL modules
+        self.numQcls = c_uint8(0)
+        self.get_qcl_no(silent=False)
+        # Check interlock status
+        self.isInterlockSet = c_bool(False)
+        self.check_interlock()
+        # Check key switch position
+        self.isKeySwitchSet = c_bool(False)
+        self.check_key_switch()
+        # Other class variables
+        self.isArmed = c_bool(False)
+        self.isEmitting = c_bool(False)
+        self.isTuned = c_bool(False)
+
+    def arm(self):
+        '''Arm laser.'''
+        print('Arming ...')
+        SDK.MIRcatSDK_IsLaserArmed(byref(self.isArmed)) # Check first
+        if not self.isArmed.value:
+            SDK.MIRcatSDK_ArmDisarmLaser()
+        while not self.isArmed.value:
+            SDK.MIRcatSDK_IsLaserArmed(byref(self.isArmed))
+            time.sleep(1) # DLS default wait: 1 s
+        print('Laser armed.')
+
+    def arm_and_stabilize(self): # DEPRECATED
+        '''Arm laser and wait for temperatures to stabilize.'''
+        '''To be removed. Use arm() then stabilize() instead.'''
+        print('Arming ...')
+        ArmAndWaitForTemp(SDK, self.numQcls)
+        print('Laser armed.')
+        self.isArmed = c_bool(True)
+
+    def check_interlock(self):
+        '''Check interlock status, exit the program if not set.'''
+        ret = SDK.MIRcatSDK_IsInterlockedStatusSet(byref(self.isInterlockSet))
+        if self.isInterlockSet.value:
+            print('Interlock set.')
+        else:
+            print('Interlock not set ({}). Exiting ...'.format(ret))
+            self.exit_program()
+
+    def check_key_switch(self):
+        '''Check key switch position, exit the program if off.'''
+        ret = SDK.MIRcatSDK_IsKeySwitchStatusSet(byref(self.isKeySwitchSet))
+        if self.isInterlockSet.value:
+            print('Key switch position: on.')
+        else:
+            print('Key switch position: off ({}). Exiting ...'.format(ret))
+            self.exit_program()
+
+    def connect(self):
+        '''Initialize API and connect to laser.'''
+        ret = SDK.MIRcatSDK_Initialize()
+        if ret == 0:
+            print('MIRcatSDK API initialized. Laser connected.')
+        else:
+            print('MIRcatSDK API: failed to initialize ({}).'.format(ret))
+            self.exit_program()
+
+    def disable(self):
+        '''Disable laser emission.'''
+        SDK.MIRcatSDK_IsEmissionOn(byref(self.isEmitting)) # Check first
+        if not self.isEmitting.value: # No need to disable
+            print('Laser emission already disabled.')
+            return
+        ret = SDK.MIRcatSDK_TurnEmissionOff()
+        SDK.MIRcatSDK_IsEmissionOn(byref(self.isEmitting))
+        if not self.isEmitting.value:
+            print('Laser emission disabled.')
+        else:
+            print('Could not disable laser emisson ({}).'.format(ret))
+
+    def disarm(self):
+        '''Disarm laser.'''
+        SDK.MIRcatSDK_IsLaserArmed(byref(self.isArmed)) # Check first
+        if not self.isArmed: # No need to disarm
+            print('Laser already disarmed.')
+            return
+        ret = SDK.MIRcatSDK_DisarmLaser()
+        SDK.MIRcatSDK_IsLaserArmed(byref(self.isArmed))
+        if not self.isArmed.value:
+            print('Laser disarmed.')
+        else:
+            print('Failed to disarm laser ({}).'.format(ret))
+
+    def disconnect(self):
+        '''Deinitialize API and disconnect from laser.'''
+        ret = SDK.MIRcatSDK_DeInitialize()
+        if ret == 0:
+            print('MIRcatSDK API deinitialized. Laser disconnected.')
+        else:
+            print('MIRcatSDK API: failed to deinitialize ({}).'.format(ret))
+
+    def enable(self):
+        '''Enable laser emission.'''
+        SDK.MIRcatSDK_IsLaserArmed(byref(self.isArmed)) # Check arming
+        if not self.isArmed.value:
+            print('Arm laser first.')
+            return
+        SDK.MIRcatSDK_IsTuned(byref(self.isTuned)) # Check tuning
+        if not self.isTuned.value:
+            print('Tune laser first.')
+            return
+        SDK.MIRcatSDK_IsEmissionOn(byref(self.isEmitting)) # Check emission
+        if self.isEmitting.value: # No need to enable
+            print('Laser emission already enabled.')
+            return
+        ret = SDK.MIRcatSDK_TurnEmissionOn()
+        while not self.isEmitting.value:
+            SDK.MIRcatSDK_IsEmissionOn(byref(self.isEmitting))
+            time.sleep(0.5) # DLS default wait: 0.5 s
+        print('Laser emission enabled.')
+
+    def exit_program(self):
+        '''Disconnect the laser and close the program.'''
+        self.disconnect()
+        sys.exit(0)
+
+    def get_api_info(self, silent=True):
+        '''Get and display API version.'''
+        major = c_uint16()
+        minor = c_uint16()
+        patch = c_uint16()
+        ret = SDK.MIRcatSDK_GetAPIVersion(byref(major), byref(minor),
+                                          byref(patch))
+        # Note: "silent" does not apply to dependencies
+        if ret == 0 and not silent:
+            print('MIRcatSDK API version: {0}.{1}.{2}'.format(major.value,
+                  minor.value, patch.value))
+        elif ret != 0:
+            print('MIRcatSDK API: failed to get info ({}).'.format(ret))
+            self.exit_program()
+
+    def get_current(self, tec):
+        '''Return the current of TEC "tec"'''
+        tecCur = c_uint16(0)
+        SDK.MIRcatSDK_GetTecCurrent(c_uint8(tec), byref(tecCur))
+        return tecCur.value
+
+    def get_temperature(self, qcl):
+        '''Return the temperature of QCL "QCL"'''
+        qclTemp = c_float(0)
+        SDK.MIRcatSDK_GetQCLTemperature(c_uint8(qcl), byref(qclTemp))
+        return qclTemp.value
+
+    def get_qcl_no(self, silent=True):
+        '''Get number of installed QCL modules.'''
+        SDK.MIRcatSDK_GetNumInstalledQcls(byref(self.numQcls))
+        if not silent:
+            print('Installed QCL modules: {}.'.format(self.numQcls.value))
+
+    def get_wavelength(self):
+        '''Get actual wavelength from laser.'''
+        wlRead = c_float()
+        units = c_uint8()
+        lightValid = c_bool()
+        SDK.MIRcatSDK_GetActualWW(byref(wlRead), byref(units),
+                                  byref(lightValid))
+        return wlRead.value
+
+    def stabilize(self):
+        '''Wait until TEC temperatures are stable.
+           Always run after arming and before tuning.'''
+        print('Waiting for TEC temperatures to stabilize ...')
+        atTemp = c_bool(False)
+        tecCur = c_uint16(0)
+        qclTemp = c_float(0)
+        while not atTemp.value:
+            for x in range(1, self.numQcls.value + 1):
+                SDK.MIRcatSDK_GetQCLTemperature(c_uint8(x), byref(qclTemp))
+                SDK.MIRcatSDK_GetTecCurrent(c_uint8(x), byref(tecCur))
+                print('QCL {}: {:.2f} °C, {} mA. '.format(x, qclTemp.value,
+                      tecCur.value), end='')
+            print('', end='\r')
+            SDK.MIRcatSDK_AreTECsAtSetTemperature(byref(atTemp))
+        print()
+        print('All TECs at temperature.')
+
+    def tune(self, qcl, wl_um):
+        '''Tune QCL "qcl" wavelength to "wl_um", in um.
+           Does not check for wavelength validity.'''
+        # Check QCL validity
+        if qcl < 1 or qcl > self.numQcls.value:
+            print('QCL {} invalid (choose 1--{}).'.format(qcl, self.numQcls))
+            return
+        # Send tune command
+        wlUnit = MIRcatSDK_UNITS_MICRONS
+        SDK.MIRcatSDK_TuneToWW(c_float(wl_um), wlUnit, c_uint8(qcl))
+        # Check tune setting
+        wlTune = c_float()
+        units = c_uint8()
+        qclTune = c_uint8()
+        SDK.MIRcatSDK_GetTuneWW(byref(wlTune), byref(units), byref(qclTune))
+        print('Tuning QCL {} to {:.3f} um.'.format(qclTune.value, wlTune.value))
+        # Verify tuning
+        self.isTuned = c_bool(False)
+        start = timer()
+        while not self.isTuned.value:
+            print('Tuning in progress ({:.3f} s).'.format(timer()-start),
+                  end='\r') # overwrite line
+            time.sleep(0.05) # refresh interval (DLS default: 0.05 s)
+            SDK.MIRcatSDK_IsTuned(byref(self.isTuned))
+        print() # clear line
+        # Read tuned wavelength
+        wlRead = self.get_wavelength()
+        print('Tuned QCL {} to {:.3f} um.'.format(qclTune.value, wlRead))
+
+
