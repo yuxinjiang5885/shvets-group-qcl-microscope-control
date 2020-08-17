@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 '''
 ni_daq_multiple_ai
 Giovanni Sartorello (srtgnn@gmail.com)
@@ -7,7 +6,6 @@ Replaces DAQ_MChAI, which was not synchronous
 Version 3
 Python 3.6 on Windows 10 64-bit
 Created 2017-Sep-08
-Updated 2017-Sep-15
 '''
 
 import numpy as np
