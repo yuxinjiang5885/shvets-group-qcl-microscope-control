@@ -217,9 +217,48 @@ class laser():
         print()
         print('All TECs at temperature.')
 
+    def sweep(self, wl_start_um, wl_end_um, wl_step_um):
+        '''Sweep between two wavelengths using the laser's built-in function.
+           Refer to MIRcat SDK documentation for details of the variables'''
+        # Send sweep command
+        wlUnit = MIRcatSDK_UNITS_MICRONS
+        SDK.MIRcatSDK_StartSweepScan(c_float(wl_start+_um),
+                                     c_float(wl_end_um),
+                                     c_float(wl_step_um),
+                                     wlUnit, c_uint16(1), c_bool(True), c_uint8(1))
+        # Check scan status
+        isScanInProgress = c_bool(True)
+        isScanActive = c_bool(False)
+        isScanPaused = c_bool(False)
+        curScanNum = c_uint16()
+        curScanPercent = c_uint16()
+        curWW = c_float()
+        isTECinProgress = c_bool()
+        isMotionInProgress = c_bool()
+        units = wlUnit
+        start = timer()
+        while isScanInProgress.value:
+            SDK.MIRcatSDK_GetScanStatus(byref(isScanInProgress),
+                                        byref(isScanActive),
+                                        byref(isScanPaused),
+                                        byref(curScanNum),
+                                        byref(curScanPercent),
+                                        byref(curWW),
+                                        byref(units),
+                                        byref(isTECinProgress),
+                                        byref(isMotionInProgress))
+            print('Sweeping. Time elapsed: {:.3f} s).'.format(timer()-start),
+                                                        end=' ', flush=True)
+            # print('Scan in progress/active/paused: {}/{}/{}'.format(
+            #     isScanInProgress.value, isScanActive.value, isScanPaused.value))
+            print('Sweep step {} ({} %).'.format(curScanNum, curScanPercent))
+        print('Sweep complete.')
+
+
     def tune(self, qcl, wl_um):
         '''Tune QCL "qcl" wavelength to "wl_um", in um.
-           Does not check for wavelength validity.'''
+           Does not check for wavelength validity.
+           Refer to MIRcat SDK documentation for details of the variables'''
         # Check QCL validity
         if qcl < 1 or qcl > self.numQcls.value:
             print('QCL {} invalid (choose 1--{}).'.format(qcl, self.numQcls))
