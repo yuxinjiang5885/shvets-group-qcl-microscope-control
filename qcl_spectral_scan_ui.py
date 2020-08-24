@@ -216,6 +216,10 @@ class experiment(): # Directory management and multiple acquisitions
                                                                    MAX_WL_QCL4))
             GUIInstance.btn['Start'][0].setChecked(False)
             return
+        # Make sure laser is armed
+        if not GUIInstance.btn['Arm'][0].isChecked():
+            print('Laser is not armed.')
+            return
         # Set up multiple acquisitions
         # if GUIElements['stop'].isChecked():
         #     break
@@ -268,9 +272,11 @@ class experiment(): # Directory management and multiple acquisitions
                MIN_WL_QCL4 <= wl <= MAX_WL_QCL4]:
                 wlList_um.append(wl)
         stepNumber = len(wlList_um)
+        print(wlList_um)
         # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
         data = np.zeros((stepNumber, 4)) # wl, X, Y, R
         print('Scan started ...')
+        GUIInstance.spectrumCanvas.clear_plots()
         GUIInstance.repaint()
         startRun = timer()
         step = 0
@@ -279,18 +285,33 @@ class experiment(): # Directory management and multiple acquisitions
               % (sampleNumber, sampleRate))
         for step in range(0, stepNumber): # First step at initial pos
             startStep = timer()
+            # Check if "Stop" has been pressed
             if GUIInstance.btn['Stop'][0].isChecked(): # Stop if button pressed
                 scanInterrupted = True
             if scanInterrupted:
                 break
-            voltages = self.pci.get_voltages(sampleNumber, sampleRate)
+            # Select QCL
             wavelength = wlList_um[step]
             data[step, 0] = wavelength
+            if MIN_WL_QCL1 <= wavelength <= MAX_WL_QCL1:
+                GUIInstance.qcl(1)
+            elif MIN_WL_QCL2 <= wavelength <= MAX_WL_QCL2:
+                GUIInstance.qcl(2)
+            elif MIN_WL_QCL3 <= wavelength <= MAX_WL_QCL3:
+                GUIInstance.qcl(3)
+            elif MIN_WL_QCL4 <= wavelength <= MAX_WL_QCL4:
+                GUIInstance.qcl(4)
+            else:
+                print('Invalid vavelength: {:.3f}'.format(wavelength))
+                continue
+            # Tune to wavelength
+            GUIInstance.tune_fast(wavelength)
+            voltages = self.pci.get_voltages(sampleNumber, sampleRate)
             data[step, 1] = voltages[0] # Lock-in X
             data[step, 2] = voltages[1] # Lock-in Y
             data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +
                                      np.power(data[step, 2], 2))) # Lock-in R
-            GUIInstance.spectrumCanvas.plot_line(data[:step+1, 1],
+            GUIInstance.spectrumCanvas.plot_line(data[:step+1, 0],
                                                  data[:step+1, 3])
             print('Step {:.0f} ({:.1f} um): {:.3f} s'.format(step, wavelength,
                                                         (timer()-startStep)))
@@ -306,7 +327,7 @@ class experiment(): # Directory management and multiple acquisitions
         # Return stdout to terminal
         sys.stdout = original
         # Save data as text file
-        np.savetxt('_wl-um_x-v_y-v_r-v.txt'.format(currentFolder), data)
+        np.savetxt('{}_wl-um_x-v_y-v_r-v.txt'.format(currentFolder), data)
         GUIInstance.setUpdatesEnabled(True)
         GUIInstance.repaint()
         GUIInstance.grab().save('screenshot.png', 'png')
@@ -340,8 +361,8 @@ class mainWindow(QMainWindow):
 
     def __init__(self):
         startupDialog = laserStartupDialog() # Closes when startup finishes
-        # self.laser = laser()
-        self.laser = [] # Debugging, UI will load immediately, laser won't work.
+        self.laser = laser()
+        # self.laser = [] # Debugging, UI will load immediately, laser won't work.
         self.pci = pci_input()
         super().__init__()
         self.make_gui()
@@ -664,6 +685,10 @@ class mainWindow(QMainWindow):
         self.btn['Tune'][0].setChecked(False)
         self.lock_controls(lock=False)
 
+    def tune_fast(self, targetWl):
+        '''Versionm of "tune" with less overhead. Use carefully.'''
+        self.laser.tune(self.activeQcl, targetWl)
+
     def update_qcl_reading(self, qcl):
         '''Reads and displays QCL "qcl" temperature, current, and wavelength.'''
         qclCurrent = self.laser.get_current(qcl)
@@ -686,6 +711,11 @@ class mplCanvas(FigCanvas):
         self.axes = self.figure.add_subplot(1, 1, 1)
         self.images = [] # Stores images plotted with "imshow"
         self.plots = [] # Stores lines plotted with "plot"
+
+    def clear_plots(self):
+        for pl in self.plots:
+            pl.remove()
+            self.plots = [] # Re-initialize list
 
     def plot_image(self, Z, colormap=DEFAULT_COLORMAP, zLim=[0, 1]):
         '''Call imshow to plot data'''

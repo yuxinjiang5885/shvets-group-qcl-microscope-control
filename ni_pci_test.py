@@ -26,7 +26,7 @@ class pci_input():
         self.multipleAI.configure(sampleNumber, sampleRate)
         voltages = self.multipleAI.readAllChannels(sampleNumber)
         self.multipleAI.clearTask()
-        return  voltages
+        return voltages
 
     def get_voltages(self, sampleNumber, sampleRate): # Collect and average
         daqVoltages = self.collect(sampleNumber, sampleRate)
