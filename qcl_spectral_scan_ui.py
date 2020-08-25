@@ -264,19 +264,20 @@ class experiment(): # Directory management and multiple acquisitions
         # sys.stdout = logFile
         # Write list of wavelengths, excuding ranges not covered by the QCLs
         wlRange_um = np.arange(wlStart_um, wlEnd_um + wlStep_um, wlStep_um)
-        wlList_um = []
-        for wl in wlRange_um:
-            if [MIN_WL_QCL1 <= wl <= MAX_WL_QCL1 or
+        wlList_um = np.zeros(len(wlRange_um))
+        for wli, wl in enumerate(wlRange_um):
+            if (MIN_WL_QCL1 <= wl <= MAX_WL_QCL1 or
                MIN_WL_QCL2 <= wl <= MAX_WL_QCL2 or
                MIN_WL_QCL3 <= wl <= MAX_WL_QCL3 or
-               MIN_WL_QCL4 <= wl <= MAX_WL_QCL4]:
-                wlList_um.append(wl)
+               MIN_WL_QCL4 <= wl <= MAX_WL_QCL4):
+                wlList_um[wli] = wl
+        wlList_um = wlList_um[wlList_um != 0]
         stepNumber = len(wlList_um)
-        print(wlList_um)
         # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
         data = np.zeros((stepNumber, 4)) # wl, X, Y, R
         print('Scan started ...')
         GUIInstance.spectrumCanvas.clear_plots()
+        GUIInstance.spectrumCanvas.axes.set_xlim(wlList_um[0], wlList_um[-1])
         GUIInstance.repaint()
         startRun = timer()
         step = 0
@@ -294,13 +295,13 @@ class experiment(): # Directory management and multiple acquisitions
             wavelength = wlList_um[step]
             data[step, 0] = wavelength
             if MIN_WL_QCL1 <= wavelength <= MAX_WL_QCL1:
-                GUIInstance.qcl(1)
+                GUIInstance.qcl_fast(1)
             elif MIN_WL_QCL2 <= wavelength <= MAX_WL_QCL2:
-                GUIInstance.qcl(2)
+                GUIInstance.qcl_fast(2)
             elif MIN_WL_QCL3 <= wavelength <= MAX_WL_QCL3:
-                GUIInstance.qcl(3)
+                GUIInstance.qcl_fast(3)
             elif MIN_WL_QCL4 <= wavelength <= MAX_WL_QCL4:
-                GUIInstance.qcl(4)
+                GUIInstance.qcl_fast(4)
             else:
                 print('Invalid vavelength: {:.3f}'.format(wavelength))
                 continue
@@ -311,11 +312,11 @@ class experiment(): # Directory management and multiple acquisitions
             data[step, 2] = voltages[1] # Lock-in Y
             data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +
                                      np.power(data[step, 2], 2))) # Lock-in R
+            GUIInstance.spectrumCanvas.flush_events()
             GUIInstance.spectrumCanvas.plot_line(data[:step+1, 0],
                                                  data[:step+1, 3])
             print('Step {:.0f} ({:.1f} um): {:.3f} s'.format(step, wavelength,
                                                         (timer()-startStep)))
-            GUIInstance.setUpdatesEnabled(True)
             GUIInstance.repaint()
         end = timer()
         if scanInterrupted:
@@ -328,6 +329,9 @@ class experiment(): # Directory management and multiple acquisitions
         sys.stdout = original
         # Save data as text file
         np.savetxt('{}_wl-um_x-v_y-v_r-v.txt'.format(currentFolder), data)
+        # Update QCL interface readings
+        GUIInstance.qcl(GUIInstance.activeQcl)
+        GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
         GUIInstance.setUpdatesEnabled(True)
         GUIInstance.repaint()
         GUIInstance.grab().save('screenshot.png', 'png')
@@ -504,6 +508,8 @@ class mainWindow(QMainWindow):
         # Make plot window
         self.spectrumCanvas = mplCanvas(width=12, height=4)
         self.spectrumCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
+        self.spectrumCanvas.axes.set_ylabel('Lock-in Mag. (V)')
         self.grid.addWidget(self.spectrumCanvas, 0, 0, 1, 11)
         # Buttons: select QCL, laser arm, tune, enable emission
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
@@ -635,6 +641,10 @@ class mainWindow(QMainWindow):
                 self.qcl_style(qclNo, False)
         self.lock_controls(lock=False)
 
+    def qcl_fast(self, qclSelectNo):
+        '''Version of "qcl" with less overhead. Use with caution.'''
+        self.activeQcl = qclSelectNo
+
     def qcl_style(self, qclNo, selected):
         '''Apply style to QCL button and related controls.'''
         qclNoStr = 'QCL{:.0f}'.format(qclNo)
@@ -686,7 +696,7 @@ class mainWindow(QMainWindow):
         self.lock_controls(lock=False)
 
     def tune_fast(self, targetWl):
-        '''Versionm of "tune" with less overhead. Use carefully.'''
+        '''Version of "tune" with less overhead. Use with caution.'''
         self.laser.tune(self.activeQcl, targetWl)
 
     def update_qcl_reading(self, qcl):
