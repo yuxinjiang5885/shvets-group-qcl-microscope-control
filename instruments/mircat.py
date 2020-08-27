@@ -222,7 +222,7 @@ class laser():
            Refer to MIRcat SDK documentation for details of the variables'''
         # Send sweep command
         wlUnit = MIRcatSDK_UNITS_MICRONS
-        SDK.MIRcatSDK_StartSweepScan(c_float(wl_start+_um),
+        SDK.MIRcatSDK_StartSweepScan(c_float(wl_start_um),
                                      c_float(wl_end_um),
                                      c_float(wl_step_um),
                                      wlUnit, c_uint16(1), c_bool(True), c_uint8(1))
