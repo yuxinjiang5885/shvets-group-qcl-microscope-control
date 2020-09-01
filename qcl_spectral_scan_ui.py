@@ -93,7 +93,7 @@ MAX_CURR_QCL4 = 950 # mA
 MAX_WL_QCL1 = 6.04 # um
 MAX_WL_QCL2 = 7.16 # um
 MAX_WL_QCL3 = 7.69 # um
-MAX_WL_QCL4 = 9.70 # um
+MAX_WL_QCL4 = 11.3 # um
 NUMBER_OF_QCLS = 4
 
 # NI PCIe card sampling default parameters
@@ -223,6 +223,11 @@ class experiment(): # Directory management and multiple acquisitions
         # Set up multiple acquisitions
         # if GUIElements['stop'].isChecked():
         #     break
+        # If in auto-enable mode, disable emission here
+        if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
+            print('Scan auto-enable mode active: disabling emission.')
+            GUIInstance.btn['Emission'][0].setChecked(False)
+            GUIInstance.emission()
         # Create individual experiment folder
         workDir = DEF_DATA_DIRECTORY
         os.chdir(workDir)
@@ -307,6 +312,10 @@ class experiment(): # Directory management and multiple acquisitions
                 continue
             # Tune to wavelength
             GUIInstance.tune_fast(wavelength)
+            if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
+                # In auto-enable mode, turn on for every wavelength
+                GUIInstance.btn['Emission'][0].setChecked(True)
+                GUIInstance.emission()
             voltages = self.pci.get_voltages(sampleNumber, sampleRate)
             data[step, 1] = voltages[0] # Lock-in X
             data[step, 2] = voltages[1] # Lock-in Y
@@ -317,6 +326,10 @@ class experiment(): # Directory management and multiple acquisitions
                                                  data[:step+1, 3])
             print('Step {:.0f} ({:.1f} um): {:.3f} s'.format(step, wavelength,
                                                         (timer()-startStep)))
+            if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
+                # In auto-enable mode, turn off for every wavelength
+                GUIInstance.btn['Emission'][0].setChecked(False)
+                GUIInstance.emission()
             GUIInstance.repaint()
         end = timer()
         if scanInterrupted:
@@ -520,6 +533,7 @@ class mainWindow(QMainWindow):
         self.btn['Tune'] = [QPushButton('Tune'), 4, 7, 2, 1]
         self.btn['Arm'] = [QPushButton('Arm'), 2, 7, 2, 1]
         self.btn['Emission'] = [QPushButton('Enable'), 6, 7, 2, 1]
+        self.btn['ScanAutoEnable'] = [QPushButton('Scan\nAuto-Enable'), 8, 7, 2, 1]
         # Buttons: start scan, stop scan
         self.btn['Start'] = [QPushButton('Start'), 10, 8, 2, 1]
         self.btn['Stop'] = [QPushButton('Stop'), 10, 9, 2, 1]
