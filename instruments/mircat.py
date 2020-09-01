@@ -22,7 +22,7 @@ if mDir not in sys.path:
 mSubdir = realpath(abspath(join(split(getfile(currentframe()))[0],'daylight')))
 if mSubdir not in sys.path:
     sys.path.append(mSubdir)
-from daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_MICRONS
+from daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_CM1, MIRcatSDK_UNITS_MICRONS
 from daylight.MIRcatSDKHelpers import ArmAndWaitForTemp
 # Import Daylight's MIRcat DLL
 SDK_NAME = 'MIRcatSDK.dll'
@@ -255,17 +255,26 @@ class laser():
         print('Sweep complete.')
 
 
-    def tune(self, qcl, wl_um):
-        '''Tune QCL "qcl" wavelength to "wl_um", in um.
+    def tune(self, qcl, wl, wlUnits='um'):
+        '''Tune QCL "qcl" wavelength to "wl", in units "wlUnits".
            Does not check for wavelength validity.
            Refer to MIRcat SDK documentation for details of the variables'''
         # Check QCL validity
         if qcl < 1 or qcl > self.numQcls.value:
             print('QCL {} invalid (choose 1--{}).'.format(qcl, self.numQcls))
             return
-        # Send tune command
-        wlUnit = MIRcatSDK_UNITS_MICRONS
-        SDK.MIRcatSDK_TuneToWW(c_float(wl_um), wlUnit, c_uint8(qcl))
+        # Set wavelength unit
+        if wlUnits in ['um']:
+            sdkWlUnits = MIRcatSDK_UNITS_MICRONS
+            unitString = 'μm'
+        elif wlUnits in ['invcm']:
+            sdkWlUnits = MIRcatSDK_UNITS_CM1
+            unitString = 'cm⁻¹'
+        else:
+            sdkWlUnits = MIRcatSDK_UNITS_MICRONS
+            unitString = 'μm'
+            # Send tune command
+        SDK.MIRcatSDK_TuneToWW(c_float(wl), sdkWlUnits, c_uint8(qcl))
         # Check tune setting
         wlTune = c_float()
         units = c_uint8()
@@ -283,6 +292,6 @@ class laser():
         print() # clear line
         # Read tuned wavelength
         wlRead = self.get_wavelength()
-        print('Tuned QCL {} to {:.3f} um.'.format(qclTune.value, wlRead))
+        print('Tuned QCL {} to {:.3f} {}.'.format(qclTune.value, wlRead, unitString))
 
 

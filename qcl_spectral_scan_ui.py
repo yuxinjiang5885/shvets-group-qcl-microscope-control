@@ -80,21 +80,46 @@ DEFAULT_COLORMAP = plt.cm.Spectral # Default colormap
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
 
 # MIRcat default parameters
-DEF_PULSERATE = 100 # kHz
-DEF_PULSEWIDTH = 500 # ns
-MIN_WL_QCL1 = 5.12 # um
-MIN_WL_QCL2 = 5.85 # um
-MIN_WL_QCL3 = 6.83 # um
-MIN_WL_QCL4 = 8.20 # um
-MAX_CURR_QCL1 = 450 # mA
-MAX_CURR_QCL2 = 825 # mA
-MAX_CURR_QCL3 = 575 # mA
-MAX_CURR_QCL4 = 950 # mA
-MAX_WL_QCL1 = 6.04 # um
-MAX_WL_QCL2 = 7.16 # um
-MAX_WL_QCL3 = 7.69 # um
-MAX_WL_QCL4 = 11.3 # um
+DEF_PULSERATE_HZ = 100 # kHz
+DEF_PULSEWIDTH_NS = 500 # ns
+MIN_WL_QCL1_INVCM = 1953.1 # cm^-1
+MIN_WL_QCL2_INVCM = 1709.4 # cm^-1
+MIN_WL_QCL3_INVCM = 1464.1 # cm^-1
+MIN_WL_QCL4_INVCM = 1219.5 # cm^-1
+MIN_WL_QCL1_UM = 5.12 # um
+MIN_WL_QCL2_UM = 5.85 # um
+MIN_WL_QCL3_UM = 6.83 # um
+MIN_WL_QCL4_UM = 8.20 # um
+MAX_CURR_QCL1_MILLIAMP = 450 # mA
+MAX_CURR_QCL2_MILLIAMP = 825 # mA
+MAX_CURR_QCL3_MILLIAMP = 575 # mA
+MAX_CURR_QCL4_MILLIAMP = 950 # mA
+MAX_WL_QCL1_INVCM = 1655.6 # cm^-1
+MAX_WL_QCL2_INVCM = 1396.6 # cm^-1
+MAX_WL_QCL3_INVCM = 1300.4 # cm^-1
+MAX_WL_QCL4_INVCM = 885.0 # cm^-1
+MAX_WL_QCL1_UM = 6.04 # um
+MAX_WL_QCL2_UM = 7.16 # um
+MAX_WL_QCL3_UM = 7.69 # um
+MAX_WL_QCL4_UM = 11.3 # um
 NUMBER_OF_QCLS = 4
+WL_MAXIMUMS_INVCM = [MAX_WL_QCL1_INVCM,
+                     MAX_WL_QCL2_INVCM,
+                     MAX_WL_QCL3_INVCM,
+                     MAX_WL_QCL4_INVCM]
+WL_MAXIMUMS_UM = [MAX_WL_QCL1_UM,
+                  MAX_WL_QCL2_UM,
+                  MAX_WL_QCL3_UM,
+                  MAX_WL_QCL4_UM]
+WL_MINIMUMS_INVCM = [MIN_WL_QCL1_INVCM,
+                     MIN_WL_QCL2_INVCM,
+                     MIN_WL_QCL3_INVCM,
+                     MIN_WL_QCL4_INVCM]
+WL_MINIMUMS_UM = [MIN_WL_QCL1_UM,
+                  MIN_WL_QCL2_UM,
+                  MIN_WL_QCL3_UM,
+                  MIN_WL_QCL4_UM]
+
 
 # NI PCIe card sampling default parameters
 DEF_SAMPLERATE = 1000 # Hz
@@ -159,6 +184,30 @@ STYLE_BUTTON = '''QPushButton {{
                  GS_COLORS['text-alt'],
                  GS_COLORS['hover'],
                  GS_COLORS['hover-alt'])
+STYLE_UNITBUTTON = '''QPushButton {{
+        background-color: {};
+        border: 2px solid {};
+        border-radius: 5px;
+        color: {};
+    }}
+    QPushButton:checked {{
+        background-color: {};
+        border: 2px solid {};
+        color: {};
+    }}
+    QPushButton:hover {{
+        background-color: {};
+    }}
+    QPushButton:checked:hover {{
+        background-color: {};
+    }}'''.format(GS_COLORS['background'],
+                 GS_COLORS['border'],
+                 GS_COLORS['text'],
+                 GS_COLORS['background'],
+                 GS_COLORS['border'],
+                 GS_COLORS['text'],
+                 GS_COLORS['hover'],
+                 GS_COLORS['hover'])
 STYLE_CONTAINER = '''QWidget {{
         background-color: {};
     }}'''.format(GS_COLORS['background'])
@@ -205,20 +254,39 @@ class experiment(): # Directory management and multiple acquisitions
     def start(self, GUIInstance):
         '''Handle experiment data directory, call scanning routine.'''
         # Check inputs
-        wlStart_um = float(GUIInstance.inputField['WlStart'][0].text())
-        wlEnd_um = float(GUIInstance.inputField['WlEnd'][0].text())
-        if wlStart_um >= wlEnd_um:
-            print('The first scan wavelength must be smaller than the last.')
-            GUIInstance.btn['Start'][0].setChecked(False)
-            return
-        if wlStart_um < MIN_WL_QCL1 or wlEnd_um > MAX_WL_QCL4:
-            print('Scan range must be within {} and {} μm.'.format(MIN_WL_QCL1,
-                                                                   MAX_WL_QCL4))
+        if GUIInstance.wlUnits == 'um':
+            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
+            if wlStart >= wlEnd:
+                print('The first scan wavelength must be smaller than the last.')
+                GUIInstance.btn['Start'][0].setChecked(False)
+                return
+            if wlStart < MIN_WL_QCL1_UM or wlEnd > MAX_WL_QCL4_UM:
+                print('Scan range must be between {} and {} μm.'.format(MIN_WL_QCL1_UM,
+                                                                    MAX_WL_QCL4_UM))
+                GUIInstance.btn['Start'][0].setChecked(False)
+                return
+        elif GUIInstance.wlUnits == 'invcm':
+            GUIInstance.spectrumCanvas.axes.invert_xaxis()
+            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
+            if wlStart <= wlEnd:
+                print('The first scan wavelength must be smaller than the last.')
+                GUIInstance.btn['Start'][0].setChecked(False)
+                return
+            if wlStart > MIN_WL_QCL1_INVCM or wlEnd < MAX_WL_QCL4_INVCM:
+                print('Scan range must be between {} and {} μm.'.format(MIN_WL_QCL1_INVCM,
+                                                                    MAX_WL_QCL4_INVCM))
+                GUIInstance.btn['Start'][0].setChecked(False)
+                return
+        else:
+            print('Invalid wavelength unit.')
             GUIInstance.btn['Start'][0].setChecked(False)
             return
         # Make sure laser is armed
         if not GUIInstance.btn['Arm'][0].isChecked():
             print('Laser is not armed.')
+            GUIInstance.btn['Start'][0].setChecked(False)
             return
         # Set up multiple acquisitions
         # if GUIElements['stop'].isChecked():
@@ -255,9 +323,13 @@ class experiment(): # Directory management and multiple acquisitions
         # Get parameters from UI
         sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
         sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
-        wlStart_um = float(GUIInstance.inputField['WlStart'][0].text())
-        wlEnd_um = float(GUIInstance.inputField['WlEnd'][0].text())
-        wlStep_um = float(GUIInstance.inputField['WlStep'][0].text())
+        if GUIInstance.wlUnits == 'um':
+            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
+        if GUIInstance.wlUnits == 'invcm':
+            wlStart = float(GUIInstance.inputField['WlEnd'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlStart'][0].text())
+        wlStep = float(GUIInstance.inputField['WlStep'][0].text())
         if platform.system() == 'Windows':
             currentDirSplit = currentDir.split('\\')
         else:
@@ -268,21 +340,28 @@ class experiment(): # Directory management and multiple acquisitions
         logFile = open('%s.log' % (currentFolder), 'w')
         # sys.stdout = logFile
         # Write list of wavelengths, excuding ranges not covered by the QCLs
-        wlRange_um = np.arange(wlStart_um, wlEnd_um + wlStep_um, wlStep_um)
-        wlList_um = np.zeros(len(wlRange_um))
-        for wli, wl in enumerate(wlRange_um):
-            if (MIN_WL_QCL1 <= wl <= MAX_WL_QCL1 or
-               MIN_WL_QCL2 <= wl <= MAX_WL_QCL2 or
-               MIN_WL_QCL3 <= wl <= MAX_WL_QCL3 or
-               MIN_WL_QCL4 <= wl <= MAX_WL_QCL4):
-                wlList_um[wli] = wl
-        wlList_um = wlList_um[wlList_um != 0]
-        stepNumber = len(wlList_um)
+        wlRange = np.arange(wlStart, wlEnd + wlStep, wlStep)
+        wlList = np.zeros(len(wlRange))
+        print(wlRange)
+        if GUIInstance.wlUnits == 'um':
+            minQclWl = WL_MINIMUMS_UM
+            maxQclWl = WL_MAXIMUMS_UM
+        elif GUIInstance.wlUnits == 'invcm': # Inverted, for compatibility in code
+            minQclWl = WL_MAXIMUMS_INVCM
+            maxQclWl = WL_MINIMUMS_INVCM
+        for wli, wl in enumerate(wlRange):
+            if (minQclWl[0] <= wl <= maxQclWl[0] or
+                minQclWl[1] <= wl <= maxQclWl[1] or
+                minQclWl[2] <= wl <= maxQclWl[2] or
+                minQclWl[3] <= wl <= maxQclWl[3]):
+                wlList[wli] = wl
+        wlList = wlList[wlList != 0]
+        stepNumber = len(wlList)
         # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
         data = np.zeros((stepNumber, 4)) # wl, X, Y, R
         print('Scan started ...')
         GUIInstance.spectrumCanvas.clear_plots()
-        GUIInstance.spectrumCanvas.axes.set_xlim(wlList_um[0], wlList_um[-1])
+        GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
         GUIInstance.repaint()
         startRun = timer()
         step = 0
@@ -297,15 +376,15 @@ class experiment(): # Directory management and multiple acquisitions
             if scanInterrupted:
                 break
             # Select QCL
-            wavelength = wlList_um[step]
+            wavelength = wlList[step]
             data[step, 0] = wavelength
-            if MIN_WL_QCL1 <= wavelength <= MAX_WL_QCL1:
+            if minQclWl[0] <= wavelength <= maxQclWl[0]:
                 GUIInstance.qcl_fast(1)
-            elif MIN_WL_QCL2 <= wavelength <= MAX_WL_QCL2:
+            elif minQclWl[1] <= wavelength <= maxQclWl[1]:
                 GUIInstance.qcl_fast(2)
-            elif MIN_WL_QCL3 <= wavelength <= MAX_WL_QCL3:
+            elif minQclWl[2] <= wavelength <= maxQclWl[2]:
                 GUIInstance.qcl_fast(3)
-            elif MIN_WL_QCL4 <= wavelength <= MAX_WL_QCL4:
+            elif minQclWl[3] <= wavelength <= maxQclWl[3]:
                 GUIInstance.qcl_fast(4)
             else:
                 print('Invalid vavelength: {:.3f}'.format(wavelength))
@@ -379,6 +458,7 @@ class mainWindow(QMainWindow):
     def __init__(self):
         startupDialog = laserStartupDialog() # Closes when startup finishes
         self.laser = laser()
+        self.wlUnits = 'um' # Wavelength units
         # self.laser = [] # Debugging, UI will load immediately, laser won't work.
         self.pci = pci_input()
         super().__init__()
@@ -511,13 +591,15 @@ class mainWindow(QMainWindow):
                 self.grid.setRowStretch(row, 8)
             else:
                 self.grid.setRowStretch(row, 1)
-        for col in range(0, 12): # Set column spacing
-            if col in [2, 4, 6]:
+        for col in range(0, 11): # Set column spacing
+            if col in [1, 3, 5]: # QCL settings
+                self.grid.setColumnStretch(col, 2)
+            if col in [2, 4, 6]: # Scl setting labels
                 self.grid.setColumnStretch(col, 1)
             # elif col in [3]:
             #     self.grid.setColumnStretch(col, 4)
             else:
-                self.grid.setColumnStretch(col, 10)
+                self.grid.setColumnStretch(col, 20)
         # Make plot window
         self.spectrumCanvas = mplCanvas(width=12, height=4)
         self.spectrumCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -530,6 +612,7 @@ class mainWindow(QMainWindow):
         self.btn['QCL2'] = [QPushButton('QCL 2 Off'), 4, 0, 2, 1]
         self.btn['QCL3'] = [QPushButton('QCL 3 Off'), 6, 0, 2, 1]
         self.btn['QCL4'] = [QPushButton('QCL 4 Off'), 8, 0, 2, 1]
+        self.btn['WlUnits'] = [QPushButton('Units: μm'), 10, 5, 2, 1]
         self.btn['Tune'] = [QPushButton('Tune'), 4, 7, 2, 1]
         self.btn['Arm'] = [QPushButton('Arm'), 2, 7, 2, 1]
         self.btn['Emission'] = [QPushButton('Enable'), 6, 7, 2, 1]
@@ -544,15 +627,17 @@ class mainWindow(QMainWindow):
             k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             if x in ['QCL1', 'QCL2', 'QCL3', 'QCL4']:
                 k[0].setStyleSheet(STYLE_BUTTON)
+            elif x in ['WlUnits']:
+                k[0].setStyleSheet(STYLE_UNITBUTTON)
             else:
                 k[0].setStyleSheet(STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Input fields: current, current percentage, wavelength
         paramStrings = ['SetCurrent', 'SetCurrPc', 'SetWl']
         self.inputField = dict() # to collect all input fields
-        startupText = [MAX_CURR_QCL1, MAX_CURR_QCL2, MAX_CURR_QCL3,
-                       MAX_CURR_QCL4, 100, 100, 100, 100, MIN_WL_QCL1,
-                       MIN_WL_QCL2, MIN_WL_QCL3, MIN_WL_QCL4]
+        startupText = [MAX_CURR_QCL1_MILLIAMP, MAX_CURR_QCL2_MILLIAMP, MAX_CURR_QCL3_MILLIAMP,
+                       MAX_CURR_QCL4_MILLIAMP, 100, 100, 100, 100, MIN_WL_QCL1_UM,
+                       MIN_WL_QCL2_UM, MIN_WL_QCL3_UM, MIN_WL_QCL4_UM]
         startupFormat = ['{:.0f}', '{:.0f}', '{:.2f}'] # Current, %, wavelength
         for param in range(0, len(paramStrings)):
             for qcl in range(1, NUMBER_OF_QCLS + 1):
@@ -618,8 +703,8 @@ class mainWindow(QMainWindow):
             self.labelInstr[labelString].setFont(font)
             self.labelInstr[labelString].setStyleSheet(STYLE_LABEL_READ)
             self.grid.addWidget(self.labelInstr[labelString], 2*qcl+1, 5, 1, 2)
-        # Labels: units
-        unitLabelStrings = ['mA    ', '%     ', 'μm    ']
+        # Labels: current controls
+        unitLabelStrings = ['mA    ', '%     ']
         for label in range(0, len(unitLabelStrings)):
             col = label * 2 + 2 # odd columns starting at 2 (the third)
             for row in range(2, 9, 2): # every other row
@@ -627,6 +712,13 @@ class mainWindow(QMainWindow):
                 labelObject.setFont(font)
                 labelObject.setStyleSheet(STYLE_LABEL_UNIT)
                 self.grid.addWidget(labelObject, row, col, 1, 1)
+        # Labels: wavelength units
+        for qcl in range(1, NUMBER_OF_QCLS + 1):
+            labelString = 'QCL{:d}WlUnit'.format(qcl)
+            self.labelInstr[labelString] = QLabel('μm    ')
+            self.labelInstr[labelString].setFont(font)
+            self.labelInstr[labelString].setStyleSheet(STYLE_LABEL_UNIT)
+            self.grid.addWidget(self.labelInstr[labelString], 2*qcl, 6, 1, 1)
         # Compile relevant GUI elements to pass to other classes
         # GUIElem['expNo'] = outfld['ExpCur'][0]
         # GUIElem['expStepTot'] = outfld['ExpTotSteps'][0]
@@ -635,6 +727,7 @@ class mainWindow(QMainWindow):
         self.btn['QCL2'][0].clicked.connect(lambda: self.qcl(2))
         self.btn['QCL3'][0].clicked.connect(lambda: self.qcl(3))
         self.btn['QCL4'][0].clicked.connect(lambda: self.qcl(4))
+        self.btn['WlUnits'][0].clicked.connect(lambda: self.wl_units())
         self.btn['Arm'][0].clicked.connect(lambda: self.arm())
         self.btn['Emission'][0].clicked.connect(lambda: self.emission())
         self.btn['Tune'][0].clicked.connect(lambda: self.tune())
@@ -702,7 +795,7 @@ class mainWindow(QMainWindow):
             qclNoStrSetWl = 'QCL{:.0f}SetWl'.format(self.activeQcl)
             self.btn['Tune'][0].setText('Tuning ...')
             targetWl = float(self.inputField[qclNoStrSetWl][0].text())
-            self.laser.tune(self.activeQcl, targetWl)
+            self.laser.tune(self.activeQcl, targetWl, self.wlUnits)
             self.update_qcl_reading(self.activeQcl)
             self.btn['Tune'][0].setText('Tune')
             self.statusbar.showMessage('Ready')
@@ -711,20 +804,108 @@ class mainWindow(QMainWindow):
 
     def tune_fast(self, targetWl):
         '''Version of "tune" with less overhead. Use with caution.'''
-        self.laser.tune(self.activeQcl, targetWl)
+        self.laser.tune(self.activeQcl, targetWl, self.wlUnits)
 
     def update_qcl_reading(self, qcl):
-        '''Reads and displays QCL "qcl" temperature, current, and wavelength.'''
+        '''Read and display QCL "qcl" temperature, current, and wavelength.'''
+        if self.wlUnits=='um':
+            unitString = 'μm'
+        elif self.wlUnits=='invcm':
+            unitString = 'cm⁻¹'
+        else:
+            unitString = ''
         qclCurrent = self.laser.get_current(qcl)
         tecTemp = self.laser.get_temperature(qcl)
         labelString = 'QCL{:d}Current'.format(qcl)
         labelText = '{:.2f}°C, {:d} mA'.format(tecTemp, qclCurrent)
         self.labelInstr[labelString].setText(labelText)
         qclWl = self.laser.get_wavelength()
-        labelText = '{:.2f} um'.format(qclWl)
+        labelText = '{:.2f} {}'.format(qclWl, unitString)
         labelString = 'QCL{:d}Wavelength'.format(qcl)
         self.labelInstr[labelString].setText(labelText)
 
+    def wl_converter(self, wavelength, unit, qcl=[]):
+        '''Convert "wavelength" to "unit", check it is within "qcl" limits'''
+        # Convert um to cm^-1
+        if unit in ['invcm']:
+            convertedWl_invcm = 1/(wavelength*1E-4)
+            # Check that converted wavelength is within QCL bounds
+            if not qcl:
+                outWl = convertedWl_invcm
+            else:
+                if convertedWl_invcm > WL_MINIMUMS_INVCM[qcl-1]:
+                    outWl = WL_MINIMUMS_INVCM[qcl-1]
+                elif convertedWl_invcm < WL_MAXIMUMS_INVCM[qcl-1]:
+                    outWl = WL_MAXIMUMS_INVCM[qcl-1]
+                else:
+                    outWl = convertedWl_invcm
+        # Convert cm^-1 to um
+        if unit in ['um']:
+            convertedWl_um = 1E4/wavelength
+            # Check that converted wavelength is within QCL bounds
+            if not qcl:
+                outWl = convertedWl_um
+            else:
+                if convertedWl_um < WL_MINIMUMS_UM[qcl-1]:
+                    outWl = WL_MINIMUMS_UM[qcl-1]
+                elif convertedWl_um > WL_MAXIMUMS_UM[qcl-1]:
+                    outWl = WL_MAXIMUMS_UM[qcl-1]
+                else:
+                    outWl = convertedWl_um
+        return outWl
+
+    def wl_units(self):
+        '''Change wavelength units.'''
+        # Uncheck
+        if self.btn['WlUnits'][0].isChecked:
+            self.btn['WlUnits'][0].setChecked(False)
+        # Switch units from um to cm^-1
+        if self.wlUnits == 'um':
+            self.wlUnits = 'invcm'
+            self.btn['WlUnits'][0].setText('Units: cm⁻¹')
+            # Relabel QCL fields
+            for qcl in range(1, NUMBER_OF_QCLS + 1):
+                labelString = 'QCL{:d}WlUnit'.format(qcl)
+                self.labelInstr[labelString].setText('cm⁻¹  ')
+                inputFieldString = 'QCL{}SetWl'.format(qcl)
+                currentWl = float(self.inputField[inputFieldString][0].text())
+                convertedWl = self.wl_converter(currentWl, 'invcm', qcl)
+                wlString = '{:.1f}'.format(convertedWl)
+                self.inputField[inputFieldString][0].setText(wlString)
+            # Relabel scan settings
+            self.labelSubHead['WlStart'][0].setText('Wl. Start (cm⁻¹)')
+            self.labelSubHead['WlEnd'][0].setText('Wl. End (cm⁻¹)')
+            self.labelSubHead['WlStep'][0].setText('Wl. Step (cm⁻¹)')
+            for wlLabel in ['WlStart', 'WlEnd']:
+                currentWl = float(self.inputField[wlLabel][0].text())
+                convertedWl = self.wl_converter(currentWl, 'invcm', qcl=[])
+                wlString = '{:.1f}'.format(convertedWl)
+                self.inputField[wlLabel][0].setText(wlString)
+            # Can't unambiguously convert step
+            self.inputField['WlStep'][0].setText('0.1')
+        # Switch units from cm^-1 to um
+        elif self.wlUnits == 'invcm':
+            self.wlUnits = 'um'
+            self.btn['WlUnits'][0].setText('Units: μm')
+            for qcl in range(1, NUMBER_OF_QCLS + 1):
+                labelString = 'QCL{:d}WlUnit'.format(qcl)
+                self.labelInstr[labelString].setText('μm    ')
+                inputFieldString = 'QCL{}SetWl'.format(qcl)
+                currentWl = float(self.inputField[inputFieldString][0].text())
+                convertedWl = self.wl_converter(currentWl, 'um', qcl)
+                wlString = '{:.2f}'.format(convertedWl)
+                self.inputField[inputFieldString][0].setText(wlString)
+            # Relabel scan settings
+            self.labelSubHead['WlStart'][0].setText('Wl. Start (μm)')
+            self.labelSubHead['WlEnd'][0].setText('Wl. End (μm)')
+            self.labelSubHead['WlStep'][0].setText('Wl. Step (μm)')
+            for wlLabel in ['WlStart', 'WlEnd']:
+                currentWl = float(self.inputField[wlLabel][0].text())
+                convertedWl = self.wl_converter(currentWl, 'um', qcl=[])
+                wlString = '{:.1f}'.format(convertedWl)
+                self.inputField[wlLabel][0].setText(wlString)
+            # Can't unambiguously convert step
+            self.inputField['WlStep'][0].setText('0.1')
 
 class mplCanvas(FigCanvas):
     '''Matplotlib canvas embeddable in QT5.'''
