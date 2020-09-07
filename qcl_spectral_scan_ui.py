@@ -255,6 +255,7 @@ class experiment(): # Directory management and multiple acquisitions
         '''Handle experiment data directory, call scanning routine.'''
         # Check inputs
         if GUIInstance.wlUnits == 'um':
+            wlUnits = 'um'
             wlStart = float(GUIInstance.inputField['WlStart'][0].text())
             wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
             if wlStart >= wlEnd:
@@ -267,7 +268,7 @@ class experiment(): # Directory management and multiple acquisitions
                 GUIInstance.btn['Start'][0].setChecked(False)
                 return
         elif GUIInstance.wlUnits == 'invcm':
-            GUIInstance.spectrumCanvas.axes.invert_xaxis()
+            wlUnits = 'invcm'
             wlStart = float(GUIInstance.inputField['WlStart'][0].text())
             wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
             if wlStart <= wlEnd:
@@ -312,21 +313,21 @@ class experiment(): # Directory management and multiple acquisitions
         os.mkdir(expDir)
         os.chdir(expDir)
         # GUIElements['expNo'].setText('%.0f' % newExpNo)
-        data = self.scan(GUIInstance)
+        data = self.scan(GUIInstance, wlUnits)
         GUIInstance.btn['Start'][0].setChecked(False)
         GUIInstance.btn['Stop'][0].setChecked(False)
         return data
 
-    def scan(self, GUIInstance):
+    def scan(self, GUIInstance, wlUnits='um'):
         '''Scan and logging routine.'''
         currentDir = os.getcwd()
         # Get parameters from UI
         sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
         sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
-        if GUIInstance.wlUnits == 'um':
+        if wlUnits == 'um':
             wlStart = float(GUIInstance.inputField['WlStart'][0].text())
             wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
-        if GUIInstance.wlUnits == 'invcm':
+        if wlUnits == 'invcm':
             wlStart = float(GUIInstance.inputField['WlEnd'][0].text())
             wlEnd = float(GUIInstance.inputField['WlStart'][0].text())
         wlStep = float(GUIInstance.inputField['WlStep'][0].text())
@@ -355,13 +356,19 @@ class experiment(): # Directory management and multiple acquisitions
                 minQclWl[2] <= wl <= maxQclWl[2] or
                 minQclWl[3] <= wl <= maxQclWl[3]):
                 wlList[wli] = wl
-        wlList = wlList[wlList != 0]
+        wlList = wlList[wlList != 0] # Remove zero values
+        if GUIInstance.wlUnits == 'invcm':
+            wlList = np.flip(wlList)
         stepNumber = len(wlList)
         # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
         data = np.zeros((stepNumber, 4)) # wl, X, Y, R
         print('Scan started ...')
         GUIInstance.spectrumCanvas.clear_plots()
         GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
+        # if GUIInstance.wlUnits == 'um':
+        #     GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
+        # elif GUIInstance.wlUnits == 'invcm':
+        #     GUIInstance.spectrumCanvas.axes.set_xlim(wlList[-1], wlList[0])
         GUIInstance.repaint()
         startRun = timer()
         step = 0
@@ -609,17 +616,28 @@ class mainWindow(QMainWindow):
         # Buttons: select QCL, laser arm, tune, enable emission
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['QCL1'] = [QPushButton('QCL 1 Off'), 2, 0, 2, 1]
+        self.btn['QCL1'][0].setToolTip('Select QCL module 1')
         self.btn['QCL2'] = [QPushButton('QCL 2 Off'), 4, 0, 2, 1]
+        self.btn['QCL2'][0].setToolTip('Select QCL module 2')
         self.btn['QCL3'] = [QPushButton('QCL 3 Off'), 6, 0, 2, 1]
+        self.btn['QCL3'][0].setToolTip('Select QCL module 3')
         self.btn['QCL4'] = [QPushButton('QCL 4 Off'), 8, 0, 2, 1]
+        self.btn['QCL4'][0].setToolTip('Select QCL module 4')
         self.btn['WlUnits'] = [QPushButton('Units: μm'), 10, 5, 2, 1]
+        self.btn['WlUnits'][0].setToolTip('Switch wavelength units')
         self.btn['Tune'] = [QPushButton('Tune'), 4, 7, 2, 1]
+        self.btn['Tune'][0].setToolTip('Tune laser to displayed wavelength for selected QCL')
         self.btn['Arm'] = [QPushButton('Arm'), 2, 7, 2, 1]
+        self.btn['Arm'][0].setToolTip('Arm/Disarm laser')
         self.btn['Emission'] = [QPushButton('Enable'), 6, 7, 2, 1]
-        self.btn['ScanAutoEnable'] = [QPushButton('Scan\nAuto-Enable'), 8, 7, 2, 1]
+        self.btn['Emission'][0].setToolTip('Enable/disable laser emission')
+        self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
+        self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
         # Buttons: start scan, stop scan
         self.btn['Start'] = [QPushButton('Start'), 10, 8, 2, 1]
+        self.btn['Start'][0].setToolTip('Start scan')
         self.btn['Stop'] = [QPushButton('Stop'), 10, 9, 2, 1]
+        self.btn['Stop'][0].setToolTip('Stop scan')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
             k[0].setFocusPolicy(Qt.NoFocus)
@@ -648,12 +666,18 @@ class mainWindow(QMainWindow):
                 startupString = '{}'.format(startupFormat[param]).format(
                                                             startupText[itemNo])
                 self.inputField[fieldString] = [QLineEdit(startupString), row, col, 1, 1]
+                self.inputField[fieldString][0].setToolTip('DO NOT USE: set in MIRcatControl')
         # Input fields: experiment controls
         self.inputField['WlStart'] = [QLineEdit('5.4'), 3, 8, 1, 1]
+        self.inputField['WlStart'][0].setToolTip('First scan wavelength')
         self.inputField['WlEnd'] = [QLineEdit('5.8'), 3, 9, 1, 1]
+        self.inputField['WlEnd'][0].setToolTip('Last scan wavelength')
         self.inputField['WlStep'] = [QLineEdit('0.1'), 3, 10, 1, 1]
+        self.inputField['WlStep'][0].setToolTip('Scan wavelength step')
         self.inputField['SamplingRate'] = [QLineEdit('{}'.format(DEF_SAMPLERATE)), 9, 8, 1, 1]
+        self.inputField['SamplingRate'][0].setToolTip('Acquisition card sampling rate')
         self.inputField['SamplesPerWl'] = [QLineEdit('{}'.format(DEF_SAMPLES)), 9, 9, 1, 1]
+        self.inputField['SamplesPerWl'][0].setToolTip('Samples read by acquisition card at every step')
         # Create all input fields
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
@@ -695,6 +719,7 @@ class mainWindow(QMainWindow):
             self.labelInstr[labelString] = QLabel('n/a')
             self.labelInstr[labelString].setFont(font)
             self.labelInstr[labelString].setStyleSheet(STYLE_LABEL_READ)
+            self.labelInstr[labelString].setToolTip('Reading from laser')
             self.grid.addWidget(self.labelInstr[labelString], 2*qcl+1, 1, 1, 4)
         # Labels: read wavelengths (blank at startup)
         for qcl in range(1, NUMBER_OF_QCLS + 1):
@@ -702,6 +727,7 @@ class mainWindow(QMainWindow):
             self.labelInstr[labelString] = QLabel('n/a')
             self.labelInstr[labelString].setFont(font)
             self.labelInstr[labelString].setStyleSheet(STYLE_LABEL_READ)
+            self.labelInstr[labelString].setToolTip('Reading from laser')
             self.grid.addWidget(self.labelInstr[labelString], 2*qcl+1, 5, 1, 2)
         # Labels: current controls
         unitLabelStrings = ['mA    ', '%     ']
@@ -859,6 +885,8 @@ class mainWindow(QMainWindow):
         # Uncheck
         if self.btn['WlUnits'][0].isChecked:
             self.btn['WlUnits'][0].setChecked(False)
+        # Invert plot x axis
+        # self.spectrumCanvas.axes.invert_xaxis()
         # Switch units from um to cm^-1
         if self.wlUnits == 'um':
             self.wlUnits = 'invcm'
@@ -882,7 +910,8 @@ class mainWindow(QMainWindow):
                 wlString = '{:.1f}'.format(convertedWl)
                 self.inputField[wlLabel][0].setText(wlString)
             # Can't unambiguously convert step
-            self.inputField['WlStep'][0].setText('0.1')
+            self.inputField['WlStep'][0].setText('10')
+            self.spectrumCanvas.axes.set_xlabel('Wavelength (cm⁻¹)')
         # Switch units from cm^-1 to um
         elif self.wlUnits == 'invcm':
             self.wlUnits = 'um'
@@ -906,6 +935,8 @@ class mainWindow(QMainWindow):
                 self.inputField[wlLabel][0].setText(wlString)
             # Can't unambiguously convert step
             self.inputField['WlStep'][0].setText('0.1')
+            self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
+
 
 class mplCanvas(FigCanvas):
     '''Matplotlib canvas embeddable in QT5.'''
