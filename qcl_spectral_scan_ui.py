@@ -839,14 +839,19 @@ class mainWindow(QMainWindow):
         elif self.wlUnits=='invcm':
             unitString = 'cm⁻¹'
         else:
-            unitString = ''
+            unitString = '...'
         qclCurrent = self.laser.get_current(qcl)
         tecTemp = self.laser.get_temperature(qcl)
         labelString = 'QCL{:d}Current'.format(qcl)
         labelText = '{:.2f}°C, {:d} mA'.format(tecTemp, qclCurrent)
         self.labelInstr[labelString].setText(labelText)
         qclWl = self.laser.get_wavelength()
-        labelText = '{:.2f} {}'.format(qclWl, unitString)
+        if self.wlUnits=='um':
+            labelText = '{:.2f} {}'.format(qclWl, unitString)
+        elif self.wlUnits=='invcm':
+            if qclWl > 0:
+                qclWl = self.wl_converter(qclWl, self.wlUnits, qcl)
+            labelText = '{:.1f} {}'.format(qclWl, unitString)
         labelString = 'QCL{:d}Wavelength'.format(qcl)
         self.labelInstr[labelString].setText(labelText)
 
