@@ -80,26 +80,35 @@ DEFAULT_COLORMAP = plt.cm.Spectral # Default colormap
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
 
 # MIRcat default parameters
+# Limits changed to have maximum power in overlap regions
 DEF_PULSERATE_HZ = 100 # kHz
 DEF_PULSEWIDTH_NS = 500 # ns
 MIN_WL_QCL1_INVCM = 1953.1 # cm^-1
-MIN_WL_QCL2_INVCM = 1709.4 # cm^-1
-MIN_WL_QCL3_INVCM = 1464.1 # cm^-1
+# MIN_WL_QCL2_INVCM = 1709.4 # cm^-1
+MIN_WL_QCL2_INVCM = 1692.0 # cm^-1
+# MIN_WL_QCL3_INVCM = 1464.1 # cm^-1
+MIN_WL_QCL3_INVCM = 1408.5 # cm^-1
 MIN_WL_QCL4_INVCM = 1219.5 # cm^-1
 MIN_WL_QCL1_UM = 5.12 # um
-MIN_WL_QCL2_UM = 5.85 # um
-MIN_WL_QCL3_UM = 6.83 # um
+# MIN_WL_QCL2_UM = 5.85 # um
+MIN_WL_QCL2_UM = 5.95 # um
+# MIN_WL_QCL3_UM = 6.83 # um
+MIN_WL_QCL3_UM = 7.1 # um
 MIN_WL_QCL4_UM = 8.20 # um
 MAX_CURR_QCL1_MILLIAMP = 450 # mA
 MAX_CURR_QCL2_MILLIAMP = 825 # mA
 MAX_CURR_QCL3_MILLIAMP = 575 # mA
 MAX_CURR_QCL4_MILLIAMP = 950 # mA
-MAX_WL_QCL1_INVCM = 1655.6 # cm^-1
-MAX_WL_QCL2_INVCM = 1396.6 # cm^-1
+# MAX_WL_QCL1_INVCM = 1655.6 # cm^-1
+MAX_WL_QCL1_INVCM = 1692.0 # cm^-1
+# MAX_WL_QCL2_INVCM = 1396.6 # cm^-1
+MAX_WL_QCL2_INVCM = 1408.5 # cm^-1
 MAX_WL_QCL3_INVCM = 1300.4 # cm^-1
 MAX_WL_QCL4_INVCM = 885.0 # cm^-1
-MAX_WL_QCL1_UM = 6.04 # um
-MAX_WL_QCL2_UM = 7.16 # um
+# MAX_WL_QCL1_UM = 6.04 # um
+MAX_WL_QCL1_UM = 5.95 # um
+# MAX_WL_QCL2_UM = 7.16 # um
+MAX_WL_QCL2_UM = 7.1 # um
 MAX_WL_QCL3_UM = 7.69 # um
 MAX_WL_QCL4_UM = 11.3 # um
 NUMBER_OF_QCLS = 4
@@ -123,7 +132,7 @@ WL_MINIMUMS_UM = [MIN_WL_QCL1_UM,
 
 # NI PCIe card sampling default parameters
 # DEF_SAMPLERATE = 1000 # Hz
-DEF_SAMPLERATE = 1E6 # Hz
+DEF_SAMPLERATE = 1000000 # Hz
 # DEF_SAMPLES = 100
 DEF_SAMPLES = 320
 
