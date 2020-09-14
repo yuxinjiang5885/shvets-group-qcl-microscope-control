@@ -122,8 +122,10 @@ WL_MINIMUMS_UM = [MIN_WL_QCL1_UM,
 
 
 # NI PCIe card sampling default parameters
-DEF_SAMPLERATE = 1000 # Hz
-DEF_SAMPLES = 100
+# DEF_SAMPLERATE = 1000 # Hz
+DEF_SAMPLERATE = 1E6 # Hz
+# DEF_SAMPLES = 100
+DEF_SAMPLES = 320
 
 # UI look and feel settings
 COL_WIDTH = 100
