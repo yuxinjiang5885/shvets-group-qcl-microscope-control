@@ -619,7 +619,7 @@ class mainWindow(QMainWindow):
             else:
                 self.grid.setColumnStretch(col, 20)
         # Make plot window
-        self.spectrumCanvas = mplCanvas(width=12, height=4)
+        self.spectrumCanvas = mplCanvas(width=6, height=4)
         self.spectrumCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
         self.spectrumCanvas.axes.set_ylabel('Lock-in Mag. (V)')
@@ -644,6 +644,8 @@ class mainWindow(QMainWindow):
         self.btn['Emission'][0].setToolTip('Enable/disable laser emission')
         self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
         self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
+        # Buttons: reference
+        # self.btn['Start'] = [QPushButton('Start'), 10, 8, 2, 1]
         # Buttons: start scan, stop scan
         self.btn['Start'] = [QPushButton('Start'), 10, 8, 2, 1]
         self.btn['Start'][0].setToolTip('Start scan')
@@ -689,12 +691,14 @@ class mainWindow(QMainWindow):
         self.inputField['SamplingRate'][0].setToolTip('Acquisition card sampling rate')
         self.inputField['SamplesPerWl'] = [QLineEdit('{}'.format(DEF_SAMPLES)), 9, 9, 1, 1]
         self.inputField['SamplesPerWl'][0].setToolTip('Samples read by acquisition card at every step')
+        # Input fields: reference
+        self.inputField['RefPath'] = [QLineEdit('C:\\Data\\_experiment_data'), 11, 0, 1, 3]
         # Create all input fields
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        # Labels: headers, in a dict just for ease of positioning
+        # Labels: headers, in a dict for ease of positioning
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
         self.labelHead['QCLMod'] = [QLabel('QCL Modules'), 1, 0, 1, 1]
         self.labelHead['QCLCurr'] = [QLabel('QCL Currents'), 1, 1, 1, 4]
@@ -707,6 +711,7 @@ class mainWindow(QMainWindow):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: experiment controls sub-headers
         self.labelSubHead = dict() # [label, row, col, rowSpan, colSpan]
+        self.labelSubHead['RefPath'] = [QLabel('Reference Path'), 10, 0, 1, 3]
         self.labelSubHead['WlStart'] = [QLabel('Wl. Start (μm)'), 2, 8, 1, 1]
         self.labelSubHead['WlEnd'] = [QLabel('Wl. End (μm)'), 2, 9, 1, 1]
         self.labelSubHead['WlStep'] = [QLabel('Wl. Step (μm)'), 2, 10, 1, 1]
