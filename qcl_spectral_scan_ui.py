@@ -265,7 +265,7 @@ class experiment(): # Directory management and multiple acquisitions
     def __init__(self):
         self.pci = pci_input()
 
-    def start(self, GUIInstance):
+    def start(self, GUIInstance, sweep=True):
         '''Handle experiment data directory, call scanning routine.'''
         # Check inputs
         if GUIInstance.wlUnits == 'um':
@@ -327,7 +327,10 @@ class experiment(): # Directory management and multiple acquisitions
         os.mkdir(expDir)
         os.chdir(expDir)
         # GUIElements['expNo'].setText('%.0f' % newExpNo)
-        data = self.scan(GUIInstance, wlUnits)
+        if sweep:
+            data = self.weep(GUIInstance, wlUnits)
+        else:
+            data = self.scan(GUIInstance, wlUnits)
         GUIInstance.btn['Start'][0].setChecked(False)
         GUIInstance.btn['Stop'][0].setChecked(False)
         return data
@@ -357,7 +360,6 @@ class experiment(): # Directory management and multiple acquisitions
         # Write list of wavelengths, excuding ranges not covered by the QCLs
         wlRange = np.arange(wlStart, wlEnd + wlStep, wlStep)
         wlList = np.zeros(len(wlRange))
-        print(wlRange)
         if GUIInstance.wlUnits == 'um':
             minQclWl = WL_MINIMUMS_UM
             maxQclWl = WL_MAXIMUMS_UM
@@ -379,10 +381,6 @@ class experiment(): # Directory management and multiple acquisitions
         print('Scan started ...')
         GUIInstance.spectrumCanvas.clear_plots()
         GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
-        # if GUIInstance.wlUnits == 'um':
-        #     GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
-        # elif GUIInstance.wlUnits == 'invcm':
-        #     GUIInstance.spectrumCanvas.axes.set_xlim(wlList[-1], wlList[0])
         GUIInstance.repaint()
         startRun = timer()
         step = 0
@@ -449,6 +447,31 @@ class experiment(): # Directory management and multiple acquisitions
         GUIInstance.repaint()
         GUIInstance.grab().save('screenshot.png', 'png')
         return data
+
+    def sweep(self, GUIInstance, wlUnits):
+        '''Run a sweep using the MIRcat's built-in function.'''
+        currentDir = os.getcwd()
+        # Get parameters from UI
+        sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
+        sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
+        if wlUnits == 'um':
+            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
+        if wlUnits == 'invcm':
+            wlStart = float(GUIInstance.inputField['WlEnd'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlStart'][0].text())
+        wlStep = float(GUIInstance.inputField['WlStep'][0].text())
+        if platform.system() == 'Windows':
+            currentDirSplit = currentDir.split('\\')
+        else:
+            currentDirSplit = currentDir.split('/')
+        currentFolder = currentDirSplit[-1]
+        # Divert stdout to log file
+        original = sys.stdout
+        logFile = open('%s.log' % (currentFolder), 'w')
+        # sys.stdout = logFile
+        # Write list of wavelengths, excuding ranges not covered by the QCLs
+        wlRange = np.arange(wlStart, wlEnd + wlStep, wlStep)
 
 
 class laserStartupDialog(QMessageBox):
