@@ -32,6 +32,7 @@ from PyQt5.QtWidgets import (QAction,
                              QPushButton,
                              QWidget,
                              QSizePolicy,
+                             QTextEdit,
                              QLineEdit)
 
 # NI PCIe channels. Should be binary strings (b'') for compatibility
@@ -140,6 +141,8 @@ DEF_SAMPLES = 320
 COL_WIDTH = 100
 FONT_FAMILY = 'Open Sans Semibold'
 FONT_SIZE = 12
+NUMBER_OF_ROWS = 14 # UI grid template rows
+NUMBER_OF_COLS = 11 # UI grid template columns
 MSG_TIMEOUT = 1000 # ms
 ROW_HEIGHT = 20
 STYLE_ARMED = '''QPushButton {{
@@ -566,7 +569,7 @@ class mainWindow(QMainWindow):
 
     def make_gui(self):
         '''Create main GUI window.'''
-        self.setGeometry(0, 0, 1200, 900)
+        self.setGeometry(0, 0, 1400, 960)
         font = QFont()
         font.setFamily(FONT_FAMILY)
         font.setPointSize(FONT_SIZE)
@@ -603,13 +606,13 @@ class mainWindow(QMainWindow):
         self.grid = QGridLayout()
         self.container.setLayout(self.grid)
         self.grid.setSpacing(10)
-        for row in range(0, 12): # Set row spacing
+        for row in range(0, NUMBER_OF_ROWS): # Set row spacing
             # self.grid.setRowMinimumHeight(row, ROW_HEIGHT)
             if row in [0]:
                 self.grid.setRowStretch(row, 8)
             else:
                 self.grid.setRowStretch(row, 1)
-        for col in range(0, 11): # Set column spacing
+        for col in range(0, NUMBER_OF_COLS): # Set column spacing
             if col in [1, 3, 5]: # QCL settings
                 self.grid.setColumnStretch(col, 2)
             if col in [2, 4, 6]: # Scl setting labels
@@ -645,11 +648,14 @@ class mainWindow(QMainWindow):
         self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
         self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
         # Buttons: reference
-        # self.btn['Start'] = [QPushButton('Start'), 10, 8, 2, 1]
+        self.btn['RefEnable'] = [QPushButton('Ref. OFF'), 11, 7, 1, 1]
+        self.btn['RefSave'] = [QPushButton('Save'), 11, 8, 1, 1]
+        self.btn['RefAlt'] = [QPushButton('Alt'), 11, 9, 1, 1]
+        self.btn['RefRecall'] = [QPushButton('Recall'), 11, 10, 1, 1]
         # Buttons: start scan, stop scan
-        self.btn['Start'] = [QPushButton('Start'), 10, 8, 2, 1]
+        self.btn['Start'] = [QPushButton('Start'), 12, 8, 2, 1]
         self.btn['Start'][0].setToolTip('Start scan')
-        self.btn['Stop'] = [QPushButton('Stop'), 10, 9, 2, 1]
+        self.btn['Stop'] = [QPushButton('Stop'), 12, 9, 2, 1]
         self.btn['Stop'][0].setToolTip('Stop scan')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
@@ -692,7 +698,7 @@ class mainWindow(QMainWindow):
         self.inputField['SamplesPerWl'] = [QLineEdit('{}'.format(DEF_SAMPLES)), 9, 9, 1, 1]
         self.inputField['SamplesPerWl'][0].setToolTip('Samples read by acquisition card at every step')
         # Input fields: reference
-        self.inputField['RefPath'] = [QLineEdit('C:\\Data\\_experiment_data'), 11, 0, 1, 3]
+        self.inputField['RefPath'] = [QLineEdit('C:\\Data\\_experiment_data'), 10, 8, 1, 3]
         # Create all input fields
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
@@ -705,13 +711,14 @@ class mainWindow(QMainWindow):
         self.labelHead['QCLWav'] = [QLabel('QCL Wavelengths'), 1, 5, 1, 2]
         self.labelHead['LasControls'] = [QLabel('Laser Controls'), 1, 7, 1, 1]
         self.labelHead['ExpControls'] = [QLabel('Experiment Controls'), 1, 8, 1, 3]
+        self.labelHead['Notes'] = [QLabel('Experiment Notes'), 12, 0, 1, 1]
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(STYLE_LABEL_EMPH)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: experiment controls sub-headers
         self.labelSubHead = dict() # [label, row, col, rowSpan, colSpan]
-        self.labelSubHead['RefPath'] = [QLabel('Reference Path'), 10, 0, 1, 3]
+        self.labelSubHead['RefPath'] = [QLabel('Reference Path'), 10, 7, 1, 1]
         self.labelSubHead['WlStart'] = [QLabel('Wl. Start (μm)'), 2, 8, 1, 1]
         self.labelSubHead['WlEnd'] = [QLabel('Wl. End (μm)'), 2, 9, 1, 1]
         self.labelSubHead['WlStep'] = [QLabel('Wl. Step (μm)'), 2, 10, 1, 1]
@@ -764,6 +771,11 @@ class mainWindow(QMainWindow):
         # Compile relevant GUI elements to pass to other classes
         # GUIElem['expNo'] = outfld['ExpCur'][0]
         # GUIElem['expStepTot'] = outfld['ExpTotSteps'][0]
+        # Text field for experiment notes
+        self.notes = QTextEdit('')
+        self.notes.setFont(font)
+        self.notes.setStyleSheet(STYLE_INPUT)
+        self.grid.addWidget(self.notes, 12, 1, 2, 4)
         # Connect buttons to actions
         self.btn['QCL1'][0].clicked.connect(lambda: self.qcl(1))
         self.btn['QCL2'][0].clicked.connect(lambda: self.qcl(2))
@@ -936,7 +948,7 @@ class mainWindow(QMainWindow):
         # Switch units from cm^-1 to um
         elif self.wlUnits == 'invcm':
             self.wlUnits = 'um'
-            self.btn['WlUnits'][0].setText('Units: μm')
+            self.btn['WlUnits'][0].setText('Units: μm  ')
             for qcl in range(1, NUMBER_OF_QCLS + 1):
                 labelString = 'QCL{:d}WlUnit'.format(qcl)
                 self.labelInstr[labelString].setText('μm    ')
@@ -946,9 +958,9 @@ class mainWindow(QMainWindow):
                 wlString = '{:.2f}'.format(convertedWl)
                 self.inputField[inputFieldString][0].setText(wlString)
             # Relabel scan settings
-            self.labelSubHead['WlStart'][0].setText('Wl. Start (μm)')
-            self.labelSubHead['WlEnd'][0].setText('Wl. End (μm)')
-            self.labelSubHead['WlStep'][0].setText('Wl. Step (μm)')
+            self.labelSubHead['WlStart'][0].setText('Wl. Start (μm)  ')
+            self.labelSubHead['WlEnd'][0].setText('Wl. End (μm)  ')
+            self.labelSubHead['WlStep'][0].setText('Wl. Step (μm)  ')
             for wlLabel in ['WlStart', 'WlEnd']:
                 currentWl = float(self.inputField[wlLabel][0].text())
                 convertedWl = self.wl_converter(currentWl, 'um', qcl=[])
