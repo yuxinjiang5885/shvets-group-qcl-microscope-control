@@ -265,7 +265,7 @@ class experiment(): # Directory management and multiple acquisitions
     def __init__(self):
         self.pci = pci_input()
 
-    def start(self, GUIInstance, sweep=True):
+    def start(self, GUIInstance, sweep=False):
         '''Handle experiment data directory, call scanning routine.'''
         # Check inputs
         if GUIInstance.wlUnits == 'um':
@@ -328,7 +328,7 @@ class experiment(): # Directory management and multiple acquisitions
         os.chdir(expDir)
         # GUIElements['expNo'].setText('%.0f' % newExpNo)
         if sweep:
-            data = self.weep(GUIInstance, wlUnits)
+            data = self.sweep(GUIInstance, wlUnits)
         else:
             data = self.scan(GUIInstance, wlUnits)
         GUIInstance.btn['Start'][0].setChecked(False)
@@ -449,6 +449,7 @@ class experiment(): # Directory management and multiple acquisitions
         return data
 
     def sweep(self, GUIInstance, wlUnits):
+        '''WORK IN PROGRESS'''
         '''Run a sweep using the MIRcat's built-in function.'''
         currentDir = os.getcwd()
         # Get parameters from UI

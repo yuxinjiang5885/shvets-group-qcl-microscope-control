@@ -225,7 +225,7 @@ class laser():
         SDK.MIRcatSDK_StartSweepScan(c_float(wl_start_um),
                                      c_float(wl_end_um),
                                      c_float(wl_step_um),
-                                     wlUnit, c_uint16(1), c_bool(True), c_uint8(1))
+                                     wlUnit, c_uint16(1), c_bool(False), c_uint8(0))
         # Check scan status
         isScanInProgress = c_bool(True)
         isScanActive = c_bool(False)
@@ -238,6 +238,7 @@ class laser():
         units = wlUnit
         start = timer()
         while isScanInProgress.value:
+            time.sleep(1)
             SDK.MIRcatSDK_GetScanStatus(byref(isScanInProgress),
                                         byref(isScanActive),
                                         byref(isScanPaused),
@@ -247,12 +248,12 @@ class laser():
                                         byref(units),
                                         byref(isTECinProgress),
                                         byref(isMotionInProgress))
-            print('Sweeping. Time elapsed: {:.3f} s).'.format(timer()-start),
+            print('Sweep in progress ({:.3f} s).'.format(timer()-start),
                                                         end=' ', flush=True)
             # print('Scan in progress/active/paused: {}/{}/{}'.format(
             #     isScanInProgress.value, isScanActive.value, isScanPaused.value))
-            print('Sweep step {} ({} %).'.format(curScanNum, curScanPercent))
-        print('Sweep complete.')
+            print('Sweep step {} ({} %).'.format(curScanNum.value, curScanPercent.value))
+        print('Sweep complete ({} s).'.format(timer() - start))
 
 
     def tune(self, qcl, wl, wlUnits='um'):
