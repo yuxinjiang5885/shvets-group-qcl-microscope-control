@@ -79,6 +79,7 @@ DEFAULT_COLORMAP = plt.cm.Spectral # Default colormap
 
 # Directories
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
+DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
 
 # MIRcat default parameters
 # Limits changed to have maximum power in overlap regions
@@ -326,6 +327,7 @@ class experiment(): # Directory management and multiple acquisitions
             expDir = os.path.join(workDir, expFolder)
         os.mkdir(expDir)
         os.chdir(expDir)
+        GUIInstance.latestDir = expDir
         # GUIElements['expNo'].setText('%.0f' % newExpNo)
         if sweep:
             data = self.sweep(GUIInstance, wlUnits)
@@ -439,7 +441,7 @@ class experiment(): # Directory management and multiple acquisitions
         # Return stdout to terminal
         sys.stdout = original
         # Save data as text file
-        np.savetxt('{}_wl-um_x-v_y-v_r-v.txt'.format(currentFolder), data)
+        np.savetxt('{}{}'.format(currentFolder, DEF_FILENAME), data)
         # Update QCL interface readings
         GUIInstance.qcl(GUIInstance.activeQcl)
         GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
@@ -506,9 +508,11 @@ class mainWindow(QMainWindow):
         self.wlUnits = 'um' # Wavelength units
         # self.laser = [] # Debugging, UI will load immediately, laser won't work.
         self.pci = pci_input()
+        self.latestDir = '' # Latest experiment directory
         super().__init__()
         self.make_gui()
         self.statusbar.showMessage('Ready')
+
 
     def about(self):
         '''Show dialog when "about" is clicked.'''
@@ -645,12 +649,27 @@ class mainWindow(QMainWindow):
             #     self.grid.setColumnStretch(col, 4)
             else:
                 self.grid.setColumnStretch(col, 20)
-        # Make plot window
-        self.spectrumCanvas = mplCanvas(width=6, height=4)
+        # Plot: latest spectrum
+        self.spectrumCanvas = mplCanvas(width=5, height=4)
         self.spectrumCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
         self.spectrumCanvas.axes.set_ylabel('Lock-in Mag. (V)')
-        self.grid.addWidget(self.spectrumCanvas, 0, 0, 1, 11)
+        self.spectrumCanvas.axes.set_title('Latest Spectrum')
+        self.grid.addWidget(self.spectrumCanvas, 0, 0, 1, 5)
+        # Plot: current reference
+        self.spectrumCanvasRef = mplCanvas(width=5, height=4)
+        self.spectrumCanvasRef.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.spectrumCanvasRef.axes.set_xlabel('Wavelength (μm)')
+        self.spectrumCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
+        self.spectrumCanvasRef.axes.set_title('Current Reference')
+        self.grid.addWidget(self.spectrumCanvasRef, 0, 5, 1, 3)
+        # Plot: transmittance
+        self.spectrumCanvasT = mplCanvas(width=5, height=4)
+        self.spectrumCanvasT.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.spectrumCanvasT.axes.set_xlabel('Wavelength (μm)')
+        self.spectrumCanvasT.axes.set_ylabel('Transmittance')
+        self.spectrumCanvasT.axes.set_title('Transmittance (Latest/Reference)')
+        self.grid.addWidget(self.spectrumCanvasT, 0, 8, 1, 3)
         # Buttons: select QCL, laser arm, tune, enable emission
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['QCL1'] = [QPushButton('QCL 1 Off'), 2, 0, 2, 1]
@@ -673,9 +692,13 @@ class mainWindow(QMainWindow):
         self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
         # Buttons: reference
         self.btn['RefEnable'] = [QPushButton('Ref. OFF'), 11, 7, 1, 1]
-        self.btn['RefSave'] = [QPushButton('Save'), 11, 8, 1, 1]
-        self.btn['RefAlt'] = [QPushButton('Alt'), 11, 9, 1, 1]
-        self.btn['RefRecall'] = [QPushButton('Recall'), 11, 10, 1, 1]
+        self.btn['RefEnable'][0].setToolTip('Enable/disable use of reference')
+        self.btn['RefSet'] = [QPushButton('Set Reference'), 11, 8, 1, 1]
+        self.btn['RefSet'][0].setToolTip('Set latest spectrum as reference')
+        self.btn['RefSave'] = [QPushButton('Save Reference'), 11, 9, 1, 1]
+        self.btn['RefSave'][0].setToolTip('Save latest spectrum path for later')
+        self.btn['RefRecall'] = [QPushButton('Recall Reference'), 11, 10, 1, 1]
+        self.btn['RefRecall'][0].setToolTip('Recall saved spectrum path and set as reference')
         # Buttons: start scan, stop scan
         self.btn['Start'] = [QPushButton('Start'), 12, 8, 2, 1]
         self.btn['Start'][0].setToolTip('Start scan')
@@ -810,6 +833,7 @@ class mainWindow(QMainWindow):
         self.btn['Emission'][0].clicked.connect(lambda: self.emission())
         self.btn['Tune'][0].clicked.connect(lambda: self.tune())
         self.btn['Start'][0].clicked.connect(lambda: self.run_experiment(self))
+        self.btn['RefSet'][0].clicked.connect(lambda: self.reference())
         self.activeQcl = 0 # None selected on startup
         self.show()
 
@@ -854,6 +878,21 @@ class mainWindow(QMainWindow):
             self.inputField[qclNoStrSetWl][0].setStyleSheet(STYLE_INPUT)
             self.labelInstr[qclNoStrCurr].setStyleSheet(STYLE_LABEL_READ)
             self.labelInstr[qclNoStrWl].setStyleSheet(STYLE_LABEL_READ)
+
+    def reference(self):
+        '''Set latest spectrum as reference.'''
+        dataPath = self.latestDir # Latest experiment directory
+        self.inputField['RefPath'][0].setText('{}'.format(dataPath))
+        self.spectrumCanvasRef.clear_plots()
+        try: # Must follow conventions of experiment routine to find data
+            dataPathParts = os.path.split(dataPath)
+            fileName = '{}{}'.format(dataPathParts[-1], DEF_FILENAME)
+            filePath = os.path.join(dataPath, fileName)
+            data = np.loadtxt(filePath)
+            self.spectrumCanvasRef.axes.set_xlim(data[0, 0], data[-1, 0])
+            self.spectrumCanvasRef.plot_line(data[:, 0], data[:, 3])
+        except Exception as exc:
+            print('Could not read reference spectrum data:\n{}'.format(exc))
 
     def run_experiment(self, GUIElements):
         '''Run scan, return data'''
