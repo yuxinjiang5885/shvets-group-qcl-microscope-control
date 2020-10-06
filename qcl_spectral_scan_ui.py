@@ -25,6 +25,7 @@ from PyQt5.QtWidgets import (QAction,
                              QApplication,
                              QDesktopWidget,
                              QDialog,
+                             QFileDialog,
                              QGridLayout,
                              QLabel,
                              QMainWindow,
@@ -134,9 +135,11 @@ WL_MINIMUMS_UM = [MIN_WL_QCL1_UM,
 
 # NI PCIe card sampling default parameters
 # DEF_SAMPLERATE = 1000 # Hz
-DEF_SAMPLERATE = 1000000 # Hz
+# DEF_SAMPLERATE = 1000000 # Hz
+DEF_SAMPLERATE = 100000 # Hz
 # DEF_SAMPLES = 100
-DEF_SAMPLES = 320
+# DEF_SAMPLES = 320
+DEF_SAMPLES = 32
 
 # UI look and feel settings
 COL_WIDTH = 100
@@ -340,6 +343,21 @@ class experiment(): # Directory management and multiple acquisitions
     def scan(self, GUIInstance, wlUnits='um'):
         '''Scan and logging routine.'''
         currentDir = os.getcwd()
+        # Lock use of reference
+        dataRef = np.zeros((1, 2))
+        if GUIInstance.btn['RefEnable'][0].isChecked:
+            useRef = True
+        else:
+            useRef = False
+        if useRef:
+            try:
+                dataPath = GUIInstance.refDir # Latest experiment directory
+                dataPathParts = os.path.split(dataPath)
+                fileName = '{}{}'.format(dataPathParts[-1], DEF_FILENAME)
+                filePath = os.path.join(dataPath, fileName)
+                dataRef = np.loadtxt(filePath)
+            except Exception as exc:
+                print('Failed to load reference:\n{}'.format(exc))
         # Get parameters from UI
         sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
         sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
@@ -378,11 +396,17 @@ class experiment(): # Directory management and multiple acquisitions
         if GUIInstance.wlUnits == 'invcm':
             wlList = np.flip(wlList)
         stepNumber = len(wlList)
+        if useRef and len(dataRef[:,0]) != stepNumber:
+            print('Steps in reference and planned experiment do not match.')
+            useRef = False
         # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
         data = np.zeros((stepNumber, 4)) # wl, X, Y, R
         print('Scan started ...')
         GUIInstance.spectrumCanvas.clear_plots()
         GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
+        if useRef:
+            GUIInstance.spectrumCanvasT.clear_plots()
+            GUIInstance.spectrumCanvasT.axes.set_xlim(wlList[0], wlList[-1])
         GUIInstance.repaint()
         startRun = timer()
         step = 0
@@ -424,6 +448,10 @@ class experiment(): # Directory management and multiple acquisitions
             GUIInstance.spectrumCanvas.flush_events()
             GUIInstance.spectrumCanvas.plot_line(data[:step+1, 0],
                                                  data[:step+1, 3])
+            if useRef:
+                GUIInstance.spectrumCanvasT.flush_events()
+                GUIInstance.spectrumCanvasT.plot_line(data[:step+1, 0],
+                                                 data[:step+1, 3]/dataRef[:step+1, 3])
             print('Step {:.0f} ({:.1f} um): {:.3f} s'.format(step, wavelength,
                                                         (timer()-startStep)))
             if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
@@ -509,6 +537,7 @@ class mainWindow(QMainWindow):
         # self.laser = [] # Debugging, UI will load immediately, laser won't work.
         self.pci = pci_input()
         self.latestDir = '' # Latest experiment directory
+        self.refDir = '' # Reference experiment directory
         super().__init__()
         self.make_gui()
         self.statusbar.showMessage('Ready')
@@ -691,7 +720,7 @@ class mainWindow(QMainWindow):
         self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
         self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
         # Buttons: reference
-        self.btn['RefEnable'] = [QPushButton('Ref. OFF'), 11, 7, 1, 1]
+        self.btn['RefEnable'] = [QPushButton('Reference'), 11, 7, 1, 1]
         self.btn['RefEnable'][0].setToolTip('Enable/disable use of reference')
         self.btn['RefSet'] = [QPushButton('Set Reference'), 11, 8, 1, 1]
         self.btn['RefSet'][0].setToolTip('Set latest spectrum as reference')
@@ -833,7 +862,8 @@ class mainWindow(QMainWindow):
         self.btn['Emission'][0].clicked.connect(lambda: self.emission())
         self.btn['Tune'][0].clicked.connect(lambda: self.tune())
         self.btn['Start'][0].clicked.connect(lambda: self.run_experiment(self))
-        self.btn['RefSet'][0].clicked.connect(lambda: self.reference())
+        # self.btn['RefEnable'][0].clicked.connect(lambda: self.reference_enable())
+        self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.latestDir))
         self.activeQcl = 0 # None selected on startup
         self.show()
 
@@ -879,11 +909,19 @@ class mainWindow(QMainWindow):
             self.labelInstr[qclNoStrCurr].setStyleSheet(STYLE_LABEL_READ)
             self.labelInstr[qclNoStrWl].setStyleSheet(STYLE_LABEL_READ)
 
-    def reference(self):
+    def reference_enable(self):
+        '''Enable use of reference'''
+        if self.btn['RefEnable'][0].isChecked:
+            self.btn['RefEnable'][0].setText('Ref. ON')
+        else:
+            self.btn['RefEnable'][0].setText('Ref. Off')
+
+    def reference_set(self, refDir):
         '''Set latest spectrum as reference.'''
-        dataPath = self.latestDir # Latest experiment directory
+        dataPath = refDir # Reference experiment directory
         self.inputField['RefPath'][0].setText('{}'.format(dataPath))
         self.spectrumCanvasRef.clear_plots()
+        self.btn['RefSet'][0].setChecked(False)
         try: # Must follow conventions of experiment routine to find data
             dataPathParts = os.path.split(dataPath)
             fileName = '{}{}'.format(dataPathParts[-1], DEF_FILENAME)
@@ -891,6 +929,7 @@ class mainWindow(QMainWindow):
             data = np.loadtxt(filePath)
             self.spectrumCanvasRef.axes.set_xlim(data[0, 0], data[-1, 0])
             self.spectrumCanvasRef.plot_line(data[:, 0], data[:, 3])
+            self.refDir = refDir
         except Exception as exc:
             print('Could not read reference spectrum data:\n{}'.format(exc))
 
