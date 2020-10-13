@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import time
 from timeit import default_timer as timer
 from instruments.mircat import laser
-from instruments.ni_daq_multiple_ai import MultiChannelAnalogInput as MultiAI
+from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
 from matplotlib.figure import Figure
 from PyQt5.QtCore import Qt
@@ -719,8 +719,10 @@ class mainWindow(QMainWindow):
         self.btn['Emission'][0].setToolTip('Enable/disable laser emission')
         self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
         self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
+        self.btn['Triggering'] = [QPushButton('Triggering'), 12, 7, 2, 1]
+        self.btn['Triggering'][0].setToolTip('Enable/disable triggering')
         # Buttons: reference
-        self.btn['RefEnable'] = [QPushButton('Reference'), 11, 7, 1, 1]
+        self.btn['RefEnable'] = [QPushButton('Reference'), 10, 7, 2, 1]
         self.btn['RefEnable'][0].setToolTip('Enable/disable use of reference')
         self.btn['RefSet'] = [QPushButton('Set Reference'), 11, 8, 1, 1]
         self.btn['RefSet'][0].setToolTip('Set latest spectrum as reference')
@@ -729,9 +731,9 @@ class mainWindow(QMainWindow):
         self.btn['RefRecall'] = [QPushButton('Recall Reference'), 11, 10, 1, 1]
         self.btn['RefRecall'][0].setToolTip('Recall saved spectrum path and set as reference')
         # Buttons: start scan, stop scan
-        self.btn['Start'] = [QPushButton('Start'), 12, 8, 2, 1]
+        self.btn['Start'] = [QPushButton('Start'), 12, 9, 2, 1]
         self.btn['Start'][0].setToolTip('Start scan')
-        self.btn['Stop'] = [QPushButton('Stop'), 12, 9, 2, 1]
+        self.btn['Stop'] = [QPushButton('Stop'), 12, 10, 2, 1]
         self.btn['Stop'][0].setToolTip('Stop scan')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
@@ -785,8 +787,8 @@ class mainWindow(QMainWindow):
         self.labelHead['QCLMod'] = [QLabel('QCL Modules'), 1, 0, 1, 1]
         self.labelHead['QCLCurr'] = [QLabel('QCL Currents'), 1, 1, 1, 4]
         self.labelHead['QCLWav'] = [QLabel('QCL Wavelengths'), 1, 5, 1, 2]
-        self.labelHead['LasControls'] = [QLabel('Laser Controls'), 1, 7, 1, 1]
-        self.labelHead['ExpControls'] = [QLabel('Experiment Controls'), 1, 8, 1, 3]
+        self.labelHead['LasControls'] = [QLabel('Laser/Experiment Settings and Controls'), 1, 7, 1, 4]
+        # self.labelHead['ExpControls'] = [QLabel('Scan/Reference Settings'), 1, 8, 1, 3]
         self.labelHead['Notes'] = [QLabel('Experiment Notes'), 12, 0, 1, 1]
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
@@ -794,7 +796,7 @@ class mainWindow(QMainWindow):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: experiment controls sub-headers
         self.labelSubHead = dict() # [label, row, col, rowSpan, colSpan]
-        self.labelSubHead['RefPath'] = [QLabel('Reference Path'), 10, 7, 1, 1]
+        # self.labelSubHead['RefPath'] = [QLabel('Reference Path'), 10, 7, 1, 1]
         self.labelSubHead['WlStart'] = [QLabel('Wl. Start (μm)'), 2, 8, 1, 1]
         self.labelSubHead['WlEnd'] = [QLabel('Wl. End (μm)'), 2, 9, 1, 1]
         self.labelSubHead['WlStep'] = [QLabel('Wl. Step (μm)'), 2, 10, 1, 1]
