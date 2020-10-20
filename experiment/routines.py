@@ -14,6 +14,8 @@ import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+from ctypes import (byref, c_bool, c_float, c_uint, c_uint8, c_uint16, c_uint32)
+from instruments.mircat import SDK
 from . import defaults
 from timeit import default_timer as timer
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
@@ -258,7 +260,7 @@ class experiment(): # Directory management and multiple acquisitions
                 dataRef = np.loadtxt(filePath)
             except Exception as exc:
                 print('Failed to load reference:\n{}'.format(exc))
-        # Get parameters from UI
+        ### Get parameters from UI
         sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
         sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
         if wlUnits == 'um':
@@ -273,7 +275,7 @@ class experiment(): # Directory management and multiple acquisitions
         else:
             currentDirSplit = currentDir.split('/')
         currentFolder = currentDirSplit[-1]
-        # Divert stdout to log file
+        ### Divert stdout to log file
         original = sys.stdout
         logFile = open('%s.log' % (currentFolder), 'w')
         # sys.stdout = logFile
@@ -313,41 +315,44 @@ class experiment(): # Directory management and multiple acquisitions
         scanInterrupted = False
         print('One wavelength point per step, avg. of %.0f samples at %.0f Hz'
               % (sampleNumber, sampleRate))
-        # Configure triggered acquisition
-        MultiAI.configure_triggered()
+        ### Configure triggered acquisition
+        multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
+        multipleAI.configure_triggered(sampleNumber, sampleRate)
+        ### Start laser sweep
 
-        # Run experiment
-
-        for step in range(0, stepNumber): # First step at initial pos
-            startStep = timer()
-            # Check if "Stop" has been pressed
+        ### Run experiment
+        sweepRunning = True
+        while sweepRunning:
+            ### Check if "Stop" has been pressed
             if GUIInstance.btn['Stop'][0].isChecked(): # Stop if button pressed
                 scanInterrupted = True
             if scanInterrupted:
                 break
-            # Select QCL
-            wavelength = wlList[step]
-            data[step, 0] = wavelength
-            if minQclWl[0] <= wavelength <= maxQclWl[0]:
-                GUIInstance.qcl_fast(1)
-            elif minQclWl[1] <= wavelength <= maxQclWl[1]:
-                GUIInstance.qcl_fast(2)
-            elif minQclWl[2] <= wavelength <= maxQclWl[2]:
-                GUIInstance.qcl_fast(3)
-            elif minQclWl[3] <= wavelength <= maxQclWl[3]:
-                GUIInstance.qcl_fast(4)
-            else:
-                print('Invalid vavelength: {:.3f}'.format(wavelength))
-                continue
-            # Tune to wavelength
-            GUIInstance.tune_fast(wavelength)
-            if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
-                # In auto-enable mode, turn on for every wavelength
-                GUIInstance.btn['Emission'][0].setChecked(True)
-                GUIInstance.emission()
-            voltages = self.pci.get_voltages(sampleNumber, sampleRate)
-            data[step, 1] = voltages[0] # Lock-in X
-            data[step, 2] = voltages[1] # Lock-in Y
+            ### Arm triggered acquisition
+            voltages = multipleAI.acquire(sampleNumber)
+            ### Monitor laser status
+            isScanInProgress = c_bool(True)
+            isScanActive = c_bool(False)
+            isScanPaused = c_bool(False)
+            curScanNum = c_uint16()
+            curScanPercent = c_uint16()
+            curWW = c_float()
+            isTECinProgress = c_bool()
+            isMotionInProgress = c_bool()
+            units = wlUnit
+            start = timer()
+            SDK.MIRcatSDK_GetScanStatus(byref(isScanInProgress),
+                                        byref(isScanActive),
+                                        byref(isScanPaused),
+                                        byref(curScanNum),
+                                        byref(curScanPercent),
+                                        byref(curWW),
+                                        byref(units),
+                                        byref(isTECinProgress),
+                                        byref(isMotionInProgress))
+            ### Average voltages
+            data[step, 1] = np.sum(voltages[0])/sampleNumber # Lock-in X
+            data[step, 2] = np.sum(voltages[1])/sampleNumber # Lock-in Y
             data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +
                                      np.power(data[step, 2], 2))) # Lock-in R
             GUIInstance.spectrumCanvas.flush_events()
@@ -356,26 +361,26 @@ class experiment(): # Directory management and multiple acquisitions
             if useRef:
                 GUIInstance.spectrumCanvasT.flush_events()
                 GUIInstance.spectrumCanvasT.plot_line(data[:step+1, 0],
-                                                 data[:step+1, 3]/dataRef[:step+1, 3])
-            print('Step {:.0f} ({:.1f} um): {:.3f} s'.format(step, wavelength,
-                                                        (timer()-startStep)))
+                                          data[:step+1, 3]/dataRef[:step+1, 3])
             if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
                 # In auto-enable mode, turn off for every wavelength
                 GUIInstance.btn['Emission'][0].setChecked(False)
                 GUIInstance.emission()
             GUIInstance.repaint()
         end = timer()
+        ### Clear triggered acquisition task
+        multipleAI.clear_task()
         if scanInterrupted:
             print('Scan interrupted after %.3f s' % (end-startRun))
             data = data[0:step]
         else:
             print('Scan complete, took %.3f s' % (end-startRun))
         logFile.close()
-        # Return stdout to terminal
+        ### Return stdout to terminal
         sys.stdout = original
-        # Save data as text file
+        ### Save data as text file
         np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
-        # Update QCL interface readings
+        ### Update QCL interface readings
         GUIInstance.qcl(GUIInstance.activeQcl)
         GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
         GUIInstance.setUpdatesEnabled(True)

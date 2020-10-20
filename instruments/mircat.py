@@ -255,6 +255,16 @@ class laser():
             print('Sweep step {} ({} %).'.format(curScanNum.value, curScanPercent.value))
         print('Sweep complete ({} s).'.format(timer() - start))
 
+    def sweep_and_forget(self, wl_start_um, wl_end_um, wl_step_um):
+        '''Launch a sweep, but do not monitor it.
+           Intended for use with a separate monitoring routine.'''
+        ### Send sweep command
+        wlUnit = MIRcatSDK_UNITS_MICRONS
+        SDK.MIRcatSDK_StartSweepScan(c_float(wl_start_um),
+                                    c_float(wl_end_um),
+                                    c_float(wl_step_um),
+                                    wlUnit, c_uint16(1), c_bool(False), c_uint8(0))
+
 
     def tune(self, qcl, wl, wlUnits='um'):
         '''Tune QCL "qcl" wavelength to "wl", in units "wlUnits".
