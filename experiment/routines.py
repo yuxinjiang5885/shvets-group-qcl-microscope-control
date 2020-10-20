@@ -1,5 +1,5 @@
 '''
-experiment
+routines
 Giovanni Sartorello (srtgnn@gmail.com)
 Experiment control classes for MIRcat spectral scan UI
 Version 1

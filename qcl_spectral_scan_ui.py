@@ -16,11 +16,10 @@ import matplotlib.pyplot as plt
 import time
 from timeit import default_timer as timer
 from experiment.defaults import *
-from experiment.experiment import experiment
+from experiment.routines import experiment
 from ui.plot_widgets import mplCanvas
 from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
-
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWidgets import (QAction,
