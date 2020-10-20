@@ -14,6 +14,7 @@ from PyDAQmx.DAQmxConstants import (DAQmx_Val_Cfg_Default,
                                     DAQmx_Val_Rising,
                                     DAQmx_Val_Volts)
 from PyDAQmx.DAQmxFunctions import (byref,
+                                    DAQmxCfgDigEdgeStartTrig,
                                     DAQmxCfgSampClkTiming,
                                     DAQmxClearTask,
                                     DAQmxCreateAIVoltageChan,
@@ -43,19 +44,9 @@ class MultiChannelAnalogInput():
             DAQmxResetDevice(physicalChannel[0].split('/')[0] )
         self.taskHandle = TaskHandle()
 
-    def configure(self, sampleNumber, sampleRate):
-        DAQmxCreateTask("",byref(self.taskHandle))
-        for name in self.physicalChannel:
-             DAQmxCreateAIVoltageChan(self.taskHandle,name,"",
-                                      DAQmx_Val_Cfg_Default,
-                                     self.limit[name][0],self.limit[name][1],
-                                     DAQmx_Val_Volts,None)
-        DAQmxCfgSampClkTiming(self.taskHandle,"",sampleRate,DAQmx_Val_Rising,
-                              DAQmx_Val_FiniteSamps,sampleNumber)
-
-    def readAllChannels(self, sampleNumber):
+    def acquire(self, sampleNumber):
+        '''Acquire data, one line per channel.'''
         DAQmxStartTask(self.taskHandle)
-        '''One line per channel'''
         data = np.zeros((self.numberOfChannel,sampleNumber), dtype=np.float64)
         read = int32()
         DAQmxReadAnalogF64(self.taskHandle,sampleNumber,10.0,
@@ -65,5 +56,28 @@ class MultiChannelAnalogInput():
         DAQmxStopTask(self.taskHandle)
         return data
 
-    def clearTask(self):
+    def clear_task(self):
         DAQmxClearTask(self.taskHandle)
+
+    def configure(self, sampleNumber, sampleRate):
+        '''Configure on-demand acquisition.'''
+        DAQmxCreateTask("",byref(self.taskHandle))
+        for name in self.physicalChannel:
+             DAQmxCreateAIVoltageChan(self.taskHandle,name,"",
+                                      DAQmx_Val_Cfg_Default,
+                                     self.limit[name][0],self.limit[name][1],
+                                     DAQmx_Val_Volts,None)
+        DAQmxCfgSampClkTiming(self.taskHandle,"",sampleRate,DAQmx_Val_Rising,
+                              DAQmx_Val_FiniteSamps,sampleNumber)
+
+    def configure_triggered(self, triggerChannel, sampleNumber, sampleRate):
+        '''Configure triggered acquisition.'''
+        DAQmxCreateTask("",byref(self.taskHandle))
+        DAQmxCfgDigEdgeStartTrig(self.taskHandle, triggerChannel, DAQmx_Val_Rising);
+        for name in self.physicalChannel:
+             DAQmxCreateAIVoltageChan(self.taskHandle,name,"",
+                                      DAQmx_Val_Cfg_Default,
+                                     self.limit[name][0],self.limit[name][1],
+                                     DAQmx_Val_Volts,None)
+        DAQmxCfgSampClkTiming(self.taskHandle,"",sampleRate,DAQmx_Val_Rising,
+                              DAQmx_Val_FiniteSamps,sampleNumber)
