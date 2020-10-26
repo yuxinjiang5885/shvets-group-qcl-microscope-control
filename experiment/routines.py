@@ -279,7 +279,7 @@ class experiment(): # Directory management and multiple acquisitions
         original = sys.stdout
         logFile = open('%s.log' % (currentFolder), 'w')
         # sys.stdout = logFile
-        # Write list of wavelengths, excuding ranges not covered by the QCLs
+        ### Write list of wavelengths, excuding ranges not covered by the QCLs
         wlRange = np.arange(wlStart, wlEnd + wlStep, wlStep)
         wlList = np.zeros(len(wlRange))
         if GUIInstance.wlUnits == 'um':
@@ -319,7 +319,10 @@ class experiment(): # Directory management and multiple acquisitions
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
         multipleAI.configure_triggered(sampleNumber, sampleRate)
         ### Start laser sweep
-
+        if GUIInstance.wlUnits == 'um':
+            GUIInstance.laser.sweep_and_forget_um(wlList[0], wlList[-1], wlStep)
+        elif GUIInstance.wlUnits == 'invcm':
+            GUIInstance.laser.sweep_and_forget_invcm(wlList[0], wlList[-1], wlStep)
         ### Run experiment
         sweepRunning = True
         while sweepRunning:
