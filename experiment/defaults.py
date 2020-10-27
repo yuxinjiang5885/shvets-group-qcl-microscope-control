@@ -9,10 +9,11 @@ Created 2020-Oct-20
 
 import matplotlib.pyplot as plt
 
-# NI PCIe channels. Should be binary strings (b'') for compatibility
+### NI PCIe channels. Should be binary strings (b'') for compatibility
+### Use NI MAX to verify device and channel names.
 PCI_CH_X = b'Dev1/ai0'
 PCI_CH_Y = b'Dev1/ai1'
-PCI_TRIG = b'Dev1/pfi12'
+PCI_TRIG = b'/Dev1/PFI12'
 
 # Color dictionaries
 newTab10 = {'blue' : '#4e79a7', 'orange' : '#f28e2b', 'red' : '#e15759',

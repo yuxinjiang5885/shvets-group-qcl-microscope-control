@@ -21,7 +21,7 @@ from timeit import default_timer as timer
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
 from matplotlib.figure import Figure
-
+from instruments.daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_CM1, MIRcatSDK_UNITS_MICRONS
 
 class experiment(): # Directory management and multiple acquisitions
 
@@ -95,7 +95,7 @@ class experiment(): # Directory management and multiple acquisitions
         os.chdir(expDir)
         GUIInstance.latestDir = expDir
         # GUIElements['expNo'].setText('%.0f' % newExpNo)
-        if sweep:
+        if GUIInstance.btn['Sweep'][0].isChecked():
             data = self.sweep(GUIInstance, wlUnits)
         else:
             data = self.scan(GUIInstance, wlUnits)
@@ -104,7 +104,7 @@ class experiment(): # Directory management and multiple acquisitions
         return data
 
     def scan(self, GUIInstance, wlUnits='um'):
-        '''Scan and logging routine.'''
+        '''Run a step-and measure scan.'''
         currentDir = os.getcwd()
         ### Lock use of reference
         dataRef = np.zeros((1, 2))
@@ -317,7 +317,7 @@ class experiment(): # Directory management and multiple acquisitions
               % (sampleNumber, sampleRate))
         ### Configure triggered acquisition
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
-        multipleAI.configure_triggered(sampleNumber, sampleRate)
+        multipleAI.configure_triggered(defaults.PCI_TRIG, sampleNumber, sampleRate)
         ### Start laser sweep
         if GUIInstance.wlUnits == 'um':
             GUIInstance.laser.sweep_and_forget_um(wlList[0], wlList[-1], wlStep)
@@ -330,10 +330,12 @@ class experiment(): # Directory management and multiple acquisitions
             if GUIInstance.btn['Stop'][0].isChecked(): # Stop if button pressed
                 scanInterrupted = True
             if scanInterrupted:
+                ### Stop the laser and break while loop
+                SDK.MIRcatSDK_StopScanInProgress()
                 break
-            ### Arm triggered acquisition
+            ### Triggered acquisition
             voltages = multipleAI.acquire(sampleNumber)
-            ### Monitor laser status
+            ### Get wavelength at trigger
             isScanInProgress = c_bool(True)
             isScanActive = c_bool(False)
             isScanPaused = c_bool(False)
@@ -342,8 +344,7 @@ class experiment(): # Directory management and multiple acquisitions
             curWW = c_float()
             isTECinProgress = c_bool()
             isMotionInProgress = c_bool()
-            units = wlUnit
-            start = timer()
+            units = MIRcatSDK_UNITS_MICRONS
             SDK.MIRcatSDK_GetScanStatus(byref(isScanInProgress),
                                         byref(isScanActive),
                                         byref(isScanPaused),
@@ -353,7 +354,9 @@ class experiment(): # Directory management and multiple acquisitions
                                         byref(units),
                                         byref(isTECinProgress),
                                         byref(isMotionInProgress))
+
             ### Average voltages
+            data[step, 0] = curWW.value
             data[step, 1] = np.sum(voltages[0])/sampleNumber # Lock-in X
             data[step, 2] = np.sum(voltages[1])/sampleNumber # Lock-in Y
             data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +

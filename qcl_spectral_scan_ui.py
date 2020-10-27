@@ -398,6 +398,7 @@ class mainWindow(QMainWindow):
         self.btn['Emission'][0].clicked.connect(lambda: self.emission())
         self.btn['Tune'][0].clicked.connect(lambda: self.tune())
         self.btn['Start'][0].clicked.connect(lambda: self.run_experiment(self))
+        self.btn['Sweep'][0].clicked.connect(lambda: self.run_experiment(self))
         # self.btn['RefEnable'][0].clicked.connect(lambda: self.reference_enable())
         self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.latestDir))
         self.activeQcl = 0 # None selected on startup
