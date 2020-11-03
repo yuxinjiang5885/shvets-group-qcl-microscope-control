@@ -115,6 +115,7 @@ DEF_SAMPLERATE = 100000 # Hz
 # DEF_SAMPLES = 100
 # DEF_SAMPLES = 320
 DEF_SAMPLES = 32
+DEF_SPEED = 1. # Defauls sweep speed, um/s
 
 # UI look and feel settings
 COL_WIDTH = 100

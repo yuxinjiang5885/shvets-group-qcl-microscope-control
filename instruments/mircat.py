@@ -255,7 +255,7 @@ class laser():
             print('Sweep step {} ({} %).'.format(curScanNum.value, curScanPercent.value))
         print('Sweep complete ({} s).'.format(timer() - start))
 
-    def sweep_and_forget_um(self, wl_start_um, wl_end_um, wl_step_um):
+    def sweep_and_forget_um(self, wl_start_um, wl_end_um, wl_speed_ums=1.):
         '''Launch a sweep, but do not monitor it.
            Wavelength in microns.
            Intended for use with a separate monitoring routine.'''
@@ -263,11 +263,11 @@ class laser():
         wlUnit = MIRcatSDK_UNITS_MICRONS
         SDK.MIRcatSDK_StartSweepScan(c_float(wl_start_um),
                                      c_float(wl_end_um),
-                                     c_float(wl_step_um),
+                                     c_float(wl_speed_ums),
                                      wlUnit, c_uint16(1), c_bool(False),
                                      c_uint8(0))
 
-    def sweep_and_forget_invcm(self, wn_start_invcm, wn_end_invcm, wn_step_invcm):
+    def sweep_and_forget_invcm(self, wn_start_invcm, wn_end_invcm, wn_speed_invcms=1.):
         '''Launch a sweep, but do not monitor it.
            Wavenumber in inverse centimeters.
            Intended for use with a separate monitoring routine.'''
@@ -275,7 +275,7 @@ class laser():
         wnUnit = MIRcatSDK_UNITS_CM1
         SDK.MIRcatSDK_StartSweepScan(c_float(wn_start_invcm),
                                      c_float(wn_end_invcm),
-                                     c_float(wn_step_invcm),
+                                     c_float(wn_speed_invcms),
                                      wnUnit, c_uint16(1), c_bool(False),
                                      c_uint8(0))
 

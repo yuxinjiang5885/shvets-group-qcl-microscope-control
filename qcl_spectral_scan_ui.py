@@ -309,6 +309,8 @@ class mainWindow(QMainWindow):
         self.inputField['SamplingRate'][0].setToolTip('Acquisition card sampling rate')
         self.inputField['SamplesPerWl'] = [QLineEdit('{}'.format(DEF_SAMPLES)), 9, 9, 1, 1]
         self.inputField['SamplesPerWl'][0].setToolTip('Samples read by acquisition card at every step')
+        self.inputField['Speed'] = [QLineEdit('{}'.format(DEF_SPEED)), 9, 10, 1, 1]
+        self.inputField['Speed'][0].setToolTip('Sweep speed')
         # Input fields: reference
         self.inputField['RefPath'] = [QLineEdit('C:\\Data\\_experiment_data'), 10, 8, 1, 3]
         # Create all input fields
@@ -342,6 +344,7 @@ class mainWindow(QMainWindow):
         self.labelSubHead['YStep'] = [QLabel('Stg. Y Step (μm)'), 6, 10, 1, 1]
         self.labelSubHead['SamplingRate'] = [QLabel('Sampl. Rate (Hz)'), 8, 8, 1, 1]
         self.labelSubHead['SamplesPerWl'] = [QLabel('Sampl. per Wl.'), 8, 9, 1, 1]
+        self.labelSubHead['Speed'] = [QLabel('Speed (μm/s)'), 8, 10, 1, 1]
         for _, k in self.labelSubHead.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(STYLE_LABEL_EMPH)
@@ -576,6 +579,7 @@ class mainWindow(QMainWindow):
             self.labelSubHead['WlStart'][0].setText('Wl. Start (cm⁻¹)')
             self.labelSubHead['WlEnd'][0].setText('Wl. End (cm⁻¹)')
             self.labelSubHead['WlStep'][0].setText('Wl. Step (cm⁻¹)')
+            self.labelSubHead['Speed'][0].setText('Speed (cm⁻¹/s)')
             for wlLabel in ['WlStart', 'WlEnd']:
                 currentWl = float(self.inputField[wlLabel][0].text())
                 convertedWl = self.wl_converter(currentWl, 'invcm', qcl=[])
@@ -600,6 +604,7 @@ class mainWindow(QMainWindow):
             self.labelSubHead['WlStart'][0].setText('Wl. Start (μm)  ')
             self.labelSubHead['WlEnd'][0].setText('Wl. End (μm)  ')
             self.labelSubHead['WlStep'][0].setText('Wl. Step (μm)  ')
+            self.labelSubHead['Speed'][0].setText('Speed (μm/s)')
             for wlLabel in ['WlStart', 'WlEnd']:
                 currentWl = float(self.inputField[wlLabel][0].text())
                 convertedWl = self.wl_converter(currentWl, 'um', qcl=[])

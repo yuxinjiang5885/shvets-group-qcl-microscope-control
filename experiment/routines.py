@@ -319,61 +319,71 @@ class experiment(): # Directory management and multiple acquisitions
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
         multipleAI.configure_triggered(defaults.PCI_TRIG, sampleNumber, sampleRate)
         ### Start laser sweep
+        speed = float(GUIInstance.inputField['Speed'][0].text())
         if GUIInstance.wlUnits == 'um':
-            GUIInstance.laser.sweep_and_forget_um(wlList[0], wlList[-1], wlStep)
+            GUIInstance.laser.sweep_and_forget_um(wlList[0], wlList[-1] + wlStep, speed)
         elif GUIInstance.wlUnits == 'invcm':
-            GUIInstance.laser.sweep_and_forget_invcm(wlList[0], wlList[-1], wlStep)
+            GUIInstance.laser.sweep_and_forget_invcm(wlList[0], wlList[-1], speed)
         ### Run experiment
         sweepRunning = True
-        while sweepRunning:
-            ### Check if "Stop" has been pressed
-            if GUIInstance.btn['Stop'][0].isChecked(): # Stop if button pressed
-                scanInterrupted = True
-            if scanInterrupted:
-                ### Stop the laser and break while loop
-                SDK.MIRcatSDK_StopScanInProgress()
-                break
-            ### Triggered acquisition
-            voltages = multipleAI.acquire(sampleNumber)
-            ### Get wavelength at trigger
-            isScanInProgress = c_bool(True)
-            isScanActive = c_bool(False)
-            isScanPaused = c_bool(False)
-            curScanNum = c_uint16()
-            curScanPercent = c_uint16()
-            curWW = c_float()
-            isTECinProgress = c_bool()
-            isMotionInProgress = c_bool()
-            units = MIRcatSDK_UNITS_MICRONS
-            SDK.MIRcatSDK_GetScanStatus(byref(isScanInProgress),
-                                        byref(isScanActive),
-                                        byref(isScanPaused),
-                                        byref(curScanNum),
-                                        byref(curScanPercent),
-                                        byref(curWW),
-                                        byref(units),
-                                        byref(isTECinProgress),
-                                        byref(isMotionInProgress))
-
-            ### Average voltages
-            data[step, 0] = curWW.value
-            data[step, 1] = np.sum(voltages[0])/sampleNumber # Lock-in X
-            data[step, 2] = np.sum(voltages[1])/sampleNumber # Lock-in Y
-            data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +
-                                     np.power(data[step, 2], 2))) # Lock-in R
-            GUIInstance.spectrumCanvas.flush_events()
-            GUIInstance.spectrumCanvas.plot_line(data[:step+1, 0],
-                                                 data[:step+1, 3])
-            if useRef:
-                GUIInstance.spectrumCanvasT.flush_events()
-                GUIInstance.spectrumCanvasT.plot_line(data[:step+1, 0],
-                                          data[:step+1, 3]/dataRef[:step+1, 3])
-            if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
-                # In auto-enable mode, turn off for every wavelength
-                GUIInstance.btn['Emission'][0].setChecked(False)
-                GUIInstance.emission()
-            GUIInstance.repaint()
+        try:
+            while sweepRunning:
+                ### Check if "Stop" has been pressed
+                if GUIInstance.btn['Stop'][0].isChecked(): # Stop if button pressed
+                    scanInterrupted = True
+                if scanInterrupted:
+                    ### Stop the laser and break while loop
+                    SDK.MIRcatSDK_StopScanInProgress()
+                    break
+                ### Triggered acquisition
+                voltages = multipleAI.acquire(sampleNumber)
+                ### Get wavelength at trigger
+                isScanInProgress = c_bool(True)
+                isScanActive = c_bool(False)
+                isScanPaused = c_bool(False)
+                curScanNum = c_uint16()
+                curScanPercent = c_uint16()
+                curWW = c_float()
+                isTECinProgress = c_bool()
+                isMotionInProgress = c_bool()
+                units = MIRcatSDK_UNITS_MICRONS
+                SDK.MIRcatSDK_GetScanStatus(byref(isScanInProgress),
+                                            byref(isScanActive),
+                                            byref(isScanPaused),
+                                            byref(curScanNum),
+                                            byref(curScanPercent),
+                                            byref(curWW),
+                                            byref(units),
+                                            byref(isTECinProgress),
+                                            byref(isMotionInProgress))
+                print(curWW.value) # troubleshooting
+                ### Average voltages
+                data[step, 0] = curWW.value
+                data[step, 1] = np.sum(voltages[0])/sampleNumber # Lock-in X
+                data[step, 2] = np.sum(voltages[1])/sampleNumber # Lock-in Y
+                data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +
+                                        np.power(data[step, 2], 2))) # Lock-in R
+                GUIInstance.spectrumCanvas.flush_events()
+                GUIInstance.spectrumCanvas.plot_line(data[:step+1, 0],
+                                                    data[:step+1, 3])
+                if useRef:
+                    GUIInstance.spectrumCanvasT.flush_events()
+                    GUIInstance.spectrumCanvasT.plot_line(data[:step+1, 0],
+                                            data[:step+1, 3]/dataRef[:step+1, 3])
+                if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
+                    # In auto-enable mode, turn off for every wavelength
+                    GUIInstance.btn['Emission'][0].setChecked(False)
+                    GUIInstance.emission()
+                step += 1
+                GUIInstance.repaint()
+                if not isScanActive or curWW.value > wlList[-1]:
+                    sweepRunning = False
+                    break
+        except Exception as exc:
+            print('Failed to run sweep:\n{}'.format(exc))
         end = timer()
+        SDK.MIRcatSDK_StopScanInProgress() # Scan may otherwise hang
+        GUIInstance.btn['Sweep'][0].setChecked(False)
         ### Clear triggered acquisition task
         multipleAI.clear_task()
         if scanInterrupted:

@@ -30,7 +30,7 @@ from PyDAQmx.DAQmxFunctions import (byref,
 #from PyDAQmx.Task import TaskHandle
 from PyDAQmx.DAQmxTypes import int32, TaskHandle
 
-DAQ_TIMEOUT = 10 # s
+DAQMX_TIMEOUT = 10 # s
 
 class MultiChannelAnalogInput():
     '''Read multiple analog input channels simultaneously with NI DAQmx.'''
@@ -39,8 +39,7 @@ class MultiChannelAnalogInput():
         self.physicalChannel = physicalChannel
         self.numberOfChannel = physicalChannel.__len__()
         if limit is None:
-            self.limit = dict([(name, (-10.0,10.0))
-            for name in self.physicalChannel])
+            self.limit = dict([(name, (-10.0,10.0)) for name in self.physicalChannel])
         elif type(limit) == tuple:
             self.limit = dict([(name, limit) for name in self.physicalChannel])
         else:
@@ -57,7 +56,7 @@ class MultiChannelAnalogInput():
         read = int32()
         DAQmxReadAnalogF64(self.taskHandle,
                            sampleNumber,
-                           10.0,
+                           DAQMX_TIMEOUT,
                            DAQmx_Val_GroupByChannel,
                            data,
                            sampleNumber*self.numberOfChannel,
