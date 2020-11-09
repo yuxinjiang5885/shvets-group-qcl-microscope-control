@@ -288,7 +288,7 @@ class experiment(): # Directory management and multiple acquisitions
         elif GUIInstance.wlUnits == 'invcm': # Inverted, for compatibility in code
             minQclWl = defaults.WL_MAXIMUMS_INVCM
             maxQclWl = defaults.WL_MINIMUMS_INVCM
-        for wli, wl in enumerate(wlRange):
+        for wli, wl in enumerate(wlRange): # Only keep wavelengths within limits
             if (minQclWl[0] <= wl <= maxQclWl[0] or
                 minQclWl[1] <= wl <= maxQclWl[1] or
                 minQclWl[2] <= wl <= maxQclWl[2] or
@@ -346,7 +346,10 @@ class experiment(): # Directory management and multiple acquisitions
                 curWW = c_float()
                 isTECinProgress = c_bool()
                 isMotionInProgress = c_bool()
-                units = MIRcatSDK_UNITS_MICRONS
+                if GUIInstance.wlUnits == 'um':
+                    units = MIRcatSDK_UNITS_MICRONS
+                elif GUIInstance.wlUnits == 'invcm':
+                    units = MIRcatSDK_UNITS_CM1
                 SDK.MIRcatSDK_GetScanStatus(byref(isScanInProgress),
                                             byref(isScanActive),
                                             byref(isScanPaused),
