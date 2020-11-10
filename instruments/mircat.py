@@ -8,27 +8,38 @@ Control MIRcat QCL laser via VISA.
 Created 2019-Mar-12 for Python 3.7.2
 '''
 
+### Basic imports
 import inspect, os, sys, time
 from ctypes import (byref, CDLL, c_bool, c_float, c_uint, c_uint8, c_uint16,
                     c_uint32)
 from inspect import currentframe, getfile
 from os.path import abspath, join, split, realpath
 from timeit import default_timer as timer
-# Look for modules in "instruments", https://stackoverflow.com/a/6098238
+
+### Look for modules in "instruments", https://stackoverflow.com/a/6098238
 mDir = realpath(abspath(split(getfile(currentframe()))[0]))
 if mDir not in sys.path:
     sys.path.append(mDir)
-# Look for modules in "daylight"
+
+### Look for modules in "daylight"
 mSubdir = realpath(abspath(join(split(getfile(currentframe()))[0],'daylight')))
 if mSubdir not in sys.path:
     sys.path.append(mSubdir)
-from daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_CM1, MIRcatSDK_UNITS_MICRONS
+from daylight.MIRcatSDKConstants import (MIRcatSDK_PROC_TRIG_MODE_INTERNAL,
+                                         MIRcatSDK_PULSE_MODE_INTERNAL,
+                                         MIRcatSDK_UNITS_CM1,
+                                         MIRcatSDK_UNITS_MICRONS)
 from daylight.MIRcatSDKHelpers import ArmAndWaitForTemp
-# Import Daylight's MIRcat DLL
+
+### Import Daylight's MIRcat DLL
 SDK_NAME = 'MIRcatSDK.dll'
 sdkPath = os.path.join(mSubdir, SDK_NAME)
 SDK = CDLL(sdkPath)
 
+### Default values for wavelength triggering.
+### These were found via MIRcatSDK_GetWlTrigParams and units are unknown.
+DEFAULT_DWELL_TIME = 100000
+DEFAULT_AFTER_OFF_TIME = 100000
 
 class laser():
     '''Control MIRcat QCL laser.'''
@@ -199,6 +210,55 @@ class laser():
                                   byref(lightValid))
         return wlRead.value
 
+    def get_wl_trigger_parameters(self):
+        '''Get the wavelength trigger parameters.'''
+        pbPulseMode = c_uint8()
+        pbProcTrigMode = c_uint8()
+        pfWlTrigStart = c_float()
+        pfWlTrigStop = c_float()
+        pfWlTrigInterval = c_float()
+        pbUnits = c_uint8()
+        pDwellTime = c_uint32()
+        pAfterOffTime = c_uint32()
+        SDK.MIRcatSDK_GetWlTrigParams(byref(pbPulseMode),
+                                      byref(pbProcTrigMode),
+                                      byref(pfWlTrigStart),
+                                      byref(pfWlTrigStop),
+                                      byref(pfWlTrigInterval),
+                                      byref(pbUnits),
+                                      byref(pDwellTime),
+                                      byref(pAfterOffTime))
+        return([pfWlTrigStart.value,
+                pfWlTrigStop.value,
+                pfWlTrigInterval.value,
+                pDwellTime.value,
+                pAfterOffTime.value])
+
+    def set_wl_trigger_parameters(self, start, end, interval, units = 'um'):
+        '''Set the wavelength trigger parameters.'''
+        pbPulseMode = MIRcatSDK_PULSE_MODE_INTERNAL
+        pbProcTrigMode = MIRcatSDK_PROC_TRIG_MODE_INTERNAL
+        pfWlTrigStart = c_float(start)
+        pfWlTrigStop = c_float(end)
+        pfWlTrigInterval = c_float(interval)
+        if units == 'invcm':
+            pbUnits = MIRcatSDK_UNITS_CM1
+        elif units == 'um':
+            pbUnits = MIRcatSDK_UNITS_MICRONS
+        else:
+            print('Trigger settings: unknown units. Defaulting to micrometers.')
+            pbUnits = MIRcatSDK_UNITS_MICRONS
+        pDwellTime = c_uint32(DEFAULT_DWELL_TIME)
+        pAfterOffTime = c_uint32(DEFAULT_AFTER_OFF_TIME)
+        SDK.MIRcatSDK_SetWlTrigParams(pbPulseMode,
+                                      pbProcTrigMode,
+                                      pfWlTrigStart,
+                                      pfWlTrigStop,
+                                      pfWlTrigInterval,
+                                      pbUnits,
+                                      pDwellTime,
+                                      pAfterOffTime)
+
     def stabilize(self):
         '''Wait until TEC temperatures are stable.
            Always run after arming and before tuning.'''
@@ -255,29 +315,47 @@ class laser():
             print('Sweep step {} ({} %).'.format(curScanNum.value, curScanPercent.value))
         print('Sweep complete ({} s).'.format(timer() - start))
 
-    def sweep_and_forget_um(self, wl_start_um, wl_end_um, wl_speed_ums=1.):
+    def sweep_and_forget(self, start, end, speed=0.5, units='um'):
         '''Launch a sweep, but do not monitor it.
-           Wavelength in microns.
            Intended for use with a separate monitoring routine.'''
-        ### Send sweep command
-        wlUnit = MIRcatSDK_UNITS_MICRONS
-        SDK.MIRcatSDK_StartSweepScan(c_float(wl_start_um),
-                                     c_float(wl_end_um),
-                                     c_float(wl_speed_ums),
-                                     wlUnit, c_uint16(1), c_bool(False),
-                                     c_uint8(0))
+        ### Give time for the routine to start the acquisition
+        time.sleep(1)
+        if units == 'invcm': # Wavenumbers in inverse cm
+            wlUnits = MIRcatSDK_UNITS_CM1
+        elif units == 'um': # Wavelenghts in microns
+            wlUnits = MIRcatSDK_UNITS_MICRONS
+        else:
+            print('Trigger settings: unknown units. Defaulting to micrometers.')
+            wlUnits = MIRcatSDK_UNITS_MICRONS
+        SDK.MIRcatSDK_StartSweepScan(c_float(start),
+                                     c_float(end),
+                                     c_float(speed),
+                                     wlUnits,
+                                     c_uint16(1), c_bool(False), c_uint8(0))
 
-    def sweep_and_forget_invcm(self, wn_start_invcm, wn_end_invcm, wn_speed_invcms=1.):
-        '''Launch a sweep, but do not monitor it.
-           Wavenumber in inverse centimeters.
-           Intended for use with a separate monitoring routine.'''
-           ### Send sweep command
-        wnUnit = MIRcatSDK_UNITS_CM1
-        SDK.MIRcatSDK_StartSweepScan(c_float(wn_start_invcm),
-                                     c_float(wn_end_invcm),
-                                     c_float(wn_speed_invcms),
-                                     wnUnit, c_uint16(1), c_bool(False),
-                                     c_uint8(0))
+    # def sweep_and_forget_um(self, wl_start_um, wl_end_um, wl_speed_ums=1.):
+    #     '''Launch a sweep, but do not monitor it.
+    #        Wavelength in microns.
+    #        Intended for use with a separate monitoring routine.'''
+    #     ### Send sweep command
+    #     wlUnit = MIRcatSDK_UNITS_MICRONS
+    #     SDK.MIRcatSDK_StartSweepScan(c_float(wl_start_um),
+    #                                  c_float(wl_end_um),
+    #                                  c_float(wl_speed_ums),
+    #                                  wlUnit, c_uint16(1), c_bool(False),
+    #                                  c_uint8(0))
+
+    # def sweep_and_forget_invcm(self, wn_start_invcm, wn_end_invcm, wn_speed_invcms=1.):
+    #     '''Launch a sweep, but do not monitor it.
+    #        Wavenumber in inverse centimeters.
+    #        Intended for use with a separate monitoring routine.'''
+    #        ### Send sweep command
+    #     wnUnit = MIRcatSDK_UNITS_CM1
+    #     SDK.MIRcatSDK_StartSweepScan(c_float(wn_start_invcm),
+    #                                  c_float(wn_end_invcm),
+    #                                  c_float(wn_speed_invcms),
+    #                                  wnUnit, c_uint16(1), c_bool(False),
+    #                                  c_uint8(0))
 
     def tune(self, qcl, wl, wlUnits='um'):
         '''Tune QCL "qcl" wavelength to "wl", in units "wlUnits".

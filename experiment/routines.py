@@ -295,15 +295,16 @@ class experiment(): # Directory management and multiple acquisitions
                 minQclWl[3] <= wl <= maxQclWl[3]):
                 wlList[wli] = wl
         wlList = wlList[wlList != 0] # Remove zero values
-        if GUIInstance.wlUnits == 'invcm':
+        if GUIInstance.wlUnits == 'invcm': # Go from largest to smallest
             wlList = np.flip(wlList)
+        print(wlList)
         stepNumber = len(wlList)
         if useRef and len(dataRef[:,0]) != stepNumber:
             print('Steps in reference and planned experiment do not match.')
             useRef = False
         # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
         data = np.zeros((stepNumber, 4)) # wl, X, Y, R
-        print('Scan started ...')
+        print('Sweep started ...')
         GUIInstance.spectrumCanvas.clear_plots()
         GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
         if useRef:
@@ -318,21 +319,34 @@ class experiment(): # Directory management and multiple acquisitions
         ### Configure triggered acquisition
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
         multipleAI.configure_triggered(defaults.PCI_TRIG, sampleNumber, sampleRate)
-        ### Start laser sweep
+        ### Set laser triggering (one TTL pulse per wl/wn) and start sweep
         speed = float(GUIInstance.inputField['Speed'][0].text())
         if GUIInstance.wlUnits == 'um':
-            GUIInstance.laser.sweep_and_forget_um(wlList[0], wlList[-1] + wlStep, speed)
+            start = wlList[0] - wlStep # Start one before, to make sure
+            end = wlList[-1] + wlStep  # End one after, to make sure
+            interval = wlStep
+            GUIInstance.laser.set_wl_trigger_parameters(start, end, interval, units='um')
+            GUIInstance.laser.sweep_and_forget(wlList[0], wlList[-1] + wlStep, speed, units='um')
+            print(GUIInstance.laser.get_wl_trigger_parameters()) # Troubleshooting
         elif GUIInstance.wlUnits == 'invcm':
-            GUIInstance.laser.sweep_and_forget_invcm(wlList[0], wlList[-1], speed)
+            end = wlList[0] + wlStep # Start one before, to make sure
+            start = wlList[-1] - wlStep  # End one after, to make sure
+            interval = wlStep
+            GUIInstance.laser.set_wl_trigger_parameters(start, end, interval, units='invcm')
+            GUIInstance.laser.sweep_and_forget(wlList[0], wlList[-1], speed, units = 'invcm')
+            print(GUIInstance.laser.get_wl_trigger_parameters()) # Troubleshooting
         ### Run experiment
         sweepRunning = True
         try:
             while sweepRunning:
+                ### Check if all points already acquired
+                if step > len(wlList):
+                    scanInterrupted = True
                 ### Check if "Stop" has been pressed
                 if GUIInstance.btn['Stop'][0].isChecked(): # Stop if button pressed
                     scanInterrupted = True
+                ### Stop the laser and break while loop
                 if scanInterrupted:
-                    ### Stop the laser and break while loop
                     SDK.MIRcatSDK_StopScanInProgress()
                     break
                 ### Triggered acquisition
@@ -350,6 +364,8 @@ class experiment(): # Directory management and multiple acquisitions
                     units = MIRcatSDK_UNITS_MICRONS
                 elif GUIInstance.wlUnits == 'invcm':
                     units = MIRcatSDK_UNITS_CM1
+                else:
+                    units = MIRcatSDK_UNITS_MICRONS
                 SDK.MIRcatSDK_GetScanStatus(byref(isScanInProgress),
                                             byref(isScanActive),
                                             byref(isScanPaused),
@@ -359,27 +375,31 @@ class experiment(): # Directory management and multiple acquisitions
                                             byref(units),
                                             byref(isTECinProgress),
                                             byref(isMotionInProgress))
+                # Print current wavelength/wavenumber
                 print(curWW.value) # troubleshooting
                 ### Average voltages
-                data[step, 0] = curWW.value
+                # data[step, 0] = curWW.value
+                if GUIInstance.wlUnits == 'um':
+                    current_wl = curWW.value
+                elif GUIInstance.wlUnits == 'invcm':
+                    current_wl = 1 / (curWW.value*1E-4)
+                else:
+                    current_wl = curWW.value
+                data[step, 0] = wlList[(np.abs(wlList - current_wl)).argmin()]
                 data[step, 1] = np.sum(voltages[0])/sampleNumber # Lock-in X
                 data[step, 2] = np.sum(voltages[1])/sampleNumber # Lock-in Y
                 data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +
                                         np.power(data[step, 2], 2))) # Lock-in R
                 GUIInstance.spectrumCanvas.flush_events()
                 GUIInstance.spectrumCanvas.plot_line(data[:step+1, 0],
-                                                    data[:step+1, 3])
+                                                     data[:step+1, 3])
                 if useRef:
                     GUIInstance.spectrumCanvasT.flush_events()
                     GUIInstance.spectrumCanvasT.plot_line(data[:step+1, 0],
                                             data[:step+1, 3]/dataRef[:step+1, 3])
-                if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
-                    # In auto-enable mode, turn off for every wavelength
-                    GUIInstance.btn['Emission'][0].setChecked(False)
-                    GUIInstance.emission()
                 step += 1
                 GUIInstance.repaint()
-                if not isScanActive or curWW.value > wlList[-1]:
+                if not isScanActive:
                     sweepRunning = False
                     break
         except Exception as exc:

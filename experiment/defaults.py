@@ -106,7 +106,8 @@ WL_MINIMUMS_UM = [MIN_WL_QCL1_UM,
                   MIN_WL_QCL2_UM,
                   MIN_WL_QCL3_UM,
                   MIN_WL_QCL4_UM]
-
+MAX_SWEEP_SPEED_UM = 0.5
+MAX_SWEEP_SPEED_INVCM = 100
 
 # NI PCIe card sampling default parameters
 # DEF_SAMPLERATE = 1000 # Hz
@@ -115,7 +116,11 @@ DEF_SAMPLERATE = 100000 # Hz
 # DEF_SAMPLES = 100
 # DEF_SAMPLES = 320
 DEF_SAMPLES = 32
-DEF_SPEED = 1. # Defauls sweep speed, um/s
+
+# Default scan/sweep parameters
+DEF_WL_START_UM = 5.2 # Default scan/sweep start wavelength, um
+DEF_WL_END_UM = 5.8 # Default scan/sweep end wavelength, um
+DEF_WL_STEP_UM = 0.1 # Default scan/sweep wavelength step, um
 
 # UI look and feel settings
 COL_WIDTH = 100

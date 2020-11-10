@@ -299,17 +299,17 @@ class mainWindow(QMainWindow):
                 self.inputField[fieldString] = [QLineEdit(startupString), row, col, 1, 1]
                 self.inputField[fieldString][0].setToolTip('DO NOT USE: set in MIRcatControl')
         # Input fields: experiment controls
-        self.inputField['WlStart'] = [QLineEdit('5.4'), 3, 8, 1, 1]
+        self.inputField['WlStart'] = [QLineEdit('{}'.format(DEF_WL_START_UM)), 3, 8, 1, 1]
         self.inputField['WlStart'][0].setToolTip('First scan wavelength')
-        self.inputField['WlEnd'] = [QLineEdit('5.8'), 3, 9, 1, 1]
+        self.inputField['WlEnd'] = [QLineEdit('{}'.format(DEF_WL_END_UM)), 3, 9, 1, 1]
         self.inputField['WlEnd'][0].setToolTip('Last scan wavelength')
-        self.inputField['WlStep'] = [QLineEdit('0.1'), 3, 10, 1, 1]
+        self.inputField['WlStep'] = [QLineEdit('{}'.format(DEF_WL_STEP_UM)), 3, 10, 1, 1]
         self.inputField['WlStep'][0].setToolTip('Scan wavelength step')
         self.inputField['SamplingRate'] = [QLineEdit('{}'.format(DEF_SAMPLERATE)), 9, 8, 1, 1]
         self.inputField['SamplingRate'][0].setToolTip('Acquisition card sampling rate')
         self.inputField['SamplesPerWl'] = [QLineEdit('{}'.format(DEF_SAMPLES)), 9, 9, 1, 1]
         self.inputField['SamplesPerWl'][0].setToolTip('Samples read by acquisition card at every step')
-        self.inputField['Speed'] = [QLineEdit('{}'.format(DEF_SPEED)), 9, 10, 1, 1]
+        self.inputField['Speed'] = [QLineEdit('{}'.format(MAX_SWEEP_SPEED_UM)), 9, 10, 1, 1]
         self.inputField['Speed'][0].setToolTip('Sweep speed')
         # Input fields: reference
         self.inputField['RefPath'] = [QLineEdit('C:\\Data\\_experiment_data'), 10, 8, 1, 3]
@@ -556,7 +556,7 @@ class mainWindow(QMainWindow):
         return outWl
 
     def wl_units(self):
-        '''Change wavelength units.'''
+        '''Change wavelength/wavenumber units.'''
         # Uncheck
         if self.btn['WlUnits'][0].isChecked:
             self.btn['WlUnits'][0].setChecked(False)
@@ -585,8 +585,10 @@ class mainWindow(QMainWindow):
                 convertedWl = self.wl_converter(currentWl, 'invcm', qcl=[])
                 wlString = '{:.1f}'.format(convertedWl)
                 self.inputField[wlLabel][0].setText(wlString)
+            # Set maximum sweep speed
+            self.inputField['Speed'][0].setText('{:.0f}'.format(MAX_SWEEP_SPEED_INVCM))
             # Can't unambiguously convert step
-            self.inputField['WlStep'][0].setText('10')
+            self.inputField['WlStep'][0].setText('100')
             self.spectrumCanvas.axes.set_xlabel('Wavelength (cm⁻¹)')
         # Switch units from cm^-1 to um
         elif self.wlUnits == 'invcm':
@@ -610,6 +612,8 @@ class mainWindow(QMainWindow):
                 convertedWl = self.wl_converter(currentWl, 'um', qcl=[])
                 wlString = '{:.1f}'.format(convertedWl)
                 self.inputField[wlLabel][0].setText(wlString)
+            # Set maximum sweep speed
+            self.inputField['Speed'][0].setText('{:.2f}'.format(MAX_SWEEP_SPEED_UM))
             # Can't unambiguously convert step
             self.inputField['WlStep'][0].setText('0.1')
             self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
