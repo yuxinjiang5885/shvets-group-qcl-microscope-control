@@ -385,7 +385,8 @@ class experiment(): # Directory management and multiple acquisitions
                     current_wl = 1 / (curWW.value*1E-4)
                 else:
                     current_wl = curWW.value
-                data[step, 0] = wlList[(np.abs(wlList - current_wl)).argmin()]
+                # data[step, 0] = wlList[(np.abs(wlList - current_wl)).argmin()]
+                data[step, 0] = current_wl
                 data[step, 1] = np.sum(voltages[0])/sampleNumber # Lock-in X
                 data[step, 2] = np.sum(voltages[1])/sampleNumber # Lock-in Y
                 data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +
