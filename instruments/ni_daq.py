@@ -12,6 +12,7 @@ from PyDAQmx.DAQmxConstants import (DAQmx_Val_Cfg_Default,
                                     DAQmx_Val_CountUp,
                                     DAQmx_Val_FiniteSamps,
                                     DAQmx_Val_GroupByChannel,
+                                    DAQmx_StartTrig_Retriggerable,
                                     DAQmx_Val_Rising,
                                     DAQmx_Val_Volts)
 from PyDAQmx.DAQmxFunctions import (byref,
@@ -24,6 +25,7 @@ from PyDAQmx.DAQmxFunctions import (byref,
                                     DAQmxCreateTask,
                                     DAQmxReadAnalogF64,
                                     DAQmxResetDevice,
+                                    DAQmxSetTrigAttribute,
                                     DAQmxStartTask,
                                     DAQmxStopTask,
                                     DAQmxWaitUntilTaskDone)
@@ -118,3 +120,6 @@ class MultiChannelAnalogInput():
         DAQmxCfgDigEdgeStartTrig(self.taskHandle,
                                  triggerChannel,
                                  DAQmx_Val_Rising);
+        ### Make task retriggerable. Requires X-series (63XX) hardware.
+        DAQmxSetTrigAttribute(self.taskHandle,
+                              DAQmx_StartTrig_Retriggerable, True)
