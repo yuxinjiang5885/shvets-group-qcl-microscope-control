@@ -28,146 +28,6 @@ class experiment(): # Directory management and multiple acquisitions
     def __init__(self):
         pass
 
-    def fast_sweep(self, GUIInstance, wlUnits='um'):
-        '''Run a sweep using the MIRcat's built-in function.
-           Faster sweep using retriggerable analog inputs.
-           Requires NI X-series (63XX) platforms.'''
-        currentDir = os.getcwd()
-        ### Lock use of reference
-        dataRef = np.zeros((1, 2))
-        if GUIInstance.btn['RefEnable'][0].isChecked():
-            useRef = True
-        else:
-            useRef = False
-        if useRef:
-            try:
-                dataPath = GUIInstance.refDir # Latest experiment directory
-                dataPathParts = os.path.split(dataPath)
-                fileName = '{}{}'.format(dataPathParts[-1], defaults.DEF_FILENAME)
-                filePath = os.path.join(dataPath, fileName)
-                dataRef = np.loadtxt(filePath)
-            except Exception as exc:
-                print('Failed to load reference:\n{}'.format(exc))
-        ### Get parameters from UI
-        sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
-        sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
-        if wlUnits == 'um':
-            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
-            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
-        elif wlUnits == 'invcm':
-            wlStart = float(GUIInstance.inputField['WlEnd'][0].text())
-            wlEnd = float(GUIInstance.inputField['WlStart'][0].text())
-        else:
-            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
-            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
-        wlStep = float(GUIInstance.inputField['WlStep'][0].text())
-        if platform.system() == 'Windows':
-            currentDirSplit = currentDir.split('\\')
-        else:
-            currentDirSplit = currentDir.split('/')
-        currentFolder = currentDirSplit[-1]
-        ### Divert stdout to log file
-        original = sys.stdout
-        logFile = open('%s.log' % (currentFolder), 'w')
-        # sys.stdout = logFile
-        ### Write list of wavelengths, excuding ranges not covered by the QCLs
-        wlRange = np.arange(wlStart, wlEnd + wlStep, wlStep)
-        wlList = np.zeros(len(wlRange))
-        if GUIInstance.wlUnits == 'um':
-            minQclWl = defaults.WL_MINIMUMS_UM
-            maxQclWl = defaults.WL_MAXIMUMS_UM
-        elif GUIInstance.wlUnits == 'invcm': # Inverted, for compatibility in code
-            minQclWl = defaults.WL_MAXIMUMS_INVCM
-            maxQclWl = defaults.WL_MINIMUMS_INVCM
-        else:
-            minQclWl = defaults.WL_MINIMUMS_UM
-            maxQclWl = defaults.WL_MAXIMUMS_UM
-        for wli, wl in enumerate(wlRange): # Only keep wavelengths within limits
-            if (minQclWl[0] <= wl <= maxQclWl[0] or
-                minQclWl[1] <= wl <= maxQclWl[1] or
-                minQclWl[2] <= wl <= maxQclWl[2] or
-                minQclWl[3] <= wl <= maxQclWl[3]):
-                wlList[wli] = wl
-        wlList = wlList[wlList != 0] # Remove zero values
-        if GUIInstance.wlUnits == 'invcm': # Go from largest to smallest
-            wlList = np.flip(wlList)
-        print(wlList)
-        stepNumber = len(wlList)
-        if useRef and len(dataRef[:,0]) != stepNumber:
-            print('Steps in reference and planned experiment do not match.')
-            useRef = False
-        # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
-        data = np.zeros((stepNumber, 4)) # wl, X, Y, R
-        print('Sweep started ...')
-        GUIInstance.spectrumCanvas.clear_plots()
-        GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
-        if useRef:
-            GUIInstance.spectrumCanvasT.clear_plots()
-            GUIInstance.spectrumCanvasT.axes.set_xlim(wlList[0], wlList[-1])
-        GUIInstance.repaint()
-        startRun = timer()
-        step = 0
-        scanInterrupted = False
-        print('One wavelength point per step, avg. of %.0f samples at %.0f Hz'
-              % (sampleNumber, sampleRate))
-        ### Configure triggered acquisition
-        multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
-        multipleAI.configure_triggered(defaults.PCI_TRIG, sampleNumber, sampleRate)
-        ### Set laser triggering (one TTL pulse per wl/wn) and start sweep
-        speed = float(GUIInstance.inputField['Speed'][0].text())
-        if GUIInstance.wlUnits == 'um':
-            start = wlList[0] - wlStep # Start one before, to make sure
-            end = wlList[-1] + wlStep  # End one after, to make sure
-            interval = wlStep
-            GUIInstance.laser.set_wl_trigger_parameters(start, end, interval, units='um')
-            GUIInstance.laser.sweep_and_forget(wlList[0], wlList[-1] + wlStep, speed, units='um')
-            print(GUIInstance.laser.get_wl_trigger_parameters()) # Troubleshooting
-        elif GUIInstance.wlUnits == 'invcm':
-            end = wlList[0] + wlStep # Start one before, to make sure
-            start = wlList[-1] - wlStep  # End one after, to make sure
-            interval = wlStep
-            GUIInstance.laser.set_wl_trigger_parameters(start, end, interval, units='invcm')
-            GUIInstance.laser.sweep_and_forget(wlList[0], wlList[-1], speed, units = 'invcm')
-            print(GUIInstance.laser.get_wl_trigger_parameters()) # Troubleshooting
-        ### Triggered acquisition
-        voltages = []
-        for x in range(0, len(wlList)):
-            voltages.append(multipleAI.acquire(sampleNumber*len(wlList)))
-        for wl, x in zip(wlList, len(wlList)):
-            data[x, 0] = wl
-            data[x, 1] = np.sum(voltages[x][0])/sampleNumber # Lock-in X
-            data[x, 2] = np.sum(voltages[x][1])/sampleNumber # Lock-in Y
-            data[x, 3] = (np.sqrt(np.power(data[step, 1], 2) +
-                                    np.power(data[step, 2], 2))) # Lock-in R
-        GUIInstance.spectrumCanvas.flush_events()
-        GUIInstance.spectrumCanvas.plot_line(data[:, 0], data[:, 3])
-        if useRef:
-            GUIInstance.spectrumCanvasT.flush_events()
-            GUIInstance.spectrumCanvasT.plot_line(data[:, 0], data[:, 3]/dataRef[:, 3])
-        GUIInstance.repaint()
-        end = timer()
-        SDK.MIRcatSDK_StopScanInProgress() # Scan may otherwise hang
-        GUIInstance.btn['Sweep'][0].setChecked(False)
-        ### Clear triggered acquisition task
-        multipleAI.clear_task()
-        if scanInterrupted:
-            print('Scan interrupted after %.3f s' % (end-startRun))
-            data = data[0:step]
-        else:
-            print('Scan complete, took %.3f s' % (end-startRun))
-        logFile.close()
-        ### Return stdout to terminal
-        sys.stdout = original
-        ### Save data as text file
-        np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
-        ### Update QCL interface readings
-        GUIInstance.qcl(GUIInstance.activeQcl)
-        GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
-        GUIInstance.setUpdatesEnabled(True)
-        GUIInstance.repaint()
-        GUIInstance.grab().save('screenshot.png', 'png')
-        return data
-
     def scan(self, GUIInstance, wlUnits='um'):
         '''Run a step-and measure scan.'''
         self.pci = pci_input()
@@ -375,7 +235,8 @@ class experiment(): # Directory management and multiple acquisitions
         GUIInstance.latestDir = expDir
         # GUIElements['expNo'].setText('%.0f' % newExpNo)
         if GUIInstance.btn['Sweep'][0].isChecked():
-            data = self.sweep(GUIInstance, wlUnits)
+            data = self.sweep_fast(GUIInstance, wlUnits)
+            # data = self.sweep_fast_retrig(GUIInstance, wlUnits)
         else:
             data = self.scan(GUIInstance, wlUnits)
         GUIInstance.btn['Start'][0].setChecked(False)
@@ -550,6 +411,312 @@ class experiment(): # Directory management and multiple acquisitions
         GUIInstance.btn['Sweep'][0].setChecked(False)
         ### Clear triggered acquisition task
         multipleAI.clear_task()
+        if scanInterrupted:
+            print('Scan interrupted after %.3f s' % (end-startRun))
+            data = data[0:step]
+        else:
+            print('Scan complete, took %.3f s' % (end-startRun))
+        logFile.close()
+        ### Return stdout to terminal
+        sys.stdout = original
+        ### Save data as text file
+        np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
+        ### Update QCL interface readings
+        GUIInstance.qcl(GUIInstance.activeQcl)
+        GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
+        GUIInstance.setUpdatesEnabled(True)
+        GUIInstance.repaint()
+        GUIInstance.grab().save('screenshot.png', 'png')
+        return data
+
+    def sweep_fast(self, GUIInstance, wlUnits='um'):
+        '''Run a sweep using the MIRcat's built-in function.
+           Fast version, skips wavelength checks.'''
+        currentDir = os.getcwd()
+        ### Lock use of reference
+        dataRef = np.zeros((1, 2))
+        if GUIInstance.btn['RefEnable'][0].isChecked():
+            useRef = True
+        else:
+            useRef = False
+        if useRef:
+            try:
+                dataPath = GUIInstance.refDir # Latest experiment directory
+                dataPathParts = os.path.split(dataPath)
+                fileName = '{}{}'.format(dataPathParts[-1], defaults.DEF_FILENAME)
+                filePath = os.path.join(dataPath, fileName)
+                dataRef = np.loadtxt(filePath)
+            except Exception as exc:
+                print('Failed to load reference:\n{}'.format(exc))
+        ### Get parameters from UI
+        sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
+        sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
+        if wlUnits == 'um':
+            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
+        elif wlUnits == 'invcm':
+            wlStart = float(GUIInstance.inputField['WlEnd'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlStart'][0].text())
+        else:
+            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
+        wlStep = float(GUIInstance.inputField['WlStep'][0].text())
+        if platform.system() == 'Windows':
+            currentDirSplit = currentDir.split('\\')
+        else:
+            currentDirSplit = currentDir.split('/')
+        currentFolder = currentDirSplit[-1]
+        ### Divert stdout to log file
+        original = sys.stdout
+        logFile = open('%s.log' % (currentFolder), 'w')
+        # sys.stdout = logFile
+        ### Write list of wavelengths, excuding ranges not covered by the QCLs
+        wlRange = np.arange(wlStart, wlEnd + wlStep, wlStep)
+        wlList = np.zeros(len(wlRange))
+        if GUIInstance.wlUnits == 'um':
+            minQclWl = defaults.WL_MINIMUMS_UM
+            maxQclWl = defaults.WL_MAXIMUMS_UM
+        elif GUIInstance.wlUnits == 'invcm': # Inverted, for compatibility in code
+            minQclWl = defaults.WL_MAXIMUMS_INVCM
+            maxQclWl = defaults.WL_MINIMUMS_INVCM
+        else:
+            minQclWl = defaults.WL_MINIMUMS_UM
+            maxQclWl = defaults.WL_MAXIMUMS_UM
+        for wli, wl in enumerate(wlRange): # Only keep wavelengths within limits
+            if (minQclWl[0] <= wl <= maxQclWl[0] or
+                minQclWl[1] <= wl <= maxQclWl[1] or
+                minQclWl[2] <= wl <= maxQclWl[2] or
+                minQclWl[3] <= wl <= maxQclWl[3]):
+                wlList[wli] = wl
+        wlList = wlList[wlList != 0] # Remove zero values
+        if GUIInstance.wlUnits == 'invcm':
+            ### Workaround for an issue with the last point:
+            ### add one here, ignore it later.
+            # wlListAlt = np.zeros(len(wlList))
+            # wlListAlt[0] = wlList[0] - wlStep
+            # wlListAlt[1:] = wlList
+            ### Go from largest to smallest
+            wlList = np.flip(wlList)
+        print(wlList)
+        stepNumber = len(wlList)
+        if useRef and len(dataRef[:,0]) != stepNumber:
+            print('Steps in reference and planned experiment do not match.')
+            useRef = False
+        # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
+        data = np.zeros((stepNumber, 4)) # wl, X, Y, R
+        print('Sweep started ...')
+        GUIInstance.spectrumCanvas.clear_plots()
+        GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
+        if useRef:
+            GUIInstance.spectrumCanvasT.clear_plots()
+            GUIInstance.spectrumCanvasT.axes.set_xlim(wlList[0], wlList[-1])
+        GUIInstance.repaint()
+        startRun = timer()
+        step = 0
+        scanInterrupted = False
+        print('One wavelength point per step, avg. of %.0f samples at %.0f Hz'
+              % (sampleNumber, sampleRate))
+        ### Configure triggered acquisition
+        multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
+        multipleAI.configure_triggered(defaults.PCI_TRIG, sampleNumber, sampleRate)
+        ### Set laser triggering (one TTL pulse per wl/wn) and start sweep
+        speed = float(GUIInstance.inputField['Speed'][0].text())
+        if GUIInstance.wlUnits == 'um':
+            start = wlList[0] - wlStep # Start one before, to make sure
+            end = wlList[-1] + wlStep  # End one after, to make sure
+            interval = wlStep
+            GUIInstance.laser.set_wl_trigger_parameters(start, end, interval, units='um')
+            GUIInstance.laser.sweep_and_forget(wlList[0], wlList[-1] + wlStep, speed, units='um')
+            # print(GUIInstance.laser.get_wl_trigger_parameters()) # Troubleshooting
+        elif GUIInstance.wlUnits == 'invcm':
+            end = wlList[0] + wlStep # Start one before, to make sure
+            start = wlList[-1] - wlStep  # End one after, to make sure
+            interval = wlStep
+            GUIInstance.laser.set_wl_trigger_parameters(start, end, interval, units='invcm')
+            GUIInstance.laser.sweep_and_forget(wlList[0], wlList[-1] - wlStep, speed, units = 'invcm')
+            # print(GUIInstance.laser.get_wl_trigger_parameters()) # Troubleshooting
+        ### Triggered acquisition
+        voltages = []
+        try: # Failure here most likely due to timeout because of skipped points
+            for x in range(0, len(wlList)):
+                voltages.append(multipleAI.acquire(sampleNumber))
+        except Exception as exc:
+            print('Sweep did not complete:\n{}'.format(exc))
+            print('Partial data may still be usable.')
+        ### Clear triggered acquisition task
+        multipleAI.clear_task()
+        try: # Failure here certain if points skipped above
+            for x, wl in enumerate(wlList):
+                data[x, 0] = wl
+                data[x, 1] = np.sum(voltages[x][0])/sampleNumber # Lock-in X
+                data[x, 2] = np.sum(voltages[x][1])/sampleNumber # Lock-in Y
+                data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
+                                        np.power(data[x, 2], 2))) # Lock-in R
+        except Exception as exc:
+            print('Data formatting did not complete:\n{}'.format(exc))
+            print('Partial data may still be usable.')
+        data = data[data[:, 0] != 0] # Remove zero-wavelength values
+        print('Requested {} points, acquired {}.'.format(len(wlList), len(data[:, 0])))
+        GUIInstance.spectrumCanvas.flush_events()
+        GUIInstance.spectrumCanvas.plot_line(data[:, 0], data[:, 3])
+        if useRef:
+            GUIInstance.spectrumCanvasT.flush_events()
+            GUIInstance.spectrumCanvasT.plot_line(data[:, 0], data[:, 3]/dataRef[:, 3])
+        GUIInstance.repaint()
+        end = timer()
+        SDK.MIRcatSDK_StopScanInProgress() # Scan may otherwise hang
+        GUIInstance.btn['Sweep'][0].setChecked(False)
+        if scanInterrupted:
+            print('Scan interrupted after %.3f s' % (end-startRun))
+            data = data[0:step]
+        else:
+            print('Scan complete, took %.3f s' % (end-startRun))
+        logFile.close()
+        ### Return stdout to terminal
+        sys.stdout = original
+        ### Save data as text file
+        np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
+        ### Update QCL interface readings
+        GUIInstance.qcl(GUIInstance.activeQcl)
+        GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
+        GUIInstance.setUpdatesEnabled(True)
+        GUIInstance.repaint()
+        GUIInstance.grab().save('screenshot.png', 'png')
+        return data
+
+    def sweep_fast_retrig(self, GUIInstance, wlUnits='um'):
+        '''Run a sweep using the MIRcat's built-in function.
+           Faster sweep using retriggerable analog inputs.
+           Requires NI X-series (63XX) platforms.'''
+        currentDir = os.getcwd()
+        ### Lock use of reference
+        dataRef = np.zeros((1, 2))
+        if GUIInstance.btn['RefEnable'][0].isChecked():
+            useRef = True
+        else:
+            useRef = False
+        if useRef:
+            try:
+                dataPath = GUIInstance.refDir # Latest experiment directory
+                dataPathParts = os.path.split(dataPath)
+                fileName = '{}{}'.format(dataPathParts[-1], defaults.DEF_FILENAME)
+                filePath = os.path.join(dataPath, fileName)
+                dataRef = np.loadtxt(filePath)
+            except Exception as exc:
+                print('Failed to load reference:\n{}'.format(exc))
+        ### Get parameters from UI
+        sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
+        sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
+        if wlUnits == 'um':
+            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
+        elif wlUnits == 'invcm':
+            wlStart = float(GUIInstance.inputField['WlEnd'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlStart'][0].text())
+        else:
+            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
+            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
+        wlStep = float(GUIInstance.inputField['WlStep'][0].text())
+        if platform.system() == 'Windows':
+            currentDirSplit = currentDir.split('\\')
+        else:
+            currentDirSplit = currentDir.split('/')
+        currentFolder = currentDirSplit[-1]
+        ### Divert stdout to log file
+        original = sys.stdout
+        logFile = open('%s.log' % (currentFolder), 'w')
+        # sys.stdout = logFile
+        ### Write list of wavelengths, excuding ranges not covered by the QCLs
+        wlRange = np.arange(wlStart, wlEnd + wlStep, wlStep)
+        wlList = np.zeros(len(wlRange))
+        if GUIInstance.wlUnits == 'um':
+            minQclWl = defaults.WL_MINIMUMS_UM
+            maxQclWl = defaults.WL_MAXIMUMS_UM
+        elif GUIInstance.wlUnits == 'invcm': # Inverted, for compatibility in code
+            minQclWl = defaults.WL_MAXIMUMS_INVCM
+            maxQclWl = defaults.WL_MINIMUMS_INVCM
+        else:
+            minQclWl = defaults.WL_MINIMUMS_UM
+            maxQclWl = defaults.WL_MAXIMUMS_UM
+        for wli, wl in enumerate(wlRange): # Only keep wavelengths within limits
+            if (minQclWl[0] <= wl <= maxQclWl[0] or
+                minQclWl[1] <= wl <= maxQclWl[1] or
+                minQclWl[2] <= wl <= maxQclWl[2] or
+                minQclWl[3] <= wl <= maxQclWl[3]):
+                wlList[wli] = wl
+        wlList = wlList[wlList != 0] # Remove zero values
+        if GUIInstance.wlUnits == 'invcm': # Go from largest to smallest
+            wlList = np.flip(wlList)
+        print(wlList)
+        stepNumber = len(wlList)
+        if useRef and len(dataRef[:,0]) != stepNumber:
+            print('Steps in reference and planned experiment do not match.')
+            useRef = False
+        # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
+        data = np.zeros((stepNumber, 4)) # wl, X, Y, R
+        print('Sweep started ...')
+        GUIInstance.spectrumCanvas.clear_plots()
+        GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
+        if useRef:
+            GUIInstance.spectrumCanvasT.clear_plots()
+            GUIInstance.spectrumCanvasT.axes.set_xlim(wlList[0], wlList[-1])
+        GUIInstance.repaint()
+        startRun = timer()
+        step = 0
+        scanInterrupted = False
+        print('One wavelength point per step, avg. of %.0f samples at %.0f Hz'
+              % (sampleNumber, sampleRate))
+        ### Configure triggered acquisition
+        multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
+        multipleAI.configure_triggered(defaults.PCI_TRIG, sampleNumber, sampleRate)
+        ### Set laser triggering (one TTL pulse per wl/wn) and start sweep
+        speed = float(GUIInstance.inputField['Speed'][0].text())
+        if GUIInstance.wlUnits == 'um':
+            start = wlList[0] - wlStep # Start one before, to make sure
+            end = wlList[-1] + wlStep  # End one after, to make sure
+            interval = wlStep
+            GUIInstance.laser.set_wl_trigger_parameters(start, end, interval, units='um')
+            GUIInstance.laser.sweep_and_forget(wlList[0], wlList[-1] + wlStep, speed, units='um')
+            print(GUIInstance.laser.get_wl_trigger_parameters()) # Troubleshooting
+        elif GUIInstance.wlUnits == 'invcm':
+            end = wlList[0] + wlStep # Start one before, to make sure
+            start = wlList[-1] - wlStep  # End one after, to make sure
+            interval = wlStep
+            GUIInstance.laser.set_wl_trigger_parameters(start, end, interval, units='invcm')
+            GUIInstance.laser.sweep_and_forget(wlList[0], wlList[-1], speed, units = 'invcm')
+            print(GUIInstance.laser.get_wl_trigger_parameters()) # Troubleshooting
+        ### Triggered acquisition
+        try: # Failure here most likely due to timeout because of skipped points
+            voltages = multipleAI.acquire(sampleNumber*len(wlList))
+            print(voltages)
+        except Exception as exc:
+            print('Sweep did not complete:\n{}'.format(exc))
+            print('Partial data may still be usable.')
+        ### Clear triggered acquisition task
+        multipleAI.clear_task()
+        try: # Failure here certain if points skipped above
+            for x, wl in enumerate(wlList):
+                vRange = [x * sampleNumber, x * sampleNumber + sampleNumber]
+                print('Enumerate step {:.0f}, wl/wn {:.2f}, points {}'.format(x, wl, vRange))
+                data[x, 0] = wl
+                data[x, 1] = np.sum(voltages[1, vRange[0]:vRange[1]])/sampleNumber # Lock-in X
+                data[x, 2] = np.sum(voltages[0, vRange[0]:vRange[1]])/sampleNumber # Lock-in Y
+                data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
+                                        np.power(data[x, 2], 2))) # Lock-in R
+        except Exception as exc:
+            print('Data formatting did not complete:\n{}'.format(exc))
+            print('Partial data may still be usable.')
+        data = data[data[:, 0] != 0] # Remove zero-wavelength values
+        print('Requested {} points, acquired {}.'.format(len(wlList), len(data[:, 0])))
+        GUIInstance.spectrumCanvas.flush_events()
+        GUIInstance.spectrumCanvas.plot_line(data[:, 0], data[:, 3])
+        if useRef:
+            GUIInstance.spectrumCanvasT.flush_events()
+            GUIInstance.spectrumCanvasT.plot_line(data[:, 0], data[:, 3]/dataRef[:, 3])
+        GUIInstance.repaint()
+        end = timer()
+        SDK.MIRcatSDK_StopScanInProgress() # Scan may otherwise hang
+        GUIInstance.btn['Sweep'][0].setChecked(False)
         if scanInterrupted:
             print('Scan interrupted after %.3f s' % (end-startRun))
             data = data[0:step]
