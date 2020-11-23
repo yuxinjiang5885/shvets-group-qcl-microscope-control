@@ -26,7 +26,97 @@ from instruments.daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_CM1, MIRcatS
 class experiment(): # Directory management and multiple acquisitions
 
     def __init__(self):
+        self.ranges = [] # Placeholder value
+        self.sampleNumber = DEF_SAMPLES
+        self.sampleRate = DEF_SAMPLERATE
+        self.speed = 1 # Placeholder value
+        self.sweep = True # By default, use the sweep routine
+        self.units = 'um' # By default, wavelengths in micrometers
+
+    def repeat(self):
+        '''
+        Run the same experiment again. Saves time compared to "run".
+        Ineffective if "run" has not been used before for a given instance.
+        '''
         pass
+
+    def run(self, GUIInstance, wlUnits='um'):
+        '''
+        Run experiment. Replaces "start" routine. Works with "sweep".
+        :param GUIInstance: GUI instance from the UI program.
+        :param wlUnits: 'um' (micrometers) or 'invcm' (inverse cm).
+        '''
+        ### Make sure laser is armed
+        if not GUIInstance.btn['Arm'][0].isChecked():
+            print('Laser is not armed.')
+            GUIInstance.btn['Start'][0].setChecked(False)
+            GUIInstance.btn['Stop'][0].setChecked(False)
+            GUIInstance.btn['Sweep'][0].setChecked(False)
+            return
+        ### Get scan parameters
+        self.sweep = GUIInstance.btn['Sweep'][0].isChecked()
+        start = float(GUIInstance.inputField['WlStart'][0].text())
+        end = float(GUIInstance.inputField['WlEnd'][0].text())
+        step = float(GUIInstance.inputField['WlStep'][0].text())
+        self.sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
+        self.sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
+        self.speed = float(GUIInstance.inputField['Speed'][0].text())
+        if GUIInstance.wlUnits == 'invcm':
+            self.units = 'invcm'
+        else: # Default to micrometers
+            self.units = 'um'
+        ### Check inputs
+        if start == end: # Requested limits are equal
+            print('Limits cannot be equal.')
+            GUIInstance.btn['Start'][0].setChecked(False)
+            GUIInstance.btn['Stop'][0].setChecked(False)
+            GUIInstance.btn['Sweep'][0].setChecked(False)
+            return
+        ### Make "raw" range with requested values
+        rawRange = np.arange(start, end+step, step)
+        if len(rawRange) < 1: # Requested limits are out of QCL bounds
+            print('Cannot sweep requested range.')
+            GUIInstance.btn['Start'][0].setChecked(False)
+            GUIInstance.btn['Stop'][0].setChecked(False)
+            GUIInstance.btn['Sweep'][0].setChecked(False)
+            return
+        ### Make a separate range for each QCL
+        ranges = [[], [], [], []] # Store allowed wavelengths/numbers per QCL
+        if self.units == 'invcm':
+            for wn in rawRange:
+                pass
+        else:
+            for wl in rawRange:
+                pass
+        ### Compile QCL ranges in class variable, if not empty
+        for r in ranges:
+            if r: # If not empty
+                self.ranges.append(r)
+        ### Create individual experiment folder
+        workDir = defaults.DEF_DATA_DIRECTORY
+        os.chdir(workDir)
+        newExpNo = 1;
+        expNoStr = '%03.0f' % (newExpNo)
+        dateStr = time.strftime('%Y-%m-%d')
+        expFolder = dateStr + '_' + expNoStr
+        expDir = os.path.join(workDir, expFolder)
+        while os.path.exists(expDir):
+            newExpNo += 1;
+            expNoStr = '%03.0f' % (newExpNo)
+            expFolder = dateStr + '_' + expNoStr
+            expDir = os.path.join(workDir, expFolder)
+        os.mkdir(expDir)
+        os.chdir(expDir)
+        GUIInstance.latestDir = expDir
+        # GUIElements['expNo'].setText('%.0f' % newExpNo)
+        if self.sweep:
+            data = self.sweep()
+        else: # Default to step-and-measure
+            data = self.scan(GUIInstance, self.units)
+        GUIInstance.btn['Start'][0].setChecked(False)
+        GUIInstance.btn['Stop'][0].setChecked(False)
+        GUIInstance.btn['Sweep'][0].setChecked(False)
+        return data
 
     def scan(self, GUIInstance, wlUnits='um'):
         '''Run a step-and measure scan.'''
@@ -243,7 +333,15 @@ class experiment(): # Directory management and multiple acquisitions
         GUIInstance.btn['Stop'][0].setChecked(False)
         return data
 
-    def sweep(self, GUIInstance, wlUnits='um'):
+    def sweep(self):
+        '''
+        Run a sweep using the MIRcat's built-in function.
+        Latest iteration of fast sweep routine, with no wavelength check.
+        Use with "run", not "start".
+        '''
+        pass
+
+    def _old_sweep(self, GUIInstance, wlUnits='um'):
         '''Run a sweep using the MIRcat's built-in function.'''
         currentDir = os.getcwd()
         ### Lock use of reference
