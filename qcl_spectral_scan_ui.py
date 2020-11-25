@@ -477,7 +477,8 @@ class mainWindow(QMainWindow):
         '''Run scan, return data'''
         self.statusbar.showMessage('Busy')
         experiment0 = experiment()
-        data = experiment0.start(GUIElements)
+        # data = experiment0.start(GUIElements)
+        data = experiment0.run(GUIElements)
         self.statusbar.showMessage('Ready')
         return data
 
