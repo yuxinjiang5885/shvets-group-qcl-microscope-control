@@ -315,23 +315,24 @@ class laser():
             print('Sweep step {} ({} %).'.format(curScanNum.value, curScanPercent.value))
         print('Sweep complete ({} s).'.format(timer() - start))
 
-    def sweep_and_forget(self, start, end, speed=0.5, units='um'):
+    def sweep_and_forget(self, start, end, speed=0.5, units='um', qcl=0):
         '''Launch a sweep, but do not monitor it.
            Intended for use with a separate monitoring routine.'''
         ### Give time for the routine to start the acquisition
-        time.sleep(1)
         if units == 'invcm': # Wavenumbers in inverse cm
             wlUnits = MIRcatSDK_UNITS_CM1
         elif units == 'um': # Wavelenghts in microns
             wlUnits = MIRcatSDK_UNITS_MICRONS
         else:
-            print('Trigger settings: unknown units. Defaulting to micrometers.')
+            print('Unknown units {}, defaulting to micrometers.'.format(units))
             wlUnits = MIRcatSDK_UNITS_MICRONS
-        SDK.MIRcatSDK_StartSweepScan(c_float(start),
-                                     c_float(end),
-                                     c_float(speed),
-                                     wlUnits,
-                                     c_uint16(1), c_bool(False), c_uint8(0))
+        SDK.MIRcatSDK_StartSweepScan(c_float(start), # Sweep start
+                                     c_float(end),   # Sweep end
+                                     c_float(speed), # Sweep speed
+                                     wlUnits,        # Sweep units
+                                     c_uint16(1),    # Iterations
+                                     c_bool(False),  # Bidirectional
+                                     c_uint8(qcl))   # Preferred QCL
 
     # def sweep_and_forget_um(self, wl_start_um, wl_end_um, wl_speed_ums=1.):
     #     '''Launch a sweep, but do not monitor it.
