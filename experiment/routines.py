@@ -70,6 +70,7 @@ class experiment(): # Directory management and multiple acquisitions
         Ineffective if "run" has not been used before for a given instance.
         '''
         ### Invert direction
+        self.sweepLimits.reverse()
         self.ranges.reverse()
         self.qcl.reverse()
         for x, (l, r) in enumerate(zip(self.sweepLimits, self.ranges)):
