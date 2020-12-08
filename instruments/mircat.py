@@ -317,7 +317,12 @@ class laser():
 
     def sweep_and_forget(self, start, end, speed=0.5, units='um', qcl=0):
         '''Launch a sweep, but do not monitor it.
-           Intended for use with a separate monitoring routine.'''
+           Intended for use with a separate monitoring routine.
+           :param start: Start wavelength (um) or wavenumber (cm^-1)
+           :param end: End wavelength (um) or wavenumber (cm^-1)
+           :param speed: Sweeping speed (um/s or cm^-1/s)
+           :param units: "um" for um or "invcm" for cm^-1
+           :param qcl: Preferred QCL module (1--4) or no preference (0)'''
         ### Give time for the routine to start the acquisition
         if units == 'invcm': # Wavenumbers in inverse cm
             wlUnits = MIRcatSDK_UNITS_CM1

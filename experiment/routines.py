@@ -69,11 +69,18 @@ class experiment(): # Directory management and multiple acquisitions
         Run the same experiment again. Saves time compared to "run".
         Ineffective if "run" has not been used before for a given instance.
         '''
+        ### Invert direction
+        self.ranges.reverse()
+        self.qcl.reverse()
+        for x, (l, r) in enumerate(zip(self.sweepLimits, self.ranges)):
+            l.reverse()
+            r.reverse()
         ### Go to main experiment directory
         workDir = defaults.DEF_DATA_DIRECTORY
         os.chdir(workDir)
         ### Get latest experiment number from previously created folder
-        oldExpNo = int(self.latestdir[-3:])
+        print(self.latestDir)
+        oldExpNo = int(self.latestDir[-3:])
         ### Create new experiment folder
         newExpNo = oldExpNo + 1;
         expNoStr = '%03.0f' % (newExpNo)
@@ -100,7 +107,7 @@ class experiment(): # Directory management and multiple acquisitions
         else: # Default to step-and-measure
             # data = self.scan() # Requires a new version of "scan"
             pass
-        return 0
+        return [[], self]
 
     def run(self, GUIInstance, wlUnits='um'):
         '''
@@ -195,12 +202,12 @@ class experiment(): # Directory management and multiple acquisitions
         if self.sweep:
             if self.units == 'invcm':
                 for r in self.ranges:
-                    self.sweepLimits.append((r[0] - WN_MAR_INVCM,
-                                             r[-1] + WN_MAR_INVCM))
+                    self.sweepLimits.append([r[0] - WN_MAR_INVCM,
+                                             r[-1] + WN_MAR_INVCM])
             else: # Default to micrometers
                 for r in self.ranges:
-                    self.sweepLimits.append((r[0] - WL_MAR_UM,
-                                             r[-1] + WL_MAR_UM))
+                    self.sweepLimits.append([r[0] - WL_MAR_UM,
+                                             r[-1] + WL_MAR_UM])
         # print(self.ranges)
         # print(self.sweepLimits)
         ### Create individual experiment folder
@@ -267,7 +274,7 @@ class experiment(): # Directory management and multiple acquisitions
         GUIInstance.btn['Start'][0].setChecked(False)
         GUIInstance.btn['Stop'][0].setChecked(False)
         GUIInstance.btn['Sweep'][0].setChecked(False)
-        return 0
+        return [data, self]
 
     def scan(self, GUIInstance, wlUnits='um'):
         '''Run a step-and measure scan.'''
@@ -458,7 +465,7 @@ class experiment(): # Directory management and multiple acquisitions
             # print(voltages) # Troubleshooting
             SDK.MIRcatSDK_StopScanInProgress() # Make sure this sweep has ended
         ### Make sure scans are done
-        SDK.MIRcatSDK_StopScanInProgress()
+        # SDK.MIRcatSDK_StopScanInProgress()
         ### Clear triggered acquisition task
         multipleAI.clear_task()
         ### Format data

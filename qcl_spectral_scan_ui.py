@@ -71,6 +71,7 @@ class mainWindow(QMainWindow):
         self.latestDir = '' # Latest experiment directory
         self.refDir = '' # Reference experiment directory
         super().__init__()
+        self.latestExperiment = [] # Placeholder for latest experiment instance
         self.make_gui()
         self.statusbar.showMessage('Ready')
 
@@ -163,23 +164,30 @@ class mainWindow(QMainWindow):
         font.setFamily(FONT_FAMILY)
         font.setPointSize(FONT_SIZE)
         # self.setWindowModality(Qt.ApplicationModal)
-        # Create menus
+        ### Create bars
         self.menubar = self.menuBar()
         self.menubar.setStyleSheet(STYLE_BAR)
         self.statusbar = self.statusBar()
         self.statusbar.setStyleSheet(STYLE_BAR)
         self.statusbar.showMessage('Initializing ...')
+        ### "Actions" menu
         exitAction = QAction(QIcon(None), 'Exit', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.setStatusTip('Exit application')
         exitAction.triggered.connect(lambda: self.close())
+        changeUnits = QAction(QIcon(None), 'Change units', self)
+        changeUnits.setShortcut('Ctrl+U')
+        changeUnits.setStatusTip('Change units')
+        changeUnits.triggered.connect(lambda: self.wl_units())
         laserOff = QAction(QIcon(None), 'Laser off', self)
         laserOff.setShortcut('Ctrl+Alt+L')
-        laserOff.setStatusTip('Power down laser')
-        laserOff.triggered.connect(lambda: self.close())
+        laserOff.setStatusTip('Power down laser (Not Implemented)')
+        laserOff.triggered.connect(lambda: print('Action not implemented'))
         fileMenu = self.menubar.addMenu('Actions')
         fileMenu.addAction(laserOff)
         fileMenu.addAction(exitAction)
+        fileMenu.addAction(changeUnits)
+        ### "About" menu
         aboutAction = QAction(QIcon(None), 'About', self)
         aboutAction.setStatusTip('About')
         aboutAction.triggered.connect(self.about)
@@ -241,8 +249,8 @@ class mainWindow(QMainWindow):
         self.btn['QCL3'][0].setToolTip('Select QCL module 3')
         self.btn['QCL4'] = [QPushButton('QCL 4 Off'), 8, 0, 2, 1]
         self.btn['QCL4'][0].setToolTip('Select QCL module 4')
-        self.btn['WlUnits'] = [QPushButton('Units: μm'), 10, 5, 2, 1]
-        self.btn['WlUnits'][0].setToolTip('Switch wavelength units')
+        # self.btn['WlUnits'] = [QPushButton('Units: μm'), 10, 5, 2, 1]
+        # self.btn['WlUnits'][0].setToolTip('Switch wavelength units')
         self.btn['Tune'] = [QPushButton('Tune'), 4, 7, 2, 1]
         self.btn['Tune'][0].setToolTip('Tune laser to displayed wavelength for selected QCL')
         self.btn['Arm'] = [QPushButton('Arm'), 2, 7, 2, 1]
@@ -251,8 +259,8 @@ class mainWindow(QMainWindow):
         self.btn['Emission'][0].setToolTip('Enable/disable laser emission')
         self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
         self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
-        self.btn['Triggering'] = [QPushButton('Triggering'), 12, 7, 2, 1]
-        self.btn['Triggering'][0].setToolTip('Enable/disable triggering')
+        # self.btn['Triggering'] = [QPushButton('Triggering'), 12, 7, 2, 1]
+        # self.btn['Triggering'][0].setToolTip('Enable/disable triggering')
         # Buttons: reference
         self.btn['RefEnable'] = [QPushButton('Reference'), 10, 7, 2, 1]
         self.btn['RefEnable'][0].setToolTip('Enable/disable use of reference')
@@ -267,8 +275,10 @@ class mainWindow(QMainWindow):
         self.btn['Sweep'][0].setToolTip('Start sweep')
         self.btn['Start'] = [QPushButton('Scan'), 12, 9, 2, 1]
         self.btn['Start'][0].setToolTip('Start step-and-measure scan')
-        self.btn['Stop'] = [QPushButton('Stop'), 12, 10, 2, 1]
-        self.btn['Stop'][0].setToolTip('Stop scan')
+        self.btn['Repeat'] = [QPushButton('Repeat'), 12, 10, 2, 1]
+        self.btn['Repeat'][0].setToolTip('Repeat last scan or sweep')
+        self.btn['Stop'] = [QPushButton('Stop'), 12, 7, 2, 1]
+        self.btn['Stop'][0].setToolTip('Stop scan or sweep in progress')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
             k[0].setFocusPolicy(Qt.NoFocus)
@@ -390,19 +400,20 @@ class mainWindow(QMainWindow):
         self.notes = QTextEdit('')
         self.notes.setFont(font)
         self.notes.setStyleSheet(STYLE_INPUT)
+        self.notes.setToolTip('Notes written here will be saved to file')
         self.grid.addWidget(self.notes, 12, 1, 2, 4)
         # Connect buttons to actions
         self.btn['QCL1'][0].clicked.connect(lambda: self.qcl(1))
         self.btn['QCL2'][0].clicked.connect(lambda: self.qcl(2))
         self.btn['QCL3'][0].clicked.connect(lambda: self.qcl(3))
         self.btn['QCL4'][0].clicked.connect(lambda: self.qcl(4))
-        self.btn['WlUnits'][0].clicked.connect(lambda: self.wl_units())
+        # self.btn['WlUnits'][0].clicked.connect(lambda: self.wl_units())
         self.btn['Arm'][0].clicked.connect(lambda: self.arm())
         self.btn['Emission'][0].clicked.connect(lambda: self.emission())
         self.btn['Tune'][0].clicked.connect(lambda: self.tune())
         self.btn['Start'][0].clicked.connect(lambda: self.run_experiment(self))
         self.btn['Sweep'][0].clicked.connect(lambda: self.run_experiment(self))
-        # self.btn['RefEnable'][0].clicked.connect(lambda: self.reference_enable())
+        self.btn['Repeat'][0].clicked.connect(lambda: self.repeat_experiment(self))
         self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.latestDir))
         self.activeQcl = 0 # None selected on startup
         self.show()
@@ -473,12 +484,24 @@ class mainWindow(QMainWindow):
         except Exception as exc:
             print('Could not read reference spectrum data:\n{}'.format(exc))
 
+    def repeat_experiment(self, GUIElements):
+        '''Run scan with previously used parameters, return data'''
+        self.statusbar.showMessage('Busy')
+        try:
+            [data, self.latestExperiment] = self.latestExperiment.repeat()
+        except Exception as exc:
+            print('Could not repeat experiment:\n{}'.format(exc))
+            data = []
+        self.btn['Repeat'][0].setChecked(False)
+        self.statusbar.showMessage('Ready')
+        return data
+
     def run_experiment(self, GUIElements):
         '''Run scan, return data'''
         self.statusbar.showMessage('Busy')
         experiment0 = experiment()
         # data = experiment0.start(GUIElements)
-        data = experiment0.run(GUIElements)
+        [data, self.latestExperiment] = experiment0.run(GUIElements)
         self.statusbar.showMessage('Ready')
         return data
 
@@ -559,14 +582,14 @@ class mainWindow(QMainWindow):
     def wl_units(self):
         '''Change wavelength/wavenumber units.'''
         # Uncheck
-        if self.btn['WlUnits'][0].isChecked:
-            self.btn['WlUnits'][0].setChecked(False)
+        # if self.btn['WlUnits'][0].isChecked:
+        #     self.btn['WlUnits'][0].setChecked(False)
         # Invert plot x axis
         # self.spectrumCanvas.axes.invert_xaxis()
         # Switch units from um to cm^-1
         if self.wlUnits == 'um':
             self.wlUnits = 'invcm'
-            self.btn['WlUnits'][0].setText('Units: cm⁻¹')
+            # self.btn['WlUnits'][0].setText('Units: cm⁻¹')
             # Relabel QCL fields
             for qcl in range(1, NUMBER_OF_QCLS + 1):
                 labelString = 'QCL{:d}WlUnit'.format(qcl)
@@ -594,7 +617,7 @@ class mainWindow(QMainWindow):
         # Switch units from cm^-1 to um
         elif self.wlUnits == 'invcm':
             self.wlUnits = 'um'
-            self.btn['WlUnits'][0].setText('Units: μm  ')
+            # self.btn['WlUnits'][0].setText('Units: μm  ')
             for qcl in range(1, NUMBER_OF_QCLS + 1):
                 labelString = 'QCL{:d}WlUnit'.format(qcl)
                 self.labelInstr[labelString].setText('μm    ')
