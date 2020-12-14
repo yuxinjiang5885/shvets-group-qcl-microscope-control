@@ -2,8 +2,8 @@
 qcl_spectral_scan_ui
 Giovanni Sartorello (srtgnn@gmail.com)
 UI for QCL scanning spectroscopy experiments
-Version 1
-Python 3.7 on Mac 10.15
+Version 2
+Python 3.8.3 on Windows 10
 Created 2020-Aug-17
 '''
 
@@ -86,6 +86,8 @@ class mainWindow(QMainWindow):
     def arm(self):
         '''Arm or disarm laser laser'''
         self.lock_controls(lock=True)
+        self.statusbar.showMessage('Busy')
+        self.repaint()
         if self.btn['Arm'][0].isChecked():
                 if self.activeQcl == 0:
                     self.statusbar.showMessage('No QCL selected', MSG_TIMEOUT)
@@ -257,8 +259,8 @@ class mainWindow(QMainWindow):
         self.btn['Arm'][0].setToolTip('Arm/Disarm laser')
         self.btn['Emission'] = [QPushButton('Enable'), 6, 7, 2, 1]
         self.btn['Emission'][0].setToolTip('Enable/disable laser emission')
-        self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
-        self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
+        # self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
+        # self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
         # self.btn['Triggering'] = [QPushButton('Triggering'), 12, 7, 2, 1]
         # self.btn['Triggering'][0].setToolTip('Enable/disable triggering')
         # Buttons: reference
@@ -277,8 +279,8 @@ class mainWindow(QMainWindow):
         self.btn['Start'][0].setToolTip('Start step-and-measure scan')
         self.btn['Repeat'] = [QPushButton('Repeat'), 12, 10, 2, 1]
         self.btn['Repeat'][0].setToolTip('Repeat last scan or sweep')
-        self.btn['Stop'] = [QPushButton('Stop'), 12, 7, 2, 1]
-        self.btn['Stop'][0].setToolTip('Stop scan or sweep in progress')
+        # self.btn['Stop'] = [QPushButton('Stop'), 12, 7, 2, 1]
+        # self.btn['Stop'][0].setToolTip('Stop scan or sweep in progress')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
             k[0].setFocusPolicy(Qt.NoFocus)
@@ -484,9 +486,10 @@ class mainWindow(QMainWindow):
         except Exception as exc:
             print('Could not read reference spectrum data:\n{}'.format(exc))
 
-    def repeat_experiment(self, GUIElements):
+    def repeat_experiment(self):
         '''Run scan with previously used parameters, return data'''
         self.statusbar.showMessage('Busy')
+        self.repaint()
         try:
             [data, self.latestExperiment] = self.latestExperiment.repeat()
         except Exception as exc:
@@ -499,6 +502,7 @@ class mainWindow(QMainWindow):
     def run_experiment(self, GUIElements):
         '''Run scan, return data'''
         self.statusbar.showMessage('Busy')
+        self.repaint()
         experiment0 = experiment()
         # data = experiment0.start(GUIElements)
         [data, self.latestExperiment] = experiment0.run(GUIElements)

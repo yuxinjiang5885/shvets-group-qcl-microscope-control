@@ -103,12 +103,12 @@ class experiment(): # Directory management and multiple acquisitions
             noteFile.write(self.notes)
             noteFile.close()
         ### Run a sweep or a step-and-measure scan
+        data = []
         if self.sweep:
             data = self.sweep()
         else: # Default to step-and-measure
-            # data = self.scan() # Requires a new version of "scan"
-            pass
-        return [[], self]
+            data = self.scan()
+        return [data, self]
 
     def run(self, GUIInstance, wlUnits='um'):
         '''
@@ -124,7 +124,7 @@ class experiment(): # Directory management and multiple acquisitions
             GUIInstance.btn['Start'][0].setChecked(False)
             GUIInstance.btn['Stop'][0].setChecked(False)
             GUIInstance.btn['Sweep'][0].setChecked(False)
-            return
+            return [[], self]
         ### Get experiment notes, if any
         self.notes = GUIInstance.notes.toPlainText()
         ### Check use of reference
@@ -158,7 +158,7 @@ class experiment(): # Directory management and multiple acquisitions
             GUIInstance.btn['Start'][0].setChecked(False)
             GUIInstance.btn['Stop'][0].setChecked(False)
             GUIInstance.btn['Sweep'][0].setChecked(False)
-            return
+            return [[], self]
         ### Make "raw" range with requested values
         if start > end:
             start, end = end, start
@@ -168,7 +168,7 @@ class experiment(): # Directory management and multiple acquisitions
             GUIInstance.btn['Start'][0].setChecked(False)
             GUIInstance.btn['Stop'][0].setChecked(False)
             GUIInstance.btn['Sweep'][0].setChecked(False)
-            return
+            return [[], self]
         ### Make a separate range for each QCL
         ranges = [[], [], [], []] # Store allowed wavelengths/numbers per QCL
         if self.units == 'invcm':
@@ -233,10 +233,11 @@ class experiment(): # Directory management and multiple acquisitions
             noteFile.write(self.notes)
             noteFile.close()
         ### Run a sweep or a step-and-measure scan
+        data = []
         if self.sweeping:
             data = self.sweep()
         else: # Default to step-and-measure
-            data = self.scan(GUIInstance, self.units)
+            data = self.scan()
         ### Update QCL interface readings
         # GUIInstance.qcl(GUIInstance.activeQcl)
         # GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
@@ -277,159 +278,77 @@ class experiment(): # Directory management and multiple acquisitions
         GUIInstance.btn['Sweep'][0].setChecked(False)
         return [data, self]
 
-    def scan(self, GUIInstance, wlUnits='um'):
+    def scan(self):
         '''Run a step-and measure scan.'''
-        self.pci = pci_input()
-        currentDir = os.getcwd()
-        ### Lock use of reference
-        dataRef = np.zeros((1, 2))
-        if GUIInstance.btn['RefEnable'][0].isChecked():
-            useRef = True
-        else:
-            useRef = False
-        if useRef:
-            try:
-                dataPath = GUIInstance.refDir # Latest experiment directory
-                dataPathParts = os.path.split(dataPath)
-                fileName = '{}{}'.format(dataPathParts[-1], defaults.DEF_FILENAME)
-                filePath = os.path.join(dataPath, fileName)
-                dataRef = np.loadtxt(filePath)
+        ### Preamble
+        print('Scan started ...')
+        print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
+              .format(self.sampleNumber, self.sampleRate))
+        startRun = timer()
+        ### Setup acquisition
+        multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
+        multipleAI.configure(self.sampleNumber, self.sampleRate)
+        ### Run multi-range scan
+        numRanges = len(self.ranges)
+        steps = 0
+        voltages, wavelengths = [], []
+        for x, r in enumerate(self.ranges):
+            steps += len(r)
+            wavelengths +=r
+            qcl = self.qcl[x]
+            print('Range {}/{}, using QCL module {}...'.format(
+                                                           x+1, numRanges, qcl))
+            ### Acquisition
+            rangeVoltages = []
+            try: # Failure here likely due to timeout because of skipped points
+                for wl in r:
+                    ### Tune
+                    self.laser.tune(qcl, wl, self.units)
+                    ### Acquire
+                    rangeVoltages.append(multipleAI.acquire(self.sampleNumber))
             except Exception as exc:
-                print('Failed to load reference:\n{}'.format(exc))
-        ### Get parameters from UI
-        sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
-        sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
-        if wlUnits == 'um':
-            wlStart = float(GUIInstance.inputField['WlStart'][0].text())
-            wlEnd = float(GUIInstance.inputField['WlEnd'][0].text())
-        if wlUnits == 'invcm':
-            wlStart = float(GUIInstance.inputField['WlEnd'][0].text())
-            wlEnd = float(GUIInstance.inputField['WlStart'][0].text())
-        wlStep = float(GUIInstance.inputField['WlStep'][0].text())
+                print('Scan did not complete:\n{}'.format(exc))
+                print('Partial data may still be usable.')
+            voltages += rangeVoltages
+        ### Clear triggered acquisition task
+        multipleAI.clear_task()
+        ### Format data
+        data = np.zeros((steps, 4)) # wl, X, Y, R
+        try:
+            for x, v in enumerate(voltages):
+                data[x, 0] = wavelengths[x]
+                data[x, 1] = np.sum(v[0])/self.sampleNumber # Lock-in X
+                data[x, 2] = np.sum(v[1])/self.sampleNumber # Lock-in Y
+                data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
+                                      np.power(data[x, 2], 2))) # Lock-in R
+        except Exception as exc:
+            print('Data formatting did not complete:\n{}'.format(exc))
+            print('Data was not saved.')
+        data = data[data[:, 0] != 0] # Remove zero-wavelength values
+        endRun = timer()
+        print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
+                                                              len(wavelengths)))
+        print('Scan complete (%.3f s).' % (endRun-startRun))
+        ### Save data as text file
+        currentDir = os.getcwd()
         if platform.system() == 'Windows':
             currentDirSplit = currentDir.split('\\')
         else:
             currentDirSplit = currentDir.split('/')
         currentFolder = currentDirSplit[-1]
-        # Divert stdout to log file
-        original = sys.stdout
-        logFile = open('%s.log' % (currentFolder), 'w')
-        # sys.stdout = logFile
-        # Write list of wavelengths, excuding ranges not covered by the QCLs
-        wlRange = np.arange(wlStart, wlEnd + wlStep, wlStep)
-        wlList = np.zeros(len(wlRange))
-        if GUIInstance.wlUnits == 'um':
-            minQclWl = defaults.WL_MINIMUMS_UM
-            maxQclWl = defaults.WL_MAXIMUMS_UM
-        elif GUIInstance.wlUnits == 'invcm': # Inverted, for compatibility in code
-            minQclWl = defaults.WL_MAXIMUMS_INVCM
-            maxQclWl = defaults.WL_MINIMUMS_INVCM
-        for wli, wl in enumerate(wlRange):
-            if (minQclWl[0] <= wl <= maxQclWl[0] or
-                minQclWl[1] <= wl <= maxQclWl[1] or
-                minQclWl[2] <= wl <= maxQclWl[2] or
-                minQclWl[3] <= wl <= maxQclWl[3]):
-                wlList[wli] = wl
-        wlList = wlList[wlList != 0] # Remove zero values
-        if GUIInstance.wlUnits == 'invcm':
-            wlList = np.flip(wlList)
-        stepNumber = len(wlList)
-        if useRef and len(dataRef[:,0]) != stepNumber:
-            print('Steps in reference and planned experiment do not match.')
-            useRef = False
-        # GUIElements['expStepTot'].setText('0 / %.0f' % stepNumber)
-        data = np.zeros((stepNumber, 4)) # wl, X, Y, R
-        print('Scan started ...')
-        GUIInstance.spectrumCanvas.clear_plots()
-        GUIInstance.spectrumCanvas.axes.set_xlim(wlList[0], wlList[-1])
-        if useRef:
-            GUIInstance.spectrumCanvasT.clear_plots()
-            GUIInstance.spectrumCanvasT.axes.set_xlim(wlList[0], wlList[-1])
-        GUIInstance.repaint()
-        startRun = timer()
-        step = 0
-        scanInterrupted = False
-        print('One wavelength point per step, avg. of %.0f samples at %.0f Hz'
-              % (sampleNumber, sampleRate))
-        for step in range(0, stepNumber): # First step at initial pos
-            startStep = timer()
-            # Check if "Stop" has been pressed
-            if GUIInstance.btn['Stop'][0].isChecked(): # Stop if button pressed
-                scanInterrupted = True
-            if scanInterrupted:
-                break
-            # Select QCL
-            wavelength = wlList[step]
-            data[step, 0] = wavelength
-            if minQclWl[0] <= wavelength <= maxQclWl[0]:
-                GUIInstance.qcl_fast(1)
-            elif minQclWl[1] <= wavelength <= maxQclWl[1]:
-                GUIInstance.qcl_fast(2)
-            elif minQclWl[2] <= wavelength <= maxQclWl[2]:
-                GUIInstance.qcl_fast(3)
-            elif minQclWl[3] <= wavelength <= maxQclWl[3]:
-                GUIInstance.qcl_fast(4)
-            else:
-                print('Invalid vavelength: {:.3f}'.format(wavelength))
-                continue
-            # Tune to wavelength
-            GUIInstance.tune_fast(wavelength)
-            if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
-                # In auto-enable mode, turn on for every wavelength
-                GUIInstance.btn['Emission'][0].setChecked(True)
-                GUIInstance.emission()
-            voltages = self.pci.get_voltages(sampleNumber, sampleRate)
-            data[step, 1] = voltages[0] # Lock-in X
-            data[step, 2] = voltages[1] # Lock-in Y
-            data[step, 3] = (np.sqrt(np.power(data[step, 1], 2) +
-                                     np.power(data[step, 2], 2))) # Lock-in R
-            GUIInstance.spectrumCanvas.flush_events()
-            GUIInstance.spectrumCanvas.plot_line(data[:step+1, 0],
-                                                 data[:step+1, 3])
-            if useRef:
-                GUIInstance.spectrumCanvasT.flush_events()
-                GUIInstance.spectrumCanvasT.plot_line(data[:step+1, 0],
-                                                 data[:step+1, 3]/dataRef[:step+1, 3])
-            print('Step {:.0f} ({:.1f} um): {:.3f} s'.format(step, wavelength,
-                                                        (timer()-startStep)))
-            if GUIInstance.btn['ScanAutoEnable'][0].isChecked():
-                # In auto-enable mode, turn off for every wavelength
-                GUIInstance.btn['Emission'][0].setChecked(False)
-                GUIInstance.emission()
-            GUIInstance.repaint()
-        end = timer()
-        if scanInterrupted:
-            print('Scan interrupted after %.3f s' % (end-startRun))
-            data = data[0:step]
-        else:
-            print('Scan complete, took %.3f s' % (end-startRun))
-        logFile.close()
-        # Return stdout to terminal
-        sys.stdout = original
-        # Save data as text file
         np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
-        # Update QCL interface readings
-        GUIInstance.qcl(GUIInstance.activeQcl)
-        GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
-        GUIInstance.setUpdatesEnabled(True)
-        GUIInstance.repaint()
-        GUIInstance.grab().save('screenshot.png', 'png')
         return data
 
     def sweep(self):
         '''
         Run a sweep using the MIRcat's built-in function.
-        Latest iteration of fast sweep routine, with no wavelength check.
-        Use with "run", not "start".
-        There is no need to directly select QCLs. If QCL ranges were properly
-        compiled by "run", there will be no QCL swith within a range.
         '''
         ### Preamble
         print('Sweep started ...')
         print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
               .format(self.sampleNumber, self.sampleRate))
         startRun = timer()
-        ### Configure triggered acquisition
+        ### Setup triggered acquisition
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
         multipleAI.configure_triggered(defaults.PCI_TRIG,
                                        self.sampleNumber, self.sampleRate)
@@ -465,8 +384,6 @@ class experiment(): # Directory management and multiple acquisitions
             # print(wavelengths) # Troubleshooting
             # print(voltages) # Troubleshooting
             SDK.MIRcatSDK_StopScanInProgress() # Make sure this sweep has ended
-        ### Make sure scans are done
-        # SDK.MIRcatSDK_StopScanInProgress()
         ### Clear triggered acquisition task
         multipleAI.clear_task()
         ### Format data
@@ -496,21 +413,3 @@ class experiment(): # Directory management and multiple acquisitions
         np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
         return data
 
-
-class pci_input():
-    '''Get voltage from NI PCI analog inputs.'''
-
-    def __init__(self): # Prepare NI-DAQ task
-        self.multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
-
-    def collect(self, sampleNumber, sampleRate): # Get samples fromDAQ device
-        self.multipleAI.configure(sampleNumber, sampleRate)
-        voltages = self.multipleAI.acquire(sampleNumber)
-        self.multipleAI.clear_task()
-        return voltages
-
-    def get_voltages(self, sampleNumber, sampleRate): # Collect and average
-        daqVoltages = self.collect(sampleNumber, sampleRate)
-        PCI_X = np.sum(daqVoltages[0])/sampleNumber
-        PCI_Y = np.sum(daqVoltages[1])/sampleNumber
-        return [PCI_X, PCI_Y]
