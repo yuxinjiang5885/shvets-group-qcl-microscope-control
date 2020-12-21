@@ -122,7 +122,7 @@ class experiment(): # Directory management and multiple acquisitions
         if not GUIInstance.btn['Arm'][0].isChecked():
             print('Laser is not armed.')
             GUIInstance.btn['Start'][0].setChecked(False)
-            GUIInstance.btn['Stop'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
             GUIInstance.btn['Sweep'][0].setChecked(False)
             return [[], self]
         ### Get experiment notes, if any
@@ -156,7 +156,7 @@ class experiment(): # Directory management and multiple acquisitions
         if start == end: # Requested limits are equal
             print('Limits cannot be equal.')
             GUIInstance.btn['Start'][0].setChecked(False)
-            GUIInstance.btn['Stop'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
             GUIInstance.btn['Sweep'][0].setChecked(False)
             return [[], self]
         ### Make "raw" range with requested values
@@ -166,7 +166,7 @@ class experiment(): # Directory management and multiple acquisitions
         if len(rawRange) < 1: # Requested limits are out of QCL bounds
             print('Cannot sweep requested range.')
             GUIInstance.btn['Start'][0].setChecked(False)
-            GUIInstance.btn['Stop'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
             GUIInstance.btn['Sweep'][0].setChecked(False)
             return [[], self]
         ### Make a separate range for each QCL
@@ -274,7 +274,7 @@ class experiment(): # Directory management and multiple acquisitions
         GUIInstance.grab().save('screenshot.png', 'png')
         ### Uncheck UI buttons
         GUIInstance.btn['Start'][0].setChecked(False)
-        GUIInstance.btn['Stop'][0].setChecked(False)
+        # GUIInstance.btn['Stop'][0].setChecked(False)
         GUIInstance.btn['Sweep'][0].setChecked(False)
         return [data, self]
 

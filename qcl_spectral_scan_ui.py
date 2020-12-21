@@ -337,7 +337,7 @@ class mainWindow(QMainWindow):
         self.labelHead['QCLWav'] = [QLabel('QCL Wavelengths'), 1, 5, 1, 2]
         self.labelHead['LasControls'] = [QLabel('Laser/Experiment Settings and Controls'), 1, 7, 1, 4]
         # self.labelHead['ExpControls'] = [QLabel('Scan/Reference Settings'), 1, 8, 1, 3]
-        self.labelHead['Notes'] = [QLabel('Experiment Notes'), 12, 0, 1, 1]
+        self.labelHead['Notes'] = [QLabel('Experiment Notes'), 11, 0, 1, 1]
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(STYLE_LABEL_EMPH)
@@ -403,7 +403,7 @@ class mainWindow(QMainWindow):
         self.notes.setFont(font)
         self.notes.setStyleSheet(STYLE_INPUT)
         self.notes.setToolTip('Notes written here will be saved to file')
-        self.grid.addWidget(self.notes, 12, 1, 2, 4)
+        self.grid.addWidget(self.notes, 12, 0, 2, 6)
         # Connect buttons to actions
         self.btn['QCL1'][0].clicked.connect(lambda: self.qcl(1))
         self.btn['QCL2'][0].clicked.connect(lambda: self.qcl(2))
@@ -539,9 +539,12 @@ class mainWindow(QMainWindow):
         else:
             unitString = '...'
         qclCurrent = self.laser.get_current(qcl)
+        qclPulseRate = self.laser.get_pulse_rate(qcl)
+        qclPulseWidth = self.laser.get_pulse_width(qcl)
         tecTemp = self.laser.get_temperature(qcl)
         labelString = 'QCL{:d}Current'.format(qcl)
-        labelText = '{:.2f}°C, {:d} mA'.format(tecTemp, qclCurrent)
+        labelText = '{:.2f}°C | {:d} mA | {:.0f} ns @ {:.0f} Hz'.format(tecTemp,
+                                        qclCurrent, qclPulseWidth, qclPulseRate)
         self.labelInstr[labelString].setText(labelText)
         qclWl = self.laser.get_wavelength()
         if self.wlUnits=='um':

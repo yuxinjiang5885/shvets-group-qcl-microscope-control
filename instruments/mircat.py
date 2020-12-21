@@ -184,13 +184,25 @@ class laser():
             self.exit_program()
 
     def get_current(self, tec):
-        '''Return the current of TEC "tec"'''
+        '''Return the current of TEC "tec" in mA.'''
         tecCur = c_uint16(0)
         SDK.MIRcatSDK_GetTecCurrent(c_uint8(tec), byref(tecCur))
         return tecCur.value
 
+    def get_pulse_rate(self, qcl):
+        '''Return the pulse rate of QCL "qcl" in Hz.'''
+        rate_Hz = c_float(0)
+        SDK.MIRcatSDK_GetQCLPulseRate(c_uint8(qcl), byref(rate_Hz))
+        return rate_Hz.value
+
+    def get_pulse_width(self, qcl):
+        '''Return the pulse width of QCL "qcl" in ns.'''
+        width_ns = c_float(0)
+        SDK.MIRcatSDK_GetQCLPulseWidth(c_uint8(qcl), byref(width_ns))
+        return width_ns.value
+
     def get_temperature(self, qcl):
-        '''Return the temperature of QCL "QCL"'''
+        '''Return the temperature of QCL "qcl"'''
         qclTemp = c_float(0)
         SDK.MIRcatSDK_GetQCLTemperature(c_uint8(qcl), byref(qclTemp))
         return qclTemp.value
