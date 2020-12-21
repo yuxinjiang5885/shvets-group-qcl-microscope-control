@@ -98,10 +98,10 @@ class experiment(): # Directory management and multiple acquisitions
         os.mkdir(expDir)
         os.chdir(expDir)
         ### Save experiment notes to file
-        if not len(self.notes) == 0:
-            noteFile = open('notes.txt', 'w')
-            noteFile.write(self.notes)
-            noteFile.close()
+        # if not len(self.notes) == 0:
+        #     noteFile = open('notes.txt', 'w')
+        #     noteFile.write(self.notes)
+        #     noteFile.close()
         ### Run a sweep or a step-and-measure scan
         data = []
         if self.sweep:
@@ -232,6 +232,32 @@ class experiment(): # Directory management and multiple acquisitions
             noteFile = open('notes.txt', 'w')
             noteFile.write(self.notes)
             noteFile.close()
+        ### Write parameters to log
+        logFile = open('experiment.log', 'w')
+        logFile.write('QCL/Microscope experiment log\n')
+        timeStr = time.strftime('%Y-%m-%d %H:%M:%S\n')
+        logFile.write('{}'.format(timeStr))
+        logFile.write('No. {:.0f}\n'.format(newExpNo))
+        logFile.write('\n')
+        for qclNo in self.qcl:
+            qclCurr = self.laser.get_current(qclNo)
+            qclRate = self.laser.get_pulse_rate(qclNo)
+            qclWidth = self.laser.get_pulse_width(qclNo)
+            logFile.write('QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
+                                            qclNo, qclCurr, qclRate, qclWidth))
+        logFile.write('\n')
+        if self.sweepLimits:
+            logFile.write('Type: sweep\n')
+        else:
+            logFile.write('Type: step-and-measure\n')
+        logFile.write('\n')
+        logFile.write('Target wavelengths/wavenumbers:\n')
+        logFile.write('{}\n'.format(self.ranges))
+        logFile.write('\n')
+        logFile.write('Sweep limits:\n')
+        logFile.write('{}\n'.format(self.sweepLimits))
+        logFile.write('\n')
+        logFile.close()
         ### Run a sweep or a step-and-measure scan
         data = []
         if self.sweeping:

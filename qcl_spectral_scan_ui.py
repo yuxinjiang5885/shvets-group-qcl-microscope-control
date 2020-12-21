@@ -415,7 +415,7 @@ class mainWindow(QMainWindow):
         self.btn['Tune'][0].clicked.connect(lambda: self.tune())
         self.btn['Start'][0].clicked.connect(lambda: self.run_experiment(self))
         self.btn['Sweep'][0].clicked.connect(lambda: self.run_experiment(self))
-        self.btn['Repeat'][0].clicked.connect(lambda: self.repeat_experiment(self))
+        self.btn['Repeat'][0].clicked.connect(lambda: self.repeat_experiment())
         self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.latestDir))
         self.activeQcl = 0 # None selected on startup
         self.show()
