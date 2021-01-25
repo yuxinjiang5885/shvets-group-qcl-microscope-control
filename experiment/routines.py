@@ -80,7 +80,7 @@ class experiment(): # Directory management and multiple acquisitions
         workDir = defaults.DEF_DATA_DIRECTORY
         os.chdir(workDir)
         ### Get latest experiment number from previously created folder
-        print(self.latestDir)
+        # print(self.latestDir) # Troubleshooting
         oldExpNo = int(self.latestDir[-3:])
         ### Create new experiment folder
         newExpNo = oldExpNo + 1;
@@ -104,7 +104,7 @@ class experiment(): # Directory management and multiple acquisitions
         #     noteFile.close()
         ### Run a sweep or a step-and-measure scan
         data = []
-        if self.sweep:
+        if self.sweeping:
             data = self.sweep()
         else: # Default to step-and-measure
             data = self.scan()
@@ -203,8 +203,9 @@ class experiment(): # Directory management and multiple acquisitions
         if self.sweep:
             if self.units == 'invcm':
                 for r in self.ranges:
-                    self.sweepLimits.append([r[0] - WN_MAR_INVCM,
-                                             r[-1] + WN_MAR_INVCM])
+                    r.reverse() # Default order is from higher energy down
+                    self.sweepLimits.append([r[0] + WN_MAR_INVCM,
+                                             r[-1] - WN_MAR_INVCM])
             else: # Default to micrometers
                 for r in self.ranges:
                     self.sweepLimits.append([r[0] - WL_MAR_UM,
@@ -391,7 +392,7 @@ class experiment(): # Directory management and multiple acquisitions
             ### Set laser triggering (one TTL pulse per wl/wn) and start sweep
             print('Trigger: {:.2f} to {:.2f} {}, {:.2f} {} step.'.format(
                                 r[0], r[-1], self.units, self.step, self.units))
-            self.laser.set_wl_trigger_parameters(r[0], r[-1], self.step,
+            self.laser.set_wl_trigger_parameters(r[-1], r[0], self.step,
                                                                      self.units)
             ### Start sweep
             print('Sweep: {:.2f} to {:.2f} {}, {:.2f} {}/s.'.format(

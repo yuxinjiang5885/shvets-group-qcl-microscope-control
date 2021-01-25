@@ -64,7 +64,7 @@ class MultiChannelAnalogInput():
                            sampleNumber*self.numberOfChannel,
                            byref(read),
                            None)
-        # DAQmxWaitUntilTaskDone(self.taskHandle, DAQ_TIMEOUT)
+        # DAQmxWaitUntilTaskDone(self.taskHandle, DAQMX_TIMEOUT)
         DAQmxStopTask(self.taskHandle)
         return data
 
