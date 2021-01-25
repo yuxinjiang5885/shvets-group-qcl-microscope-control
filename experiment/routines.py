@@ -175,9 +175,9 @@ class experiment(): # Directory management and multiple acquisitions
             for wn in rawRange:
                 if WN_NRANGE_QCL1[0] >= wn >= WN_NRANGE_QCL1[1]:
                     ranges[0].append(wn)
-                elif WN_NRANGE_QCL2[0] >= wn >= WN_NRANGE_QCL2[1]:
+                elif WN_NRANGE_QCL2[0] > wn >= WN_NRANGE_QCL2[1]:
                     ranges[1].append(wn)
-                elif WN_NRANGE_QCL3[0] >= wn >= WN_NRANGE_QCL3[1]:
+                elif WN_NRANGE_QCL3[0] > wn >= WN_NRANGE_QCL3[1]:
                     ranges[2].append(wn)
                 elif WN_NRANGE_QCL4[0] >= wn >= WN_NRANGE_QCL4[1]:
                     ranges[3].append(wn)
@@ -185,9 +185,9 @@ class experiment(): # Directory management and multiple acquisitions
             for wl in rawRange:
                 if WL_NRANGE_QCL1[0] <= wl <= WL_NRANGE_QCL1[1]:
                     ranges[0].append(wl)
-                elif WL_NRANGE_QCL2[0] <= wl <= WL_NRANGE_QCL2[1]:
+                elif WL_NRANGE_QCL2[0] < wl <= WL_NRANGE_QCL2[1]:
                     ranges[1].append(wl)
-                elif WL_NRANGE_QCL3[0] <= wl <= WL_NRANGE_QCL3[1]:
+                elif WL_NRANGE_QCL3[0] < wl <= WL_NRANGE_QCL3[1]:
                     ranges[2].append(wl)
                 elif WL_NRANGE_QCL4[0] <= wl <= WL_NRANGE_QCL4[1]:
                     ranges[3].append(wl)
