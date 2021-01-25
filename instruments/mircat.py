@@ -400,7 +400,7 @@ class laser():
         units = c_uint8()
         qclTune = c_uint8()
         SDK.MIRcatSDK_GetTuneWW(byref(wlTune), byref(units), byref(qclTune))
-        print('Tuning QCL {} to {:.3f} um.'.format(qclTune.value, wlTune.value))
+        print('Tuning QCL {} to {:.3f} {}.'.format(qclTune.value, wlTune.value, unitString))
         # Verify tuning
         self.isTuned = c_bool(False)
         start = timer()
