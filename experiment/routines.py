@@ -270,7 +270,8 @@ class experiment(): # Directory management and multiple acquisitions
         # GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
         ### Reverse data for plotting
         if self.units == 'invcm':
-            plotData = np.flip(data, 0)
+            # plotData = np.flip(data, 0)
+            plotData = data
         else:
             plotData = data
         ### Paint plots
