@@ -376,10 +376,12 @@ class experiment(): # Directory management and multiple acquisitions
         print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
               .format(self.sampleNumber, self.sampleRate))
         startRun = timer()
-        ### Setup triggered acquisition
+        ### Setup, start triggered acquisition task
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
         multipleAI.configure_triggered(defaults.PCI_TRIG,
                                        self.sampleNumber, self.sampleRate)
+                                       ### Start task
+        multipleAI.start_task()
         ### Run multi-range sweep
         numRanges = len(self.ranges)
         steps = 0
@@ -404,7 +406,7 @@ class experiment(): # Directory management and multiple acquisitions
             rangeVoltages = []
             try: # Failure here likely due to timeout because of skipped points
                 for x in range(0, len(r)):
-                    rangeVoltages.append(multipleAI.acquire(self.sampleNumber))
+                    rangeVoltages.append(multipleAI.acquire_fast(self.sampleNumber))
             except Exception as exc:
                 print('Sweep did not complete:\n{}'.format(exc))
                 print('Partial data may still be usable.')
@@ -412,7 +414,8 @@ class experiment(): # Directory management and multiple acquisitions
             # print(wavelengths) # Troubleshooting
             # print(voltages) # Troubleshooting
             SDK.MIRcatSDK_StopScanInProgress() # Make sure this sweep has ended
-        ### Clear triggered acquisition task
+        ### Stop, clear triggered acquisition task
+        multipleAI.stop_task() # Stop acquisition task
         multipleAI.clear_task()
         ### Format data
         data = np.zeros((steps, 4)) # wl, X, Y, R

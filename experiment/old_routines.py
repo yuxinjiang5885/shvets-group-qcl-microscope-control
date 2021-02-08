@@ -736,6 +736,79 @@ class old_experiment(): # Directory management and multiple acquisitions
         GUIInstance.grab().save('screenshot.png', 'png')
         return data
 
+    def sweep_backup(self):
+        '''
+        Run a sweep using the MIRcat's built-in function.
+        '''
+        ### Preamble
+        print('Sweep started ...')
+        print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
+              .format(self.sampleNumber, self.sampleRate))
+        startRun = timer()
+        ### Setup triggered acquisition
+        multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
+        multipleAI.configure_triggered(defaults.PCI_TRIG,
+                                       self.sampleNumber, self.sampleRate)
+        ### Run multi-range sweep
+        numRanges = len(self.ranges)
+        steps = 0
+        voltages, wavelengths = [], []
+        for x, (l, r) in enumerate(zip(self.sweepLimits, self.ranges)):
+            steps += len(r)
+            wavelengths +=r
+            ### Print QCL module in use
+            print('Range {}/{}, using QCL module {}...'.format(
+                x+1, numRanges, self.qcl[x]))
+            ### Set laser triggering (one TTL pulse per wl/wn) and start sweep
+            print('Trigger: {:.2f} to {:.2f} {}, {:.2f} {} step.'.format(
+                                r[0], r[-1], self.units, self.step, self.units))
+            self.laser.set_wl_trigger_parameters(r[-1], r[0], self.step,
+                                                                     self.units)
+            ### Start sweep
+            print('Sweep: {:.2f} to {:.2f} {}, {:.2f} {}/s.'.format(
+                                l[0], l[-1],self.units, self.speed, self.units))
+            self.laser.sweep_and_forget(l[0], l[-1], self.speed, self.units,
+                                                                    self.qcl[x])
+            ### Triggered acquisition
+            rangeVoltages = []
+            try: # Failure here likely due to timeout because of skipped points
+                for x in range(0, len(r)):
+                    rangeVoltages.append(multipleAI.acquire(self.sampleNumber))
+            except Exception as exc:
+                print('Sweep did not complete:\n{}'.format(exc))
+                print('Partial data may still be usable.')
+            voltages += rangeVoltages
+            # print(wavelengths) # Troubleshooting
+            # print(voltages) # Troubleshooting
+            SDK.MIRcatSDK_StopScanInProgress() # Make sure this sweep has ended
+        ### Clear triggered acquisition task
+        multipleAI.clear_task()
+        ### Format data
+        data = np.zeros((steps, 4)) # wl, X, Y, R
+        try: # Failure here certain if points skipped above
+            for x, v in enumerate(voltages):
+                data[x, 0] = wavelengths[x]
+                data[x, 1] = np.sum(v[0])/self.sampleNumber # Lock-in X
+                data[x, 2] = np.sum(v[1])/self.sampleNumber # Lock-in Y
+                data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
+                                      np.power(data[x, 2], 2))) # Lock-in R
+        except Exception as exc:
+            print('Data formatting did not complete:\n{}'.format(exc))
+            print('Data was not saved.')
+        data = data[data[:, 0] != 0] # Remove zero-wavelength values
+        endRun = timer()
+        print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
+                                                              len(wavelengths)))
+        print('Sweep complete (%.3f s).' % (endRun-startRun))
+        ### Save data as text file
+        currentDir = os.getcwd()
+        if platform.system() == 'Windows':
+            currentDirSplit = currentDir.split('\\')
+        else:
+            currentDirSplit = currentDir.split('/')
+        currentFolder = currentDirSplit[-1]
+        np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
+        return data
 
 class pci_input():
     '''Get voltage from NI PCI analog inputs.'''

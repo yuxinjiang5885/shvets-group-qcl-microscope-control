@@ -68,6 +68,21 @@ class MultiChannelAnalogInput():
         DAQmxStopTask(self.taskHandle)
         return data
 
+    def acquire_fast(self, sampleNumber):
+        '''Acquire data, one line per channel, no task start/stop.
+           For repeated and retriggered use between a start and a stop call.'''
+        data = np.zeros((self.numberOfChannel, sampleNumber), dtype=np.float64)
+        read = int32()
+        DAQmxReadAnalogF64(self.taskHandle,
+                           sampleNumber,
+                           DAQMX_TIMEOUT,
+                           DAQmx_Val_GroupByChannel,
+                           data,
+                           sampleNumber*self.numberOfChannel,
+                           byref(read),
+                           None)
+        return data
+
     def clear_task(self):
         DAQmxClearTask(self.taskHandle)
 
@@ -123,3 +138,11 @@ class MultiChannelAnalogInput():
         ### Make task retriggerable. Requires X-series (63XX) hardware.
         DAQmxSetTrigAttribute(self.taskHandle,
                               DAQmx_StartTrig_Retriggerable, True)
+
+    def start_task(self):
+        '''Start task.'''
+        DAQmxStartTask(self.taskHandle)
+
+    def stop_task(self):
+        '''Stop task.'''
+        DAQmxStopTask(self.taskHandle)
