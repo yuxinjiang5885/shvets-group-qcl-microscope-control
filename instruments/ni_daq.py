@@ -32,7 +32,7 @@ from PyDAQmx.DAQmxFunctions import (byref,
 #from PyDAQmx.Task import TaskHandle
 from PyDAQmx.DAQmxTypes import int32, TaskHandle
 
-DAQMX_TIMEOUT = 10 # s
+DAQMX_TIMEOUT = 20 # s
 
 class MultiChannelAnalogInput():
     '''Read multiple analog input channels simultaneously with NI DAQmx.'''
