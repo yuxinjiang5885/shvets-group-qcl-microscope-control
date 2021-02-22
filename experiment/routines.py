@@ -64,7 +64,7 @@ class experiment(): # Directory management and multiple acquisitions
         self.units = 'um' # By default, wavelengths in micrometers
         self.useRef = False # By default, do not use reference
 
-    def repeat(self):
+    def repeat(self, GUIInstance):
         '''
         Run the same experiment again. Saves time compared to "run".
         Ineffective if "run" has not been used before for a given instance.
@@ -108,6 +108,34 @@ class experiment(): # Directory management and multiple acquisitions
             data = self.sweep()
         else: # Default to step-and-measure
             data = self.scan()
+        if GUIInstance.repeatShowAction.isChecked():
+            ### Reverse data for plotting
+            if self.units == 'invcm':
+                # plotData = np.flip(data, 0)
+                plotData = data
+            else:
+                plotData = data
+            ### Paint plots
+            GUIInstance.spectrumCanvas.clear_plots()
+            GUIInstance.spectrumCanvasT.clear_plots()
+            # GUIInstance.spectrumCanvas.flush_events()
+            try:
+                GUIInstance.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+                # GUIInstance.spectrumCanvas.axes.set_ylim(min(data[:, 1]), max(data[-1, 0]))
+                GUIInstance.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
+                if self.useRef:
+                    if self.units == 'invcm':
+                        plotData = np.flip(data, 0)
+                        plotRef = np.flip(self.reference, 0)
+                    else:
+                        plotData = data
+                        plotRef = self.reference
+                    # GUIInstance.spectrumCanvasT.flush_events()
+                    GUIInstance.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+                    GUIInstance.spectrumCanvasT.plot_line(plotData[:, 0],
+                                                        plotData[:, 3]/plotRef[:, 3])
+            except Exception as exc:
+                print('Failed to plot data:\n{}'.format(exc))
         return [data, self]
 
     def run(self, GUIInstance, wlUnits='um'):

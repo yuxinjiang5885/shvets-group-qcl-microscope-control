@@ -189,6 +189,11 @@ class mainWindow(QMainWindow):
         fileMenu.addAction(laserOff)
         fileMenu.addAction(exitAction)
         fileMenu.addAction(changeUnits)
+        ### "Options" menu
+        optionsMenu = self.menubar.addMenu('Options')
+        self.repeatShowAction = QAction(QIcon(None), 'Plot data when using "Repeat"', self, checkable=True)
+        self.repeatShowAction.setStatusTip('Plot data when using the repeat function.')
+        optionsMenu.addAction(self.repeatShowAction)
         ### "About" menu
         aboutAction = QAction(QIcon(None), 'About', self)
         aboutAction.setStatusTip('About')
@@ -491,7 +496,7 @@ class mainWindow(QMainWindow):
         self.statusbar.showMessage('Busy')
         self.repaint()
         try:
-            [data, self.latestExperiment] = self.latestExperiment.repeat()
+            [data, self.latestExperiment] = self.latestExperiment.repeat(self)
         except Exception as exc:
             print('Could not repeat experiment:\n{}'.format(exc))
             data = []
