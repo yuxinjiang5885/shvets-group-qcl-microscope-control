@@ -14,14 +14,14 @@ import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-from timeit import default_timer as timer
+from timeit import default_timer as timer, timeit
 from experiment.defaults import *
 from experiment.routines import experiment
 from ui.plot_widgets import mplCanvas
 from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon, QFont
+from PyQt5.QtGui import QIcon, QFont, QWindow
 from PyQt5.QtWidgets import (QAction,
                              QApplication,
                              QDesktopWidget,
@@ -29,13 +29,13 @@ from PyQt5.QtWidgets import (QAction,
                              QFileDialog,
                              QGridLayout,
                              QLabel,
+                             QLineEdit,
                              QMainWindow,
                              QMessageBox,
                              QPushButton,
                              QWidget,
                              QSizePolicy,
-                             QTextEdit,
-                             QLineEdit)
+                             QTextEdit)
 
 
 class laserStartupDialog(QMessageBox):
@@ -189,10 +189,17 @@ class mainWindow(QMainWindow):
         fileMenu.addAction(laserOff)
         fileMenu.addAction(exitAction)
         fileMenu.addAction(changeUnits)
+        ### "Multiple" menu
+        multipleMenu = self.menubar.addMenu('Multiple')
+        multipleAcqMenu = QAction(QIcon(None), 'Timed multiple acquisitions', self)
+        multipleAcqMenu.setShortcut('Ctrl+M')
+        multipleAcqMenu.setStatusTip('Open timed multiple acquisitions menu')
+        multipleMenu.addAction(multipleAcqMenu)
+        multipleAcqMenu.triggered.connect(lambda: self.multiple_acq_menu())
         ### "Options" menu
         optionsMenu = self.menubar.addMenu('Options')
         self.repeatShowAction = QAction(QIcon(None), 'Plot data when using "Repeat"', self, checkable=True)
-        self.repeatShowAction.setStatusTip('Plot data when using the repeat function.')
+        self.repeatShowAction.setStatusTip('Plot data when using the repeat function')
         optionsMenu.addAction(self.repeatShowAction)
         ### "About" menu
         aboutAction = QAction(QIcon(None), 'About', self)
@@ -200,6 +207,7 @@ class mainWindow(QMainWindow):
         aboutAction.triggered.connect(self.about)
         helpMenu = self.menubar.addMenu('Help')
         helpMenu.addAction(aboutAction)
+        ### Set title, icon and center window
         self.setWindowTitle('MIRcat Control Panel')
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
         self.center_window()
@@ -225,28 +233,28 @@ class mainWindow(QMainWindow):
             #     self.grid.setColumnStretch(col, 4)
             else:
                 self.grid.setColumnStretch(col, 20)
-        # Plot: latest spectrum
+        ### Plot: latest spectrum
         self.spectrumCanvas = mplCanvas(width=5, height=4)
         self.spectrumCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
         self.spectrumCanvas.axes.set_ylabel('Lock-in Mag. (V)')
         self.spectrumCanvas.axes.set_title('Latest Spectrum')
         self.grid.addWidget(self.spectrumCanvas, 0, 0, 1, 5)
-        # Plot: current reference
+        ### Plot: current reference
         self.spectrumCanvasRef = mplCanvas(width=5, height=4)
         self.spectrumCanvasRef.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.spectrumCanvasRef.axes.set_xlabel('Wavelength (μm)')
         self.spectrumCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
         self.spectrumCanvasRef.axes.set_title('Current Reference')
         self.grid.addWidget(self.spectrumCanvasRef, 0, 5, 1, 3)
-        # Plot: transmittance
+        ### Plot: transmittance
         self.spectrumCanvasT = mplCanvas(width=5, height=4)
         self.spectrumCanvasT.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.spectrumCanvasT.axes.set_xlabel('Wavelength (μm)')
         self.spectrumCanvasT.axes.set_ylabel('Transmittance')
         self.spectrumCanvasT.axes.set_title('Transmittance (Latest/Reference)')
         self.grid.addWidget(self.spectrumCanvasT, 0, 8, 1, 3)
-        # Buttons: select QCL, laser arm, tune, enable emission
+        ### Buttons: select QCL, laser arm, tune, enable emission
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['QCL1'] = [QPushButton('QCL 1 Off'), 2, 0, 2, 1]
         self.btn['QCL1'][0].setToolTip('Select QCL module 1')
@@ -277,7 +285,7 @@ class mainWindow(QMainWindow):
         self.btn['RefSave'][0].setToolTip('Save latest spectrum path for later')
         self.btn['RefRecall'] = [QPushButton('Recall Reference'), 11, 10, 1, 1]
         self.btn['RefRecall'][0].setToolTip('Recall saved spectrum path and set as reference')
-        # Buttons: start sweep, start scan, stop scan
+        ### Buttons: start sweep, start scan, stop scan
         self.btn['Sweep'] = [QPushButton('Sweep'), 12, 8, 2, 1]
         self.btn['Sweep'][0].setToolTip('Start sweep')
         self.btn['Start'] = [QPushButton('Scan'), 12, 9, 2, 1]
@@ -298,7 +306,7 @@ class mainWindow(QMainWindow):
             else:
                 k[0].setStyleSheet(STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        # Input fields: current, current percentage, wavelength
+        ### Input fields: current, current percentage, wavelength
         paramStrings = ['SetCurrent', 'SetCurrPc', 'SetWl']
         self.inputField = dict() # to collect all input fields
         startupText = [MAX_CURR_QCL1_MILLIAMP, MAX_CURR_QCL2_MILLIAMP, MAX_CURR_QCL3_MILLIAMP,
@@ -315,7 +323,7 @@ class mainWindow(QMainWindow):
                                                             startupText[itemNo])
                 self.inputField[fieldString] = [QLineEdit(startupString), row, col, 1, 1]
                 self.inputField[fieldString][0].setToolTip('DO NOT USE: set in MIRcatControl')
-        # Input fields: experiment controls
+        ### Input fields: experiment controls
         self.inputField['WlStart'] = [QLineEdit('{}'.format(DEF_WL_START_UM)), 3, 8, 1, 1]
         self.inputField['WlStart'][0].setToolTip('First scan wavelength')
         self.inputField['WlEnd'] = [QLineEdit('{}'.format(DEF_WL_END_UM)), 3, 9, 1, 1]
@@ -328,14 +336,14 @@ class mainWindow(QMainWindow):
         self.inputField['SamplesPerWl'][0].setToolTip('Samples read by acquisition card at every step')
         self.inputField['Speed'] = [QLineEdit('{}'.format(MAX_SWEEP_SPEED_UM)), 9, 10, 1, 1]
         self.inputField['Speed'][0].setToolTip('Sweep speed')
-        # Input fields: reference
+        ### Input fields: reference
         self.inputField['RefPath'] = [QLineEdit('C:\\Data\\_experiment_data'), 10, 8, 1, 3]
-        # Create all input fields
+        ### Create all input fields
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        # Labels: headers, in a dict for ease of positioning
+        ### Labels: headers, in a dict for ease of positioning
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
         self.labelHead['QCLMod'] = [QLabel('QCL Modules'), 1, 0, 1, 1]
         self.labelHead['QCLCurr'] = [QLabel('QCL Currents'), 1, 1, 1, 4]
@@ -424,6 +432,10 @@ class mainWindow(QMainWindow):
         self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.latestDir))
         self.activeQcl = 0 # None selected on startup
         self.show()
+
+    def multiple_acq_menu(self):
+        self.multiAcqWindow1 = multipleAcquisitionsWindow(self)
+        self.multiAcqWindow1.show()
 
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
@@ -653,6 +665,116 @@ class mainWindow(QMainWindow):
             # Can't unambiguously convert step
             self.inputField['WlStep'][0].setText('0.1')
             self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
+
+class multipleAcquisitionsWindow(QMainWindow):
+    '''GUI for multiple acquisitions'''
+
+    def __init__(self, mainGUI):
+        super().__init__(None, Qt.WindowStaysOnTopHint)
+        self.latestExperiment = [] # Placeholder for latest experiment instance
+        self.make_gui()
+        self.mainGUI = mainGUI
+        self.acquisitions = 0
+
+    def center_window(self):
+        '''Center main application window on screen'''
+        qtRectangle = self.frameGeometry()
+        centerPoint = QDesktopWidget().availableGeometry().center()
+        qtRectangle.moveCenter(centerPoint)
+        self.move(qtRectangle.topLeft())
+
+    def closeEvent(self, event): # Redefined from parent QMainWindow
+        '''Show warning dialog on close.'''
+        event.accept()
+
+    def make_gui(self):
+        '''Draw controls'''
+        self.setGeometry(0, 0, 250, 300)
+        font = QFont()
+        font.setFamily(FONT_FAMILY)
+        font.setPointSize(FONT_SIZE)
+        ### Set title, icon and center window
+        self.setWindowTitle('Multiple Acquisitions')
+        self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
+        self.center_window()
+        ### Actions
+        exitAction = QAction(QIcon(None), 'Exit', self)
+        exitAction.setShortcut('Ctrl+Q')
+        # exitAction.setStatusTip('Exit application')
+        exitAction.triggered.connect(lambda: self.close())
+        ### Menus
+        self.menubar = self.menuBar()
+        self.menubar.setStyleSheet(STYLE_BAR)
+        fileMenu = self.menubar.addMenu('Actions')
+        fileMenu.addAction(exitAction)
+        ### Configure grid layout
+        self.container = QWidget()
+        self.container.setStyleSheet(STYLE_CONTAINER)
+        self.setCentralWidget(self.container)
+        self.grid = QGridLayout()
+        self.container.setLayout(self.grid)
+        self.grid.setSpacing(10)
+        for row in range(0, 7): # Set row spacing
+            self.grid.setRowStretch(row, 1)
+        # for col in range(0, NUMBER_OF_COLS): # Set column spacing
+    #         self.grid.setColumnStretch(col, 1)
+        ### Buttons
+        self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
+        self.btn['Start'] = [QPushButton('Start'), 3, 0, 2, 1]
+        self.btn['Start'][0].setToolTip('Start multiple acquisitions')
+        self.btn['Stop'] = [QPushButton('Stop'), 5, 0, 2, 1]
+        self.btn['Stop'][0].setToolTip('Stop multiple acquisitions')
+        for x, k in self.btn.items(): # Arrange buttons in grid
+            k[0].setCheckable(True)
+            k[0].setFocusPolicy(Qt.NoFocus)
+            k[0].setFont(font)
+            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            k[0].setStyleSheet(STYLE_ARMED)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        self.btn['Start'][0].clicked.connect(lambda: self.multiple())
+        # Input fields
+        self.inputField = dict() # to collect all input fields
+        self.inputField['timeInterval'] = [QLineEdit('{}'.format(5)), 2, 0, 1, 1]
+        self.inputField['timeInterval'][0].setToolTip('Multiple acquisition time interval')
+        for _, k in self.inputField.items(): # Arrange labels in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(STYLE_INPUT)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Labels
+        self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
+        self.labelHead['counter'] = [QLabel('Acquisitions: 0'), 0, 0, 1, 1]
+        self.labelHead['timeInterval'] = [QLabel('Time Interval (min)'), 1, 0, 1, 1]
+        for _, k in self.labelHead.items(): # Arrange labels in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(STYLE_LABEL_EMPH)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+
+    def multiple(self):
+        '''Run multiple acquisitions.'''
+        timeInterval = 60 * float(self.inputField['timeInterval'][0].text())
+        print('Acquisitions every {:.0f} minutes.'.format(timeInterval / 60))
+        self.labelHead['counter'][0].setText('Acquisitions: 0')
+        startRun = timer()
+        while not self.btn['Stop'][0].isChecked():
+            self.mainGUI.btn['Sweep'][0].setChecked(True)
+            if self.acquisitions == 0:
+                self.mainGUI.run_experiment(self.mainGUI)
+            else:
+                self.mainGUI.repeat_experiment()
+            self.acquisitions += 1
+            self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
+            # while timer() - startRun < self.acquisitions * timeInterval:
+            #     print('Waiting... {} s'.format(timer() - startRun))
+            #     time.sleep(1)
+            if self.acquisitions > 2: # Troubleshooting
+                self.btn['Stop'][0].setChecked(True)
+            self.repaint()
+            self.show()
+            time.sleep(5)
+        self.btn['Start'][0].setChecked(False)
+        self.btn['Stop'][0].setChecked(False)
+        self.acquisitions = 0
+
 
 if __name__ == '__main__':
     APP = QApplication([])
