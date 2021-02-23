@@ -750,6 +750,7 @@ class multipleAcquisitionsWindow(QMainWindow):
 
     def multiple(self):
         '''Run multiple acquisitions.'''
+        MAX_N_ACQ = 10
         timeInterval = 60 * float(self.inputField['timeInterval'][0].text())
         print('Acquisitions every {:.0f} minutes.'.format(timeInterval / 60))
         self.labelHead['counter'][0].setText('Acquisitions: 0')
@@ -762,13 +763,13 @@ class multipleAcquisitionsWindow(QMainWindow):
                 self.mainGUI.repeat_experiment()
             self.acquisitions += 1
             self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
-            # while timer() - startRun < self.acquisitions * timeInterval:
-            #     print('Waiting... {} s'.format(timer() - startRun))
-            #     time.sleep(1)
-            if self.acquisitions > 2: # Troubleshooting
+            while timer() - startRun < self.acquisitions * timeInterval:
+                # print('Waiting... {} s'.format(timer() - startRun))
+                time.sleep(1)
+            if self.acquisitions > MAX_N_ACQ: # Troubleshooting
                 self.btn['Stop'][0].setChecked(True)
             self.repaint()
-            # self.show()
+            self.show()
             # self.setFocus(True)
             # self.activateWindow()
             # self.raise_()
