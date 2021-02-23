@@ -2,7 +2,6 @@
 old_routines
 Giovanni Sartorello (srtgnn@gmail.com)
 Obsolete experiment routines
-Version 2
 Python 3.8.3 on Windows 10
 Created 2020-Nov-30
 '''

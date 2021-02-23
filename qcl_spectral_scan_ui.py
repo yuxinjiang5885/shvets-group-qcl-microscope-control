@@ -2,7 +2,6 @@
 qcl_spectral_scan_ui
 Giovanni Sartorello (srtgnn@gmail.com)
 UI for QCL scanning spectroscopy experiments
-Version 2
 Python 3.8.3 on Windows 10
 Created 2020-Aug-17
 '''
@@ -769,14 +768,16 @@ class multipleAcquisitionsWindow(QMainWindow):
             if self.acquisitions > 2: # Troubleshooting
                 self.btn['Stop'][0].setChecked(True)
             self.repaint()
-            self.show()
-            time.sleep(5)
+            # self.show()
+            # self.setFocus(True)
+            # self.activateWindow()
+            # self.raise_()
         self.btn['Start'][0].setChecked(False)
         self.btn['Stop'][0].setChecked(False)
         self.acquisitions = 0
 
 
 if __name__ == '__main__':
-    APP = QApplication([])
+    APP = QApplication(sys.argv)
     GUI1 = mainWindow()
     sys.exit(APP.exec_())

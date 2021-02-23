@@ -2,7 +2,6 @@
 defaults
 Giovanni Sartorello (srtgnn@gmail.com)
 Default values for MIRcat spectral scan UI
-Version 1
 Python 3.8.3 on Windows 10
 Created 2020-Oct-20
 '''
