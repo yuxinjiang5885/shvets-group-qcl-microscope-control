@@ -470,4 +470,3 @@ class experiment(): # Directory management and multiple acquisitions
         currentFolder = currentDirSplit[-1]
         np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
         return data
-

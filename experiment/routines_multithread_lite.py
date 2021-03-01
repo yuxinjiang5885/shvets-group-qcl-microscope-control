@@ -1,9 +1,10 @@
 '''
-routines
+routines_multithread
 Giovanni Sartorello (srtgnn@gmail.com)
 Experiment control classes for MIRcat spectral scan UI
 Python 3.8.3 on Windows 10
-Created 2020-Oct-20
+Multi-threaded version of "routines"
+Created 2021-Mar-03
 '''
 
 import os
@@ -16,6 +17,7 @@ import time
 from ctypes import (byref, c_bool, c_float, c_uint, c_uint8, c_uint16, c_uint32)
 from instruments.mircat import SDK
 from . import defaults
+from PyQt5.QtCore import QObject, QThread, pyqtSignal
 from timeit import default_timer as timer
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
@@ -104,9 +106,9 @@ class experiment(): # Directory management and multiple acquisitions
         ### Run a sweep or a step-and-measure scan
         data = []
         if self.sweeping:
-            data = self.sweep()
+            data = self.worker.sweep(self)
         else: # Default to step-and-measure
-            data = self.scan()
+            data = self.worker.scan(self)
         if GUIInstance.repeatShowAction.isChecked():
             ### Reverse data for plotting
             if self.units == 'invcm':
@@ -288,10 +290,18 @@ class experiment(): # Directory management and multiple acquisitions
         logFile.close()
         ### Run a sweep or a step-and-measure scan
         data = []
+        self.thread = QThread()
+        self.worker = worker()
+        self.worker.moveToThread(self.thread)
+        self.thread.start()
         if self.sweeping:
-            data = self.sweep()
+            data = self.worker.sweep(self)
         else: # Default to step-and-measure
-            data = self.scan()
+            data = self.worker.scan(self)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        # self.worker.progress.connect(self.reportProgress)
         ### Update QCL interface readings
         # GUIInstance.qcl(GUIInstance.activeQcl)
         # GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
@@ -333,24 +343,40 @@ class experiment(): # Directory management and multiple acquisitions
         GUIInstance.btn['Sweep'][0].setChecked(False)
         return [data, self]
 
-    def scan(self):
+
+class worker(QObject):
+    '''Run scan and sweep routines in a separate thread.
+       This prevents the GUI from freezing, which allows stop buttons.'''
+    finished = pyqtSignal()
+    progress = pyqtSignal(int)
+
+    # def __init__(self):
+    #     super().__init__()
+    #     self.finished = pyqtSignal()
+    #     self.progress = pyqtSignal(int)
+
+    def run(self):
+        self.progress.emit(1)
+        self.finished.emit()
+
+    def scan(self, experiment):
         '''Run a step-and measure scan.'''
         ### Preamble
         print('Scan started ...')
         print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
-              .format(self.sampleNumber, self.sampleRate))
+              .format(experiment.sampleNumber, experiment.sampleRate))
         startRun = timer()
         ### Setup acquisition
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
-        multipleAI.configure(self.sampleNumber, self.sampleRate)
+        multipleAI.configure(experiment.sampleNumber, experiment.sampleRate)
         ### Run multi-range scan
-        numRanges = len(self.ranges)
+        numRanges = len(experiment.ranges)
         steps = 0
         voltages, wavelengths = [], []
-        for x, r in enumerate(self.ranges):
+        for x, r in enumerate(experiment.ranges):
             steps += len(r)
             wavelengths +=r
-            qcl = self.qcl[x]
+            qcl = experiment.qcl[x]
             print('Range {}/{}, using QCL module {}...'.format(
                                                            x+1, numRanges, qcl))
             ### Acquisition
@@ -358,9 +384,9 @@ class experiment(): # Directory management and multiple acquisitions
             try: # Failure here likely due to timeout because of skipped points
                 for wl in r:
                     ### Tune
-                    self.laser.tune(qcl, wl, self.units)
+                    experiment.laser.tune(qcl, wl, experiment.units)
                     ### Acquire
-                    rangeVoltages.append(multipleAI.acquire(self.sampleNumber))
+                    rangeVoltages.append(multipleAI.acquire(experiment.sampleNumber))
             except Exception as exc:
                 print('Scan did not complete:\n{}'.format(exc))
                 print('Partial data may still be usable.')
@@ -372,8 +398,8 @@ class experiment(): # Directory management and multiple acquisitions
         try:
             for x, v in enumerate(voltages):
                 data[x, 0] = wavelengths[x]
-                data[x, 1] = np.sum(v[0])/self.sampleNumber # Lock-in X
-                data[x, 2] = np.sum(v[1])/self.sampleNumber # Lock-in Y
+                data[x, 1] = np.sum(v[0])/experiment.sampleNumber # Lock-in X
+                data[x, 2] = np.sum(v[1])/experiment.sampleNumber # Lock-in Y
                 data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
                                       np.power(data[x, 2], 2))) # Lock-in R
         except Exception as exc:
@@ -392,48 +418,48 @@ class experiment(): # Directory management and multiple acquisitions
             currentDirSplit = currentDir.split('/')
         currentFolder = currentDirSplit[-1]
         np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
+        # self.progress.emit(1)
+        # self.finished.emit()
         return data
 
-    def sweep(self):
-        '''
-        Run a sweep using the MIRcat's built-in function.
-        '''
+    def sweep(self, experiment):
+        '''Run a sweep using MIRcat's built-in function.'''
         ### Preamble
         print('Sweep started ...')
         print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
-              .format(self.sampleNumber, self.sampleRate))
+              .format(experiment.sampleNumber, experiment.sampleRate))
         startRun = timer()
         ### Setup, start triggered acquisition task
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
         multipleAI.configure_triggered(defaults.PCI_TRIG,
-                                       self.sampleNumber, self.sampleRate)
+                                       experiment.sampleNumber, experiment.sampleRate)
                                        ### Start task
         multipleAI.start_task()
         ### Run multi-range sweep
-        numRanges = len(self.ranges)
+        numRanges = len(experiment.ranges)
         steps = 0
         voltages, wavelengths = [], []
-        for x, (l, r) in enumerate(zip(self.sweepLimits, self.ranges)):
+        for x, (l, r) in enumerate(zip(experiment.sweepLimits, experiment.ranges)):
             steps += len(r)
             wavelengths +=r
             ### Print QCL module in use
             print('Range {}/{}, using QCL module {}...'.format(
-                x+1, numRanges, self.qcl[x]))
+                x+1, numRanges, experiment.qcl[x]))
             ### Set laser triggering (one TTL pulse per wl/wn) and start sweep
             print('Trigger: {:.2f} to {:.2f} {}, {:.2f} {} step.'.format(
-                                r[0], r[-1], self.units, self.step, self.units))
-            self.laser.set_wl_trigger_parameters(r[-1], r[0], self.step,
-                                                                     self.units)
+                                r[0], r[-1], experiment.units, experiment.step, experiment.units))
+            experiment.laser.set_wl_trigger_parameters(r[-1], r[0], experiment.step,
+                                                                     experiment.units)
             ### Start sweep
             print('Sweep: {:.2f} to {:.2f} {}, {:.2f} {}/s.'.format(
-                                l[0], l[-1],self.units, self.speed, self.units))
-            self.laser.sweep_and_forget(l[0], l[-1], self.speed, self.units,
-                                                                    self.qcl[x])
+                                l[0], l[-1],experiment.units, experiment.speed, experiment.units))
+            experiment.laser.sweep_and_forget(l[0], l[-1], experiment.speed, experiment.units,
+                                                                    experiment.qcl[x])
             ### Triggered acquisition
             rangeVoltages = []
             try: # Failure here likely due to timeout because of skipped points
                 for x in range(0, len(r)):
-                    rangeVoltages.append(multipleAI.acquire_fast(self.sampleNumber))
+                    rangeVoltages.append(multipleAI.acquire_fast(experiment.sampleNumber))
             except Exception as exc:
                 print('Sweep did not complete:\n{}'.format(exc))
                 print('Partial data may still be usable.')
@@ -449,8 +475,8 @@ class experiment(): # Directory management and multiple acquisitions
         try: # Failure here certain if points skipped above
             for x, v in enumerate(voltages):
                 data[x, 0] = wavelengths[x]
-                data[x, 1] = np.sum(v[0])/self.sampleNumber # Lock-in X
-                data[x, 2] = np.sum(v[1])/self.sampleNumber # Lock-in Y
+                data[x, 1] = np.sum(v[0])/experiment.sampleNumber # Lock-in X
+                data[x, 2] = np.sum(v[1])/experiment.sampleNumber # Lock-in Y
                 data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
                                       np.power(data[x, 2], 2))) # Lock-in R
         except Exception as exc:
@@ -469,5 +495,6 @@ class experiment(): # Directory management and multiple acquisitions
             currentDirSplit = currentDir.split('/')
         currentFolder = currentDirSplit[-1]
         np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
+        # self.progress.emit(1)
+        # self.finished.emit()
         return data
-
