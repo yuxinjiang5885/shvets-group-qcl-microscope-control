@@ -21,6 +21,8 @@ from ui.plot_widgets import mplCanvas
 from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QObject, QThread, pyqtSignal
+import experiment.defaults as defaults
 from PyQt5.QtGui import QIcon, QFont, QWindow
 from PyQt5.QtWidgets import (QAction,
                              QApplication,
@@ -37,6 +39,26 @@ from PyQt5.QtWidgets import (QAction,
                              QSizePolicy,
                              QTextEdit)
 
+
+class experimentParameters():
+    '''Holds experiment parameters'''
+
+    def __init__(self):
+        self.end = 100 # Placeholder value, no unit
+        self.laser = [] # Placeholder value
+        self.latestDir = 0 # Latest experiment directory, placeholder value
+        self.notes = [] # Placeholder value
+        self.ranges = [] # Placeholder value
+        self.reference = np.zeros((1, 2)) # Placeholder value
+        self.sampleNumber = defaults.DEF_SAMPLES
+        self.sampleRate = defaults.DEF_SAMPLERATE
+        self.speed = 1 # Placeholder value, no unit
+        self.start = 0 # Placeholder value, no unit
+        self.step = 1 # Placeholder value, no unit
+        self.sweeping = True # By default, use the sweep routine
+        self.sweepLimits = [] # Placeholder value
+        self.units = 'um' # By default, wavelengths in micrometers
+        self.useRef = False # By default, do not use reference
 
 class laserStartupDialog(QMessageBox):
     '''Show a dialog informing user laser is starting up.'''
@@ -426,8 +448,8 @@ class mainWindow(QMainWindow):
         self.btn['Arm'][0].clicked.connect(lambda: self.arm())
         self.btn['Emission'][0].clicked.connect(lambda: self.emission())
         self.btn['Tune'][0].clicked.connect(lambda: self.tune())
-        self.btn['Start'][0].clicked.connect(lambda: self.run_experiment(self))
-        self.btn['Sweep'][0].clicked.connect(lambda: self.run_experiment(self))
+        self.btn['Start'][0].clicked.connect(lambda: self.run_experiment())
+        self.btn['Sweep'][0].clicked.connect(lambda: self.run_experiment())
         self.btn['Repeat'][0].clicked.connect(lambda: self.repeat_experiment())
         self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.latestDir))
         self.activeQcl = 0 # None selected on startup
@@ -479,6 +501,36 @@ class mainWindow(QMainWindow):
             self.labelInstr[qclNoStrCurr].setStyleSheet(STYLE_LABEL_READ)
             self.labelInstr[qclNoStrWl].setStyleSheet(STYLE_LABEL_READ)
 
+    def plot_results(self, data):
+        ### Reverse data for plotting
+        ### Deprecated, direction handling is now elsewhere
+        if self.units == 'invcm':
+            # plotData = np.flip(data, 0)
+            plotData = data
+        else:
+            plotData = data
+        ### Paint plots
+        self.spectrumCanvas.clear_plots()
+        self.spectrumCanvasT.clear_plots()
+        # self.spectrumCanvas.flush_events()
+        try:
+            self.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+            # self.spectrumCanvas.axes.set_ylim(min(data[:, 1]), max(data[-1, 0]))
+            self.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
+            if self.useRef:
+                if self.units == 'invcm':
+                    plotData = np.flip(data, 0)
+                    plotRef = np.flip(self.reference, 0)
+                else:
+                    plotData = data
+                    plotRef = self.reference
+                # self.spectrumCanvasT.flush_events()
+                self.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+                self.spectrumCanvasT.plot_line(plotData[:, 0],
+                                                      plotData[:, 3]/plotRef[:, 3])
+        except Exception as exc:
+            print('Failed to plot data:\n{}'.format(exc))
+
     def reference_enable(self):
         '''Enable use of reference'''
         if self.btn['RefEnable'][0].isChecked:
@@ -516,15 +568,66 @@ class mainWindow(QMainWindow):
         self.statusbar.showMessage('Ready')
         return data
 
-    def run_experiment(self, GUIElements):
+    def run_experiment(self):
         '''Run scan, return data'''
+        ### Initial checks
+        if not self.btn['Arm'][0].isChecked():
+            print('Laser is not armed.')
+            self.btn['Start'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
+            self.btn['Sweep'][0].setChecked(False)
+            return
+        ### Read and compile experiment parameters
+        parameters = experimentParameters()
+        parameters.laser = self.laser
+        parameters.notes = self.notes.toPlainText()
+        parameters.useRef = self.btn['RefEnable'][0].isChecked()
+        parameters.refDir = self.refDir
+        parameters.sweeping = self.btn['Sweep'][0].isChecked()
+        parameters.start = float(self.inputField['WlStart'][0].text())
+        parameters.end = float(self.inputField['WlEnd'][0].text())
+        parameters.step = float(self.inputField['WlStep'][0].text())
+        parameters.sampleNumber = int(self.inputField['SamplesPerWl'][0].text())
+        parameters.sampleRate = int(self.inputField['SamplingRate'][0].text())
+        parameters.speed = float(self.inputField['Speed'][0].text())
+        if self.wlUnits == 'invcm':
+            parameters.units = 'invcm'
+        else: # Default to micrometers
+            parameters.units = 'um'
+        ### Parameter checks
+        if parameters.start == parameters.end: # Requested limits are equal
+            print('Limits cannot be equal.')
+            self.btn['Start'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
+            self.btn['Sweep'][0].setChecked(False)
+            return
+        ### Run acquisition in separate thread
         self.statusbar.showMessage('Busy')
         self.repaint()
-        experiment0 = experiment()
-        # data = experiment0.start(GUIElements)
-        [data, self.latestExperiment] = experiment0.run(GUIElements)
+        self.thread = QThread()
+        self.worker = experiment()
+        self.worker.parameters = parameters
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
         self.statusbar.showMessage('Ready')
-        return data
+        ### Give current experiment number to UI instance
+        ### TODO
+        ### Save current parameters for use with "repeat" function
+        ### TODO
+        # self.latestDir = expDir
+        ### Draw plots
+        ### TODO
+        ### Save UI screenshot
+        self.repaint()
+        self.grab().save('screenshot.png', 'png')
+        ### Uncheck UI buttons
+        self.btn['Start'][0].setChecked(False)
+        self.btn['Sweep'][0].setChecked(False)
+        self.repaint()
 
     def tune(self):
         '''Tune laser to input wavelength of currently selected QCL.'''

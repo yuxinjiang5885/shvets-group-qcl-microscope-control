@@ -21,6 +21,7 @@ from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
 from matplotlib.figure import Figure
 from instruments.daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_CM1, MIRcatSDK_UNITS_MICRONS
+from PyQt5.QtCore import QObject, QThread, pyqtSignal
 
 ### Define narrow QCL ranges with unused wavelengths/numbers before and after.
 ### This leaves space to sweep a little before and after the requested range.
@@ -45,13 +46,18 @@ WN_NRANGE_QCL3 = [defaults.MIN_WN_QCL3_INVCM, # Already restricted in definition
 WN_NRANGE_QCL4 = [defaults.MIN_WN_QCL4_INVCM + WN_MAR_INVCM, # Restricted
                   defaults.MAX_WN_QCL4_INVCM - WN_MAR_INVCM] # Restricted
 
-class experiment(): # Directory management and multiple acquisitions
+class experiment(QObject):
+    '''Directory management, calls scan and sweep routines.
+       Runs in a separate thread.'''
+    finished = pyqtSignal()
 
     def __init__(self):
+        super().__init__()
         self.laser = [] # Placeholder value
         self.latestDir = 0 # Latest experiment directory, placeholder value
         self.notes = [] # Placeholder value
         self.qcl = [] # QCL modules to be used, placeholder value
+        self.parameters = [] # Placeholder value
         self.ranges = [] # Placeholder value
         self.reference = np.zeros((1, 2)) # Placeholder value
         self.sampleNumber = defaults.DEF_SAMPLES
@@ -137,30 +143,22 @@ class experiment(): # Directory management and multiple acquisitions
                 print('Failed to plot data:\n{}'.format(exc))
         return [data, self]
 
-    def run(self, GUIInstance, wlUnits='um'):
+    def run(self):
         '''
         Run experiment. Replaces "start" routine. Works with "sweep".
-        :param GUIInstance: GUI instance from the UI program.
+        :param parameters: GUI instance from the UI program.
         :param wlUnits: 'um' (micrometers) or 'invcm' (inverse cm).
         '''
         ### Get laser instance
-        self.laser = GUIInstance.laser
-        ### Make sure laser is armed
-        if not GUIInstance.btn['Arm'][0].isChecked():
-            print('Laser is not armed.')
-            GUIInstance.btn['Start'][0].setChecked(False)
-            # GUIInstance.btn['Stop'][0].setChecked(False)
-            GUIInstance.btn['Sweep'][0].setChecked(False)
-            return [[], self]
+        self.laser = self.parameters.laser
         ### Get experiment notes, if any
-        self.notes = GUIInstance.notes.toPlainText()
+        self.notes = self.parameters.notes
         ### Check use of reference
-        if GUIInstance.btn['RefEnable'][0].isChecked():
-            self.useRef = True
+        self.useRef = self.parameters.useRef
         ### Load reference
         if self.useRef:
             try:
-                dataPath = GUIInstance.refDir # Latest experiment directory
+                dataPath = self.parameters.refDir # Latest experiment directory
                 dataPathParts = os.path.split(dataPath)
                 fileName = '{}{}'.format(dataPathParts[-1], defaults.DEF_FILENAME)
                 filePath = os.path.join(dataPath, fileName)
@@ -168,33 +166,20 @@ class experiment(): # Directory management and multiple acquisitions
             except Exception as exc:
                 print('Failed to load reference:\n{}'.format(exc))
         ### Get scan parameters
-        self.sweeping = GUIInstance.btn['Sweep'][0].isChecked()
-        start = float(GUIInstance.inputField['WlStart'][0].text())
-        end = float(GUIInstance.inputField['WlEnd'][0].text())
-        self.step = float(GUIInstance.inputField['WlStep'][0].text())
-        self.sampleNumber = int(GUIInstance.inputField['SamplesPerWl'][0].text())
-        self.sampleRate = int(GUIInstance.inputField['SamplingRate'][0].text())
-        self.speed = float(GUIInstance.inputField['Speed'][0].text())
-        if GUIInstance.wlUnits == 'invcm':
-            self.units = 'invcm'
-        else: # Default to micrometers
-            self.units = 'um'
-        ### Check inputs
-        if start == end: # Requested limits are equal
-            print('Limits cannot be equal.')
-            GUIInstance.btn['Start'][0].setChecked(False)
-            # GUIInstance.btn['Stop'][0].setChecked(False)
-            GUIInstance.btn['Sweep'][0].setChecked(False)
-            return [[], self]
+        self.sweeping = self.parameters.sweeping
+        start = self.parameters.start
+        end = self.parameters.end
+        self.step = self.parameters.step
+        self.sampleNumber = self.parameters.sampleNumber
+        self.sampleRate = self.parameters.sampleRate
+        self.speed = self.parameters.speed
+        self.units = self.parameters.units
         ### Make "raw" range with requested values
         if start > end:
             start, end = end, start
         rawRange = np.arange(start, end, self.step)
         if len(rawRange) < 1: # Requested limits are out of QCL bounds
             print('Cannot sweep requested range.')
-            GUIInstance.btn['Start'][0].setChecked(False)
-            # GUIInstance.btn['Stop'][0].setChecked(False)
-            GUIInstance.btn['Sweep'][0].setChecked(False)
             return [[], self]
         ### Make a separate range for each QCL
         ranges = [[], [], [], []] # Store allowed wavelengths/numbers per QCL
@@ -292,46 +277,8 @@ class experiment(): # Directory management and multiple acquisitions
             data = self.sweep()
         else: # Default to step-and-measure
             data = self.scan()
-        ### Update QCL interface readings
-        # GUIInstance.qcl(GUIInstance.activeQcl)
-        # GUIInstance.update_qcl_reading(GUIInstance.activeQcl)
-        ### Reverse data for plotting
-        if self.units == 'invcm':
-            # plotData = np.flip(data, 0)
-            plotData = data
-        else:
-            plotData = data
-        ### Paint plots
-        GUIInstance.spectrumCanvas.clear_plots()
-        GUIInstance.spectrumCanvasT.clear_plots()
-        # GUIInstance.spectrumCanvas.flush_events()
-        try:
-            GUIInstance.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-            # GUIInstance.spectrumCanvas.axes.set_ylim(min(data[:, 1]), max(data[-1, 0]))
-            GUIInstance.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
-            if self.useRef:
-                if self.units == 'invcm':
-                    plotData = np.flip(data, 0)
-                    plotRef = np.flip(self.reference, 0)
-                else:
-                    plotData = data
-                    plotRef = self.reference
-                # GUIInstance.spectrumCanvasT.flush_events()
-                GUIInstance.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-                GUIInstance.spectrumCanvasT.plot_line(plotData[:, 0],
-                                                      plotData[:, 3]/plotRef[:, 3])
-        except Exception as exc:
-            print('Failed to plot data:\n{}'.format(exc))
-        ### Give current experiment number to UI instance
-        GUIInstance.latestDir = expDir
-        ### Save UI screenshot
-        GUIInstance.repaint()
-        GUIInstance.grab().save('screenshot.png', 'png')
-        ### Uncheck UI buttons
-        GUIInstance.btn['Start'][0].setChecked(False)
-        # GUIInstance.btn['Stop'][0].setChecked(False)
-        GUIInstance.btn['Sweep'][0].setChecked(False)
-        return [data, self]
+        # return data
+        self.finished.emit()
 
     def scan(self):
         '''Run a step-and measure scan.'''
