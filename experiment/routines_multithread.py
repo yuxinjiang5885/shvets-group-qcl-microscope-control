@@ -50,14 +50,16 @@ class experiment(QObject):
     '''Directory management, calls scan and sweep routines.
        Runs in a separate thread.'''
     finished = pyqtSignal()
+    data = pyqtSignal(np.ndarray) # Used to return data to UI for plotting
 
     def __init__(self):
+        '''Set "parameters" for each instance for methods to be usable.'''
         super().__init__()
         self.laser = [] # Placeholder value
         self.latestDir = 0 # Latest experiment directory, placeholder value
         self.notes = [] # Placeholder value
         self.qcl = [] # QCL modules to be used, placeholder value
-        self.parameters = [] # Placeholder value
+        self.parameters = [] # Parameters from caller, placeholder value
         self.ranges = [] # Placeholder value
         self.reference = np.zeros((1, 2)) # Placeholder value
         self.sampleNumber = defaults.DEF_SAMPLES
@@ -69,7 +71,7 @@ class experiment(QObject):
         self.units = 'um' # By default, wavelengths in micrometers
         self.useRef = False # By default, do not use reference
 
-    def repeat(self, GUIInstance):
+    def repeat(self):
         '''
         Run the same experiment again. Saves time compared to "run".
         Ineffective if "run" has not been used before for a given instance.
@@ -113,42 +115,38 @@ class experiment(QObject):
             data = self.sweep()
         else: # Default to step-and-measure
             data = self.scan()
-        if GUIInstance.repeatShowAction.isChecked():
-            ### Reverse data for plotting
-            if self.units == 'invcm':
-                # plotData = np.flip(data, 0)
-                plotData = data
-            else:
-                plotData = data
-            ### Paint plots
-            GUIInstance.spectrumCanvas.clear_plots()
-            GUIInstance.spectrumCanvasT.clear_plots()
-            # GUIInstance.spectrumCanvas.flush_events()
-            try:
-                GUIInstance.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-                # GUIInstance.spectrumCanvas.axes.set_ylim(min(data[:, 1]), max(data[-1, 0]))
-                GUIInstance.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
-                if self.useRef:
-                    if self.units == 'invcm':
-                        plotData = np.flip(data, 0)
-                        plotRef = np.flip(self.reference, 0)
-                    else:
-                        plotData = data
-                        plotRef = self.reference
-                    # GUIInstance.spectrumCanvasT.flush_events()
-                    GUIInstance.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-                    GUIInstance.spectrumCanvasT.plot_line(plotData[:, 0],
-                                                        plotData[:, 3]/plotRef[:, 3])
-            except Exception as exc:
-                print('Failed to plot data:\n{}'.format(exc))
-        return [data, self]
+        # if GUIInstance.repeatShowAction.isChecked():
+        #     ### Reverse data for plotting
+        #     if self.units == 'invcm':
+        #         # plotData = np.flip(data, 0)
+        #         plotData = data
+        #     else:
+        #         plotData = data
+        #     ### Paint plots
+        #     GUIInstance.spectrumCanvas.clear_plots()
+        #     GUIInstance.spectrumCanvasT.clear_plots()
+        #     # GUIInstance.spectrumCanvas.flush_events()
+        #     try:
+        #         GUIInstance.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+        #         # GUIInstance.spectrumCanvas.axes.set_ylim(min(data[:, 1]), max(data[-1, 0]))
+        #         GUIInstance.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
+        #         if self.useRef:
+        #             if self.units == 'invcm':
+        #                 plotData = np.flip(data, 0)
+        #                 plotRef = np.flip(self.reference, 0)
+        #             else:
+        #                 plotData = data
+        #                 plotRef = self.reference
+        #             # GUIInstance.spectrumCanvasT.flush_events()
+        #             GUIInstance.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+        #             GUIInstance.spectrumCanvasT.plot_line(plotData[:, 0],
+        #                                                 plotData[:, 3]/plotRef[:, 3])
+        #     except Exception as exc:
+        #         print('Failed to plot data:\n{}'.format(exc))
+        self.finished.emit()
 
     def run(self):
-        '''
-        Run experiment. Replaces "start" routine. Works with "sweep".
-        :param parameters: GUI instance from the UI program.
-        :param wlUnits: 'um' (micrometers) or 'invcm' (inverse cm).
-        '''
+        '''Run experiment, calling "scan" or "sweep".'''
         ### Get laser instance
         self.laser = self.parameters.laser
         ### Get experiment notes, if any
@@ -277,7 +275,7 @@ class experiment(QObject):
             data = self.sweep()
         else: # Default to step-and-measure
             data = self.scan()
-        # return data
+        self.data.emit(data)
         self.finished.emit()
 
     def scan(self):

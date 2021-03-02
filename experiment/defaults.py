@@ -246,3 +246,9 @@ STYLE_LABEL_UNIT = '''QLabel {{
         qproperty-alignment: AlignLeft;
         qproperty-alignment: AlignMiddle;
     }}'''.format(GS_COLORS['text-lo'])
+STYLE_TEXT = '''QTextEdit {{
+        color: {};
+        border: 2px solid {};
+        border-radius: 5px;
+    }}'''.format(GS_COLORS['text-lo'],
+                 GS_COLORS['border'])
