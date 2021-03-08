@@ -50,6 +50,7 @@ class experimentParameters():
         self.notes = [] # Placeholder value
         self.qcl = [] # QCL modules to be used, placeholder value
         self.ranges = [] # Placeholder value
+        self.refDir = '' # Reference experiment directory
         self.reference = np.zeros((1, 2)) # Placeholder value
         self.sampleNumber = defaults.DEF_SAMPLES
         self.sampleRate = defaults.DEF_SAMPLERATE
@@ -90,14 +91,16 @@ class mainWindow(QMainWindow):
         super().__init__()
         startupDialog = laserStartupDialog() # Closes when startup finishes
         self.laser = laser() # Initialize laser
-        # self.laser = [] # Debugging, UI will load immediately, laser won't work.
+        ### Troubleshooting: UI will load immediately, laser won't work.
+        # self.laser = []
         ### Variables for parameters and data
         self.data = [] # Latest acquired data
-        self.latestDir = '' # Latest experiment directory
-        self.latestExperiment = [] # Placeholder for latest experiment instance
+        # self.latestDir = '' # Latest experiment directory
+        # self.latestExperiment = [] # Placeholder for latest experiment instance
         self.parameters = experimentParameters() # For passing to "run" and "repeat"
-        self.refDir = '' # Reference experiment directory
+        # self.refDir = '' # Reference experiment directory
         self.thread = [] # Placeholder for last-used thread
+        self.useRef = False # By default, do not use reference
         self.wlUnits = 'um' # Wavelength units
         self.worker = [] # Placeholder for last-used worker
         ### Create GUI
@@ -457,11 +460,16 @@ class mainWindow(QMainWindow):
         self.btn['Start'][0].clicked.connect(lambda: self.run_experiment())
         self.btn['Sweep'][0].clicked.connect(lambda: self.run_experiment())
         self.btn['Repeat'][0].clicked.connect(lambda: self.repeat_experiment())
-        self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.latestDir))
+        self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.parameters.latestDir))
         self.activeQcl = 0 # None selected on startup
         self.show()
 
+    def multiple(self):
+        '''Multiple acquisitions'''
+
+
     def multiple_acq_menu(self):
+        '''Multiple acquisitions menu'''
         self.multiAcqWindow1 = multipleAcquisitionsWindow(self)
         self.multiAcqWindow1.show()
 
@@ -523,17 +531,20 @@ class mainWindow(QMainWindow):
             self.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
             # self.spectrumCanvas.axes.set_ylim(min(data[:, 1]), max(data[-1, 0]))
             self.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
-            if self.useRef:
+            if self.btn['RefEnable'][0].isChecked():
+                self.useRef = True
                 if self.wlUnits == 'invcm':
                     plotData = np.flip(data, 0)
                     plotRef = np.flip(self.reference, 0)
                 else:
                     plotData = data
-                    plotRef = self.reference
+                    plotRef = self.parameters.reference
                 # self.spectrumCanvasT.flush_events()
                 self.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
                 self.spectrumCanvasT.plot_line(plotData[:, 0],
                                                       plotData[:, 3]/plotRef[:, 3])
+            else:
+                self.useRef = False
         except Exception as exc:
             print('Failed to plot data:\n{}'.format(exc))
 
@@ -557,27 +568,37 @@ class mainWindow(QMainWindow):
             data = np.loadtxt(filePath)
             self.spectrumCanvasRef.axes.set_xlim(data[0, 0], data[-1, 0])
             self.spectrumCanvasRef.plot_line(data[:, 0], data[:, 3])
-            self.refDir = refDir
+            self.parameters.refDir = refDir
         except Exception as exc:
             print('Could not read reference spectrum data:\n{}'.format(exc))
 
     def repeat_experiment(self):
-        '''Run scan with previously used parameters, re-using "self.worker".
+        '''Run scan with previously used parameters.
            Onlly works if "run_experiment" is used first.'''
         ### Lock GUI controls
         self.lock_controls()
         self.statusbar.showMessage('Busy')
+        ###
         try:
             self.thread = QThread()
             self.worker = experiment()
+            ### Pass relevant parameters to worker instance
             self.worker.parameters = self.parameters
+            self.worker.qcl = self.parameters.qcl
+            self.worker.ranges = self.parameters.ranges
+            self.worker.ranges = self.parameters.sweepLimits
             self.worker.moveToThread(self.thread)
-            self.thread.started.connect(self.worker.run)
+            self.thread.started.connect(self.worker.repeat)
             self.worker.finished.connect(self.thread.quit)
             self.worker.finished.connect(self.worker.deleteLater)
             self.thread.start()
         except Exception as exc:
             print('Could not repeat experiment:\n{}'.format(exc))
+        ### Plot data
+        if self.repeatShowAction.isChecked():
+            self.worker.outData.connect(self.plot)
+        ### Save current QCLs, ranges and limits for use with "repeat" function
+        self.worker.outParams.connect(self.update_parameters)
         ### Unlock GUI controls
         self.worker.finished.connect(lambda: self.lock_controls(lock=False))
         self.worker.finished.connect(lambda: self.statusbar.showMessage('Ready'))
@@ -598,7 +619,6 @@ class mainWindow(QMainWindow):
         self.parameters.laser = self.laser
         self.parameters.notes = self.notes.toPlainText()
         self.parameters.useRef = self.btn['RefEnable'][0].isChecked()
-        self.parameters.refDir = self.refDir
         self.parameters.sweeping = self.btn['Sweep'][0].isChecked()
         self.parameters.start = float(self.inputField['WlStart'][0].text())
         self.parameters.end = float(self.inputField['WlEnd'][0].text())
@@ -630,8 +650,10 @@ class mainWindow(QMainWindow):
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
         self.thread.start()
-        ### Get data
-        self.worker.data.connect(self.plot)
+        ### Plot data
+        self.worker.outData.connect(self.plot)
+        ### Save current QCLs, ranges and limits for use with "repeat" function
+        self.worker.outParams.connect(self.update_parameters)
         ### Unlock GUI controls
         self.worker.finished.connect(lambda: self.lock_controls(lock=False))
         self.worker.finished.connect(lambda: self.statusbar.showMessage('Ready'))
@@ -639,13 +661,6 @@ class mainWindow(QMainWindow):
         self.worker.finished.connect(lambda: self.btn['Sweep'][0].setChecked(False))
         ### Save UI screenshot
         self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
-        ### Give current experiment number to UI instance
-        ### TODO
-        ### Save current parameters for use with "repeat" function
-        ### TODO
-        # self.latestDir = expDir
-        ### Draw plots
-        ### TODO
 
     def tune(self):
         '''Tune laser to input wavelength of currently selected QCL.'''
@@ -667,6 +682,11 @@ class mainWindow(QMainWindow):
     def tune_fast(self, targetWl):
         '''Version of "tune" with less overhead. Use with caution.'''
         self.laser.tune(self.activeQcl, targetWl, self.wlUnits)
+
+    def update_parameters(self, parameters):
+        '''Update class instance experiment parameters with last used set, which
+           may be re-used with "repeat".'''
+        self.parameters = parameters
 
     def update_qcl_reading(self, qcl):
         '''Read and display QCL "qcl" temperature, current, and wavelength.'''
@@ -758,7 +778,7 @@ class mainWindow(QMainWindow):
             self.inputField['Speed'][0].setText('{:.0f}'.format(MAX_SWEEP_SPEED_INVCM))
             # Can't unambiguously convert step
             self.inputField['WlStep'][0].setText('100')
-            self.spectrumCanvas.axes.set_xlabel('Wavelength (cm⁻¹)')
+            self.spectrumCanvas.axes.set_xlabel('Wavenumber (cm⁻¹)')
         # Switch units from cm^-1 to um
         elif self.wlUnits == 'invcm':
             self.wlUnits = 'um'
@@ -807,6 +827,10 @@ class multipleAcquisitionsWindow(QMainWindow):
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
         event.accept()
+
+    def increase(self):
+        '''Increase acquisitions counter by 1'''
+        self.acquisitions += self.acquisitions
 
     def make_gui(self):
         '''Draw controls'''
@@ -872,18 +896,20 @@ class multipleAcquisitionsWindow(QMainWindow):
 
     def multiple(self):
         '''Run multiple acquisitions.'''
-        MAX_N_ACQ = 10
+        MAX_N_ACQ = 3
         timeInterval = 60 * float(self.inputField['timeInterval'][0].text())
         print('Acquisitions every {:.0f} minutes.'.format(timeInterval / 60))
         self.labelHead['counter'][0].setText('Acquisitions: 0')
         startRun = timer()
         while not self.btn['Stop'][0].isChecked():
+            print('1')
             self.mainGUI.btn['Sweep'][0].setChecked(True)
             if self.acquisitions == 0:
-                self.mainGUI.run_experiment(self.mainGUI)
+                self.mainGUI.run_experiment()
             else:
                 self.mainGUI.repeat_experiment()
-            self.acquisitions += 1
+            print('2')
+            self.mainGUI.worker.finished.connect(lambda: self.increase())
             self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
             # while timer() - startRun < self.acquisitions * timeInterval:
             #     # print('Waiting... {} s'.format(timer() - startRun))
@@ -891,10 +917,6 @@ class multipleAcquisitionsWindow(QMainWindow):
             if self.acquisitions > MAX_N_ACQ: # Troubleshooting
                 self.btn['Stop'][0].setChecked(True)
             self.repaint()
-            self.show()
-            # self.setFocus(True)
-            # self.activateWindow()
-            # self.raise_()
         self.btn['Start'][0].setChecked(False)
         self.btn['Stop'][0].setChecked(False)
         self.acquisitions = 0

@@ -50,26 +50,13 @@ class experiment(QObject):
     '''Directory management, calls scan and sweep routines.
        Runs in a separate thread.'''
     finished = pyqtSignal()
-    data = pyqtSignal(np.ndarray) # Used to return data to UI for plotting
+    outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
+    outParams = pyqtSignal(object) # Return parameters for re-use with "re"
 
     def __init__(self):
-        '''Set "parameters" for each instance for methods to be usable.'''
+        '''Parameters must be set by caller for any method to work.'''
         super().__init__()
-        self.laser = [] # Placeholder value
-        self.latestDir = 0 # Latest experiment directory, placeholder value
-        self.notes = [] # Placeholder value
-        self.qcl = [] # QCL modules to be used, placeholder value
         self.parameters = [] # Parameters from caller, placeholder value
-        self.ranges = [] # Placeholder value
-        self.reference = np.zeros((1, 2)) # Placeholder value
-        self.sampleNumber = defaults.DEF_SAMPLES
-        self.sampleRate = defaults.DEF_SAMPLERATE
-        self.speed = 1 # Placeholder value, no unit
-        self.step = 1 # Placeholder value, no unit
-        self.sweeping = True # By default, use the sweep routine
-        self.sweepLimits = [] # Placeholder value
-        self.units = 'um' # By default, wavelengths in micrometers
-        self.useRef = False # By default, do not use reference
 
     def repeat(self):
         '''
@@ -77,10 +64,10 @@ class experiment(QObject):
         Ineffective if "run" has not been used before for a given instance.
         '''
         ### Invert direction
-        self.sweepLimits.reverse()
-        self.ranges.reverse()
-        self.qcl.reverse()
-        for x, (l, r) in enumerate(zip(self.sweepLimits, self.ranges)):
+        self.parameters.sweepLimits.reverse()
+        self.parameters.ranges.reverse()
+        self.parameters.qcl.reverse()
+        for x, (l, r) in enumerate(zip(self.parameters.sweepLimits, self.parameters.ranges)):
             l.reverse()
             r.reverse()
         ### Go to main experiment directory
@@ -88,7 +75,7 @@ class experiment(QObject):
         os.chdir(workDir)
         ### Get latest experiment number from previously created folder
         # print(self.latestDir) # Troubleshooting
-        oldExpNo = int(self.latestDir[-3:])
+        oldExpNo = int(self.parameters.latestDir[-3:])
         ### Create new experiment folder
         newExpNo = oldExpNo + 1;
         expNoStr = '%03.0f' % (newExpNo)
@@ -111,77 +98,30 @@ class experiment(QObject):
         #     noteFile.close()
         ### Run a sweep or a step-and-measure scan
         data = []
-        if self.sweeping:
+        if self.parameters.sweeping:
             data = self.sweep()
         else: # Default to step-and-measure
             data = self.scan()
-        # if GUIInstance.repeatShowAction.isChecked():
-        #     ### Reverse data for plotting
-        #     if self.units == 'invcm':
-        #         # plotData = np.flip(data, 0)
-        #         plotData = data
-        #     else:
-        #         plotData = data
-        #     ### Paint plots
-        #     GUIInstance.spectrumCanvas.clear_plots()
-        #     GUIInstance.spectrumCanvasT.clear_plots()
-        #     # GUIInstance.spectrumCanvas.flush_events()
-        #     try:
-        #         GUIInstance.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-        #         # GUIInstance.spectrumCanvas.axes.set_ylim(min(data[:, 1]), max(data[-1, 0]))
-        #         GUIInstance.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
-        #         if self.useRef:
-        #             if self.units == 'invcm':
-        #                 plotData = np.flip(data, 0)
-        #                 plotRef = np.flip(self.reference, 0)
-        #             else:
-        #                 plotData = data
-        #                 plotRef = self.reference
-        #             # GUIInstance.spectrumCanvasT.flush_events()
-        #             GUIInstance.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-        #             GUIInstance.spectrumCanvasT.plot_line(plotData[:, 0],
-        #                                                 plotData[:, 3]/plotRef[:, 3])
-        #     except Exception as exc:
-        #         print('Failed to plot data:\n{}'.format(exc))
+        self.outData.emit(data)
+        self.outParams.emit(self.parameters)
         self.finished.emit()
 
     def run(self):
         '''Run experiment, calling "scan" or "sweep".'''
-        ### Get laser instance
-        self.laser = self.parameters.laser
-        ### Get experiment notes, if any
-        self.notes = self.parameters.notes
-        ### Check use of reference
-        self.useRef = self.parameters.useRef
-        ### Load reference
-        if self.useRef:
-            try:
-                dataPath = self.parameters.refDir # Latest experiment directory
-                dataPathParts = os.path.split(dataPath)
-                fileName = '{}{}'.format(dataPathParts[-1], defaults.DEF_FILENAME)
-                filePath = os.path.join(dataPath, fileName)
-                self.reference = np.loadtxt(filePath)
-            except Exception as exc:
-                print('Failed to load reference:\n{}'.format(exc))
-        ### Get scan parameters
-        self.sweeping = self.parameters.sweeping
-        start = self.parameters.start
-        end = self.parameters.end
-        self.step = self.parameters.step
-        self.sampleNumber = self.parameters.sampleNumber
-        self.sampleRate = self.parameters.sampleRate
-        self.speed = self.parameters.speed
-        self.units = self.parameters.units
+        ### Zero previous ranges and limits, if any
+        self.parameters.sweepLimits = []
+        self.parameters.ranges = []
+        self.parameters.qcl = []
         ### Make "raw" range with requested values
-        if start > end:
-            start, end = end, start
-        rawRange = np.arange(start, end, self.step)
+        if self.parameters.start > self.parameters.end:
+            self.parameters.start, self.parameters.end = self.parameters.end, self.parameters.start
+        rawRange = np.arange(self.parameters.start, self.parameters.end, self.parameters.step)
         if len(rawRange) < 1: # Requested limits are out of QCL bounds
             print('Cannot sweep requested range.')
             return [[], self]
         ### Make a separate range for each QCL
         ranges = [[], [], [], []] # Store allowed wavelengths/numbers per QCL
-        if self.units == 'invcm':
+        if self.parameters.units == 'invcm':
             for wn in rawRange:
                 if WN_NRANGE_QCL1[0] >= wn >= WN_NRANGE_QCL1[1]:
                     ranges[0].append(wn)
@@ -204,24 +144,22 @@ class experiment(QObject):
         ### Determine which QCL modules need to be used
         for x, r in enumerate(ranges):
             if r != []: # if this range is not empty
-                self.qcl.append(x+1) # QCLs are numbered 1--4
+                self.parameters.qcl.append(x+1) # QCLs are numbered 1--4
         ### Compile QCL ranges in class variable, if not empty
         for r in ranges:
             if len(r) > 0: # If not empty
-                self.ranges.append(r)
+                self.parameters.ranges.append(r)
         ### Compile sweep ranges, adding margins
-        if self.sweeping:
-            if self.units == 'invcm':
-                for r in self.ranges:
+        if self.parameters.sweeping:
+            if self.parameters.units == 'invcm':
+                for r in self.parameters.ranges:
                     r.reverse() # Default order is from higher energy down
-                    self.sweepLimits.append([r[0] + WN_MAR_INVCM,
+                    self.parameters.sweepLimits.append([r[0] + WN_MAR_INVCM,
                                              r[-1] - WN_MAR_INVCM])
             else: # Default to micrometers
-                for r in self.ranges:
-                    self.sweepLimits.append([r[0] - WL_MAR_UM,
+                for r in self.parameters.ranges:
+                    self.parameters.sweepLimits.append([r[0] - WL_MAR_UM,
                                              r[-1] + WL_MAR_UM])
-        # print(self.ranges)
-        # print(self.sweepLimits)
         ### Create individual experiment folder
         workDir = defaults.DEF_DATA_DIRECTORY
         os.chdir(workDir)
@@ -237,11 +175,11 @@ class experiment(QObject):
             expDir = os.path.join(workDir, expFolder)
         os.mkdir(expDir)
         os.chdir(expDir)
-        self.latestDir = expDir
+        self.parameters.latestDir = expDir
         ### Save experiment notes to file
-        if not len(self.notes) == 0:
+        if not len(self.parameters.notes) == 0:
             noteFile = open('notes.txt', 'w')
-            noteFile.write(self.notes)
+            noteFile.write(self.parameters.notes)
             noteFile.close()
         ### Write parameters to log
         logFile = open('experiment.log', 'w')
@@ -250,52 +188,54 @@ class experiment(QObject):
         logFile.write('{}'.format(timeStr))
         logFile.write('No. {:.0f}\n'.format(newExpNo))
         logFile.write('\n')
-        for qclNo in self.qcl:
-            qclCurr = self.laser.get_current(qclNo)
-            qclRate = self.laser.get_pulse_rate(qclNo)
-            qclWidth = self.laser.get_pulse_width(qclNo)
+        for qclNo in self.parameters.qcl:
+            qclCurr = self.parameters.laser.get_current(qclNo)
+            qclRate = self.parameters.laser.get_pulse_rate(qclNo)
+            qclWidth = self.parameters.laser.get_pulse_width(qclNo)
             logFile.write('QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
                                             qclNo, qclCurr, qclRate, qclWidth))
         logFile.write('\n')
-        if self.sweepLimits:
+        if self.parameters.sweeping:
             logFile.write('Type: sweep\n')
         else:
             logFile.write('Type: step-and-measure\n')
         logFile.write('\n')
         logFile.write('Target wavelengths/wavenumbers:\n')
-        logFile.write('{}\n'.format(self.ranges))
+        logFile.write('{}\n'.format(self.parameters.ranges))
         logFile.write('\n')
         logFile.write('Sweep limits:\n')
-        logFile.write('{}\n'.format(self.sweepLimits))
+        logFile.write('{}\n'.format(self.parameters.sweepLimits))
         logFile.write('\n')
         logFile.close()
         ### Run a sweep or a step-and-measure scan
         data = []
-        if self.sweeping:
+        if self.parameters.sweeping:
             data = self.sweep()
         else: # Default to step-and-measure
             data = self.scan()
-        self.data.emit(data)
+        self.outData.emit(data)
+        self.outParams.emit(self.parameters)
+        # self.outRanges.emit(self.parameters.qcl, self.parameters.ranges, self.parameters.sweepLimits)
         self.finished.emit()
 
     def scan(self):
-        '''Run a step-and measure scan.'''
+        '''Run a step-and measure scan by tuning to each wavelength/number.'''
         ### Preamble
         print('Scan started ...')
         print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
-              .format(self.sampleNumber, self.sampleRate))
+              .format(self.parameters.sampleNumber, self.parameters.sampleRate))
         startRun = timer()
         ### Setup acquisition
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
-        multipleAI.configure(self.sampleNumber, self.sampleRate)
+        multipleAI.configure(self.parameters.sampleNumber, self.parameters.sampleRate)
         ### Run multi-range scan
-        numRanges = len(self.ranges)
+        numRanges = len(self.parameters.ranges)
         steps = 0
         voltages, wavelengths = [], []
-        for x, r in enumerate(self.ranges):
+        for x, r in enumerate(self.parameters.ranges):
             steps += len(r)
             wavelengths +=r
-            qcl = self.qcl[x]
+            qcl = self.parameters.qcl[x]
             print('Range {}/{}, using QCL module {}...'.format(
                                                            x+1, numRanges, qcl))
             ### Acquisition
@@ -303,9 +243,9 @@ class experiment(QObject):
             try: # Failure here likely due to timeout because of skipped points
                 for wl in r:
                     ### Tune
-                    self.laser.tune(qcl, wl, self.units)
+                    self.parameters.laser.tune(qcl, wl, self.parameters.units)
                     ### Acquire
-                    rangeVoltages.append(multipleAI.acquire(self.sampleNumber))
+                    rangeVoltages.append(multipleAI.acquire(self.parameters.sampleNumber))
             except Exception as exc:
                 print('Scan did not complete:\n{}'.format(exc))
                 print('Partial data may still be usable.')
@@ -317,8 +257,8 @@ class experiment(QObject):
         try:
             for x, v in enumerate(voltages):
                 data[x, 0] = wavelengths[x]
-                data[x, 1] = np.sum(v[0])/self.sampleNumber # Lock-in X
-                data[x, 2] = np.sum(v[1])/self.sampleNumber # Lock-in Y
+                data[x, 1] = np.sum(v[0])/self.parameters.sampleNumber # Lock-in X
+                data[x, 2] = np.sum(v[1])/self.parameters.sampleNumber # Lock-in Y
                 data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
                                       np.power(data[x, 2], 2))) # Lock-in R
         except Exception as exc:
@@ -340,45 +280,43 @@ class experiment(QObject):
         return data
 
     def sweep(self):
-        '''
-        Run a sweep using the MIRcat's built-in function.
-        '''
+        '''Run a sweep using the MIRcat's built-in function.'''
         ### Preamble
         print('Sweep started ...')
         print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
-              .format(self.sampleNumber, self.sampleRate))
+              .format(self.parameters.sampleNumber, self.parameters.sampleRate))
         startRun = timer()
         ### Setup, start triggered acquisition task
         multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
         multipleAI.configure_triggered(defaults.PCI_TRIG,
-                                       self.sampleNumber, self.sampleRate)
+                                       self.parameters.sampleNumber, self.parameters.sampleRate)
                                        ### Start task
         multipleAI.start_task()
         ### Run multi-range sweep
-        numRanges = len(self.ranges)
+        numRanges = len(self.parameters.ranges)
         steps = 0
         voltages, wavelengths = [], []
-        for x, (l, r) in enumerate(zip(self.sweepLimits, self.ranges)):
+        for x, (l, r) in enumerate(zip(self.parameters.sweepLimits, self.parameters.ranges)):
             steps += len(r)
             wavelengths +=r
             ### Print QCL module in use
             print('Range {}/{}, using QCL module {}...'.format(
-                x+1, numRanges, self.qcl[x]))
+                x+1, numRanges, self.parameters.qcl[x]))
             ### Set laser triggering (one TTL pulse per wl/wn) and start sweep
             print('Trigger: {:.2f} to {:.2f} {}, {:.2f} {} step.'.format(
-                                r[0], r[-1], self.units, self.step, self.units))
-            self.laser.set_wl_trigger_parameters(r[-1], r[0], self.step,
-                                                                     self.units)
+                                r[0], r[-1], self.parameters.units, self.parameters.step, self.parameters.units))
+            self.parameters.laser.set_wl_trigger_parameters(r[-1], r[0], self.parameters.step,
+                                                                     self.parameters.units)
             ### Start sweep
             print('Sweep: {:.2f} to {:.2f} {}, {:.2f} {}/s.'.format(
-                                l[0], l[-1],self.units, self.speed, self.units))
-            self.laser.sweep_and_forget(l[0], l[-1], self.speed, self.units,
-                                                                    self.qcl[x])
+                                l[0], l[-1],self.parameters.units, self.parameters.speed, self.parameters.units))
+            self.parameters.laser.sweep_and_forget(l[0], l[-1], self.parameters.speed, self.parameters.units,
+                                                                    self.parameters.qcl[x])
             ### Triggered acquisition
             rangeVoltages = []
             try: # Failure here likely due to timeout because of skipped points
                 for x in range(0, len(r)):
-                    rangeVoltages.append(multipleAI.acquire_fast(self.sampleNumber))
+                    rangeVoltages.append(multipleAI.acquire_fast(self.parameters.sampleNumber))
             except Exception as exc:
                 print('Sweep did not complete:\n{}'.format(exc))
                 print('Partial data may still be usable.')
@@ -394,8 +332,8 @@ class experiment(QObject):
         try: # Failure here certain if points skipped above
             for x, v in enumerate(voltages):
                 data[x, 0] = wavelengths[x]
-                data[x, 1] = np.sum(v[0])/self.sampleNumber # Lock-in X
-                data[x, 2] = np.sum(v[1])/self.sampleNumber # Lock-in Y
+                data[x, 1] = np.sum(v[0])/self.parameters.sampleNumber # Lock-in X
+                data[x, 2] = np.sum(v[1])/self.parameters.sampleNumber # Lock-in Y
                 data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
                                       np.power(data[x, 2], 2))) # Lock-in R
         except Exception as exc:
