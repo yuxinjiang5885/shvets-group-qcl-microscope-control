@@ -105,6 +105,7 @@ class mainWindow(QMainWindow):
         self.worker = [] # Placeholder for last-used worker
         ### Create GUI
         self.make_gui()
+        self.multiAcqWindow1 = multipleAcquisitionsWindow(self)
         self.statusbar.showMessage('Ready')
 
     def about(self):
@@ -466,12 +467,13 @@ class mainWindow(QMainWindow):
 
     def multiple(self):
         '''Multiple acquisitions'''
+        pass
 
 
     def multiple_acq_menu(self):
         '''Multiple acquisitions menu'''
-        self.multiAcqWindow1 = multipleAcquisitionsWindow(self)
         self.multiAcqWindow1.show()
+        self.multiAcqWindow1.btn['Start'][0].clicked.connect(lambda: self.multiple())
 
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
@@ -529,7 +531,7 @@ class mainWindow(QMainWindow):
         # self.spectrumCanvas.flush_events()
         try:
             self.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-            # self.spectrumCanvas.axes.set_ylim(min(data[:, 1]), max(data[-1, 0]))
+            # self.spectrumCanvas.axes.set_ylim(min(plotData[:, 1]), max(plotData[-1, 0]))
             self.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
             if self.btn['RefEnable'][0].isChecked():
                 self.useRef = True
@@ -574,7 +576,7 @@ class mainWindow(QMainWindow):
 
     def repeat_experiment(self):
         '''Run scan with previously used parameters.
-           Onlly works if "run_experiment" is used first.'''
+           Only works if "run_experiment" is used first.'''
         ### Lock GUI controls
         self.lock_controls()
         self.statusbar.showMessage('Busy')
@@ -814,7 +816,6 @@ class multipleAcquisitionsWindow(QMainWindow):
         super().__init__(None, Qt.WindowStaysOnTopHint)
         self.latestExperiment = [] # Placeholder for latest experiment instance
         self.make_gui()
-        self.mainGUI = mainGUI
         self.acquisitions = 0
 
     def center_window(self):
@@ -876,7 +877,6 @@ class multipleAcquisitionsWindow(QMainWindow):
             k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             k[0].setStyleSheet(STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        self.btn['Start'][0].clicked.connect(lambda: self.multiple())
         # Input fields
         self.inputField = dict() # to collect all input fields
         self.inputField['timeInterval'] = [QLineEdit('{}'.format(5)), 2, 0, 1, 1]
@@ -909,14 +909,16 @@ class multipleAcquisitionsWindow(QMainWindow):
             else:
                 self.mainGUI.repeat_experiment()
             print('2')
+            self.mainGUI.worker.finished.connect(lambda: print('3'))
             self.mainGUI.worker.finished.connect(lambda: self.increase())
             self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
+            # time.sleep(20)
             # while timer() - startRun < self.acquisitions * timeInterval:
             #     # print('Waiting... {} s'.format(timer() - startRun))
             #     time.sleep(1)
             if self.acquisitions > MAX_N_ACQ: # Troubleshooting
                 self.btn['Stop'][0].setChecked(True)
-            self.repaint()
+            # self.repaint()
         self.btn['Start'][0].setChecked(False)
         self.btn['Stop'][0].setChecked(False)
         self.acquisitions = 0
