@@ -50,13 +50,40 @@ class experiment(QObject):
     '''Directory management, calls scan and sweep routines.
        Runs in a separate thread.'''
     finished = pyqtSignal()
+    finishedOne = pyqtSignal()
+    finishedMulti = pyqtSignal()
     outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
     outParams = pyqtSignal(object) # Return parameters for re-use with "re"
+    stopped = False
 
     def __init__(self):
         '''Parameters must be set by caller for any method to work.'''
         super().__init__()
         self.parameters = [] # Parameters from caller, placeholder value
+
+    def multiple(self):
+        '''Multiple acquisitions'''
+        print('Acquisitions every {:.0f} minutes.'.format(self.parameters.timeInterval / 60))
+        MAX_N_ACQ = 3 # Troubleshooting
+        ### Use sweep for multiple acquistions
+        self.parameters.sweeping = True
+        ### For the first acquisition, use "run"
+        self.parameters.acquisitions += 1
+        print('Acquisition {:.0f}'.format(self.parameters.acquisitions))
+        self.run()
+        self.finishedOne.emit()
+        while not self.stopped:
+            self.parameters.acquisitions += 1
+            print('Acquisition {:.0f}'.format(self.parameters.acquisitions))
+            self.repeat()
+            self.finishedOne.emit()
+            # while timer() - startRun < self.acquisitions * timeInterval:
+            #     # print('Waiting... {} s'.format(timer() - startRun))
+            #     time.sleep(1)
+            if self.parameters.acquisitions > MAX_N_ACQ: # Troubleshooting
+                print('Exceeded maximum number of acquisitions')
+                self.stopped = True
+        self.finishedMulti.emit()
 
     def repeat(self):
         '''

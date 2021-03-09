@@ -44,6 +44,8 @@ class experimentParameters():
     '''Holds experiment parameters'''
 
     def __init__(self):
+        self.acquisitions = 0 # Number of acquisitions
+        self.acq_time_interval_s = 300 # Interval between acquisitions, s
         self.end = 100 # Placeholder value, no unit
         self.laser = [] # Placeholder value
         self.latestDir = 0 # Latest experiment directory, placeholder value
@@ -94,7 +96,7 @@ class mainWindow(QMainWindow):
         ### Troubleshooting: UI will load immediately, laser won't work.
         # self.laser = []
         ### Variables for parameters and data
-        self.data = [] # Latest acquired data
+        # self.data = [] # Latest acquired data
         # self.latestDir = '' # Latest experiment directory
         # self.latestExperiment = [] # Placeholder for latest experiment instance
         self.parameters = experimentParameters() # For passing to "run" and "repeat"
@@ -105,7 +107,7 @@ class mainWindow(QMainWindow):
         self.worker = [] # Placeholder for last-used worker
         ### Create GUI
         self.make_gui()
-        self.multiAcqWindow1 = multipleAcquisitionsWindow(self)
+        self.multiMenu = multipleAcquisitionsWindow(self)
         self.statusbar.showMessage('Ready')
 
     def about(self):
@@ -467,13 +469,69 @@ class mainWindow(QMainWindow):
 
     def multiple(self):
         '''Multiple acquisitions'''
-        pass
-
+        self.parameters.timeInterval = 60 * float(self.multiMenu.inputField['timeInterval'][0].text())
+        print('Acquisitions every {:.0f} minutes.'.format(self.parameters.timeInterval / 60))
+        self.multiMenu.labelHead['counter'][0].setText('Acquisitions: 0')
+        ### Initial checks
+        if not self.btn['Arm'][0].isChecked():
+            print('Laser is not armed.')
+            self.btn['Start'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
+            self.btn['Sweep'][0].setChecked(False)
+            return
+        ### Read and compile experiment parameters
+        self.parameters.laser = self.laser
+        self.parameters.notes = self.notes.toPlainText()
+        self.parameters.useRef = self.btn['RefEnable'][0].isChecked()
+        self.parameters.sweeping = self.btn['Sweep'][0].isChecked()
+        self.parameters.start = float(self.inputField['WlStart'][0].text())
+        self.parameters.end = float(self.inputField['WlEnd'][0].text())
+        self.parameters.step = float(self.inputField['WlStep'][0].text())
+        self.parameters.sampleNumber = int(self.inputField['SamplesPerWl'][0].text())
+        self.parameters.sampleRate = int(self.inputField['SamplingRate'][0].text())
+        self.parameters.speed = float(self.inputField['Speed'][0].text())
+        if self.wlUnits == 'invcm':
+            self.parameters.units = 'invcm'
+        else: # Default to micrometers
+            self.parameters.units = 'um'
+        ### Parameter checks
+        if self.parameters.start == self.parameters.end: # Requested limits are equal
+            print('Limits cannot be equal.')
+            self.btn['Start'][0].setChecked(False)
+            self.btn['Sweep'][0].setChecked(False)
+            return
+        ### Lock GUI controls
+        self.lock_controls()
+        self.statusbar.showMessage('Busy: multiple acquisitions')
+        ### Run acquisitions until "Stop" is clicked
+        self.thread = QThread()
+        self.worker = experiment()
+        self.worker.parameters = self.parameters
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.multiple)
+        self.worker.finishedMulti.connect(self.thread.quit)
+        self.worker.finishedMulti.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
+        ### Increase counter/zero counter
+        self.worker.finishedOne.connect(self.multiMenu.increase)
+        self.worker.finishedMulti.connect(self.multiMenu.zero)
+        ### Plot data
+        self.worker.outData.connect(self.plot)
+        ### Save UI screenshot
+        self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
+        ### Save current QCLs, ranges and limits for use with "repeat" function
+        self.worker.outParams.connect(self.update_parameters)
+        ### Unlock GUI controls
+        self.worker.finishedMulti.connect(lambda: self.lock_controls(lock=False))
+        ### Uncheck UI buttons
+        self.worker.finishedMulti.connect(lambda: self.multiMenu.btn['Start'][0].setChecked(False))
+        ### TODO: connect stop
 
     def multiple_acq_menu(self):
         '''Multiple acquisitions menu'''
-        self.multiAcqWindow1.show()
-        self.multiAcqWindow1.btn['Start'][0].clicked.connect(lambda: self.multiple())
+        self.multiMenu.show()
+        self.multiMenu.btn['Start'][0].clicked.connect(lambda: self.multiple())
 
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
@@ -596,6 +654,7 @@ class mainWindow(QMainWindow):
             self.thread.start()
         except Exception as exc:
             print('Could not repeat experiment:\n{}'.format(exc))
+            return
         ### Plot data
         if self.repeatShowAction.isChecked():
             self.worker.outData.connect(self.plot)
@@ -606,7 +665,6 @@ class mainWindow(QMainWindow):
         self.worker.finished.connect(lambda: self.statusbar.showMessage('Ready'))
         ### Uncheck UI buttons
         self.worker.finished.connect(lambda: self.btn['Repeat'][0].setChecked(False))
-        self.statusbar.showMessage('Ready')
 
     def run_experiment(self):
         '''Run scan or sweep, according to which button was clicked.'''
@@ -660,6 +718,7 @@ class mainWindow(QMainWindow):
         self.worker.finished.connect(lambda: self.lock_controls(lock=False))
         self.worker.finished.connect(lambda: self.statusbar.showMessage('Ready'))
         ### Uncheck UI buttons
+        self.worker.finished.connect(lambda: self.btn['Start'][0].setChecked(False))
         self.worker.finished.connect(lambda: self.btn['Sweep'][0].setChecked(False))
         ### Save UI screenshot
         self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
@@ -809,12 +868,13 @@ class mainWindow(QMainWindow):
             self.inputField['WlStep'][0].setText('0.1')
             self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
 
+
 class multipleAcquisitionsWindow(QMainWindow):
     '''GUI for multiple acquisitions'''
 
     def __init__(self, mainGUI):
         super().__init__(None, Qt.WindowStaysOnTopHint)
-        self.latestExperiment = [] # Placeholder for latest experiment instance
+        # self.latestExperiment = [] # Placeholder for latest experiment instance
         self.make_gui()
         self.acquisitions = 0
 
@@ -832,6 +892,7 @@ class multipleAcquisitionsWindow(QMainWindow):
     def increase(self):
         '''Increase acquisitions counter by 1'''
         self.acquisitions += self.acquisitions
+        self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
 
     def make_gui(self):
         '''Draw controls'''
@@ -862,8 +923,6 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.grid.setSpacing(10)
         for row in range(0, 7): # Set row spacing
             self.grid.setRowStretch(row, 1)
-        # for col in range(0, NUMBER_OF_COLS): # Set column spacing
-    #         self.grid.setColumnStretch(col, 1)
         ### Buttons
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['Start'] = [QPushButton('Start'), 3, 0, 2, 1]
@@ -894,34 +953,10 @@ class multipleAcquisitionsWindow(QMainWindow):
             k[0].setStyleSheet(STYLE_LABEL_EMPH)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
 
-    def multiple(self):
-        '''Run multiple acquisitions.'''
-        MAX_N_ACQ = 3
-        timeInterval = 60 * float(self.inputField['timeInterval'][0].text())
-        print('Acquisitions every {:.0f} minutes.'.format(timeInterval / 60))
-        self.labelHead['counter'][0].setText('Acquisitions: 0')
-        startRun = timer()
-        while not self.btn['Stop'][0].isChecked():
-            print('1')
-            self.mainGUI.btn['Sweep'][0].setChecked(True)
-            if self.acquisitions == 0:
-                self.mainGUI.run_experiment()
-            else:
-                self.mainGUI.repeat_experiment()
-            print('2')
-            self.mainGUI.worker.finished.connect(lambda: print('3'))
-            self.mainGUI.worker.finished.connect(lambda: self.increase())
-            self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
-            # time.sleep(20)
-            # while timer() - startRun < self.acquisitions * timeInterval:
-            #     # print('Waiting... {} s'.format(timer() - startRun))
-            #     time.sleep(1)
-            if self.acquisitions > MAX_N_ACQ: # Troubleshooting
-                self.btn['Stop'][0].setChecked(True)
-            # self.repaint()
-        self.btn['Start'][0].setChecked(False)
-        self.btn['Stop'][0].setChecked(False)
+    def zero(self):
+        '''Zero acquisition counter'''
         self.acquisitions = 0
+        self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
 
 
 if __name__ == '__main__':
