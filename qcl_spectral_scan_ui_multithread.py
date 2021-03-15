@@ -504,6 +504,9 @@ class mainWindow(QMainWindow):
         ### Lock GUI controls
         self.lock_controls()
         self.statusbar.showMessage('Busy: multiple acquisitions')
+        ### Change multiple menu UI styles
+        self.multiMenu.labelHead['counter'][0].setStyleSheet(STYLE_LABEL_ALT)
+        # self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_ALT)
         ### Run acquisitions until "Stop" is clicked
         self.thread = QThread()
         self.worker = experiment()
@@ -516,15 +519,26 @@ class mainWindow(QMainWindow):
         self.worker.finishedMulti.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
         self.thread.start()
-        ### Increase counter/zero counter
-        self.worker.finishedOne.connect(self.multiMenu.increase)
-        self.worker.finishedMulti.connect(self.multiMenu.zero)
+        ### Acquisition timer
+        self.worker.acquisitionTimer.connect(self.multiMenu.update_timer)
+        self.worker.startedOne.connect(lambda: self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_READ))
+        self.worker.finishedOne.connect(lambda: self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_ALT))
+        self.worker.finishedMulti.connect(self.multiMenu.zero_timer)
+        ### Increment counter/zero counter
+        self.worker.startedOne.connect(self.multiMenu.update_counter_running)
+        self.worker.startedOne.connect(lambda: self.multiMenu.labelHead['counter'][0].setStyleSheet(STYLE_LABEL_ALT))
+        self.worker.finishedOne.connect(self.multiMenu.update_counter_waiting)
+        self.worker.finishedOne.connect(lambda: self.multiMenu.labelHead['counter'][0].setStyleSheet(STYLE_LABEL_READ))
+        self.worker.finishedMulti.connect(self.multiMenu.zero_counter)
         ### Plot data
         self.worker.outData.connect(self.plot)
         ### Save UI screenshot
         self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
         ### Save current QCLs, ranges and limits for use with "repeat" function
         self.worker.outParams.connect(self.update_parameters)
+        ### Reset multiple menu UI styles
+        self.worker.finishedMulti.connect(lambda: self.multiMenu.labelHead['counter'][0].setStyleSheet(STYLE_LABEL_READ))
+        self.worker.finishedMulti.connect(lambda: self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_READ))
         ### Unlock GUI controls
         self.worker.finishedMulti.connect(lambda: self.lock_controls(lock=False))
         self.worker.finishedMulti.connect(lambda: self.statusbar.showMessage('Ready'))
@@ -892,15 +906,9 @@ class multipleAcquisitionsWindow(QMainWindow):
         '''Show warning dialog on close.'''
         event.accept()
 
-    def increase(self):
-        '''Increase acquisitions counter by 1'''
-        self.acquisitions += 1
-        self.labelHead['counter'][0].setText('Running. Done: {:.0f}'.format(self.acquisitions))
-        self.repaint()
-
     def make_gui(self):
         '''Draw controls'''
-        self.setGeometry(0, 0, 250, 300)
+        self.setGeometry(0, 0, 250, 350)
         font = QFont()
         font.setFamily(FONT_FAMILY)
         font.setPointSize(FONT_SIZE)
@@ -925,13 +933,13 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.grid = QGridLayout()
         self.container.setLayout(self.grid)
         self.grid.setSpacing(10)
-        for row in range(0, 7): # Set row spacing
+        for row in range(0, 9): # Set row spacing
             self.grid.setRowStretch(row, 1)
         ### Buttons
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
-        self.btn['Start'] = [QPushButton('Start'), 3, 0, 2, 1]
+        self.btn['Start'] = [QPushButton('Start'), 5, 0, 2, 1]
         self.btn['Start'][0].setToolTip('Start multiple acquisitions')
-        self.btn['Stop'] = [QPushButton('Stop'), 5, 0, 2, 1]
+        self.btn['Stop'] = [QPushButton('Stop'), 7, 0, 2, 1]
         self.btn['Stop'][0].setToolTip('Stop multiple acquisitions')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
@@ -942,7 +950,7 @@ class multipleAcquisitionsWindow(QMainWindow):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Input fields
         self.inputField = dict() # to collect all input fields
-        self.inputField['timeInterval'] = [QLineEdit('{}'.format(5)), 2, 0, 1, 1]
+        self.inputField['timeInterval'] = [QLineEdit('{}'.format(5)), 4, 0, 1, 1]
         self.inputField['timeInterval'][0].setToolTip('Multiple acquisition time interval')
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
@@ -951,16 +959,44 @@ class multipleAcquisitionsWindow(QMainWindow):
         ### Labels
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
         self.labelHead['counter'] = [QLabel('Not running'), 0, 0, 1, 1]
-        self.labelHead['timeInterval'] = [QLabel('Time Interval (min)'), 1, 0, 1, 1]
+        self.labelHead['timer'] = [QLabel('Elapsed: 00 : 00 : 00'), 1, 0, 1, 1]
+        self.labelHead['timeInterval'] = [QLabel('Time Interval (min)'), 3, 0, 1, 1]
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
-            k[0].setStyleSheet(STYLE_LABEL_EMPH)
+            k[0].setStyleSheet(STYLE_LABEL_READ)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        self.labelHead['timeInterval'][0].setStyleSheet(STYLE_LABEL_EMPH)
 
-    def zero(self):
+    def update_counter_running(self, acquisitions):
+        '''Increment acquisitions counter by 1'''
+        self.labelHead['counter'][0].setText('Running. Done: {:.0f}'.format(acquisitions))
+        self.repaint()
+
+    def update_counter_waiting(self, acquisitions):
+        '''Increment acquisitions counter by 1'''
+        self.labelHead['counter'][0].setText('Waiting. Done: {:.0f}'.format(acquisitions))
+        self.repaint()
+
+    def update_timer(self, elapsed_s):
+        '''Update acquisition timer'''
+        elapsed_m, elapsed_s = divmod(elapsed_s, 60)
+        elapsed_h, elapsed_m = divmod(elapsed_m, 60)
+        self.labelHead['timer'][0].setText(
+            'Elapsed: {:02.0f} : {:02.0f} : {:02.0f}'.format(
+                elapsed_h, elapsed_m, elapsed_s))
+
+    def zero_counter(self):
         '''Zero acquisition counter'''
         self.acquisitions = 0
-        self.labelHead['counter'][0].setText('Not running'.format(self.acquisitions))
+        self.labelHead['counter'][0].setText('Not running'.format(
+            self.acquisitions))
+
+    def zero_timer(self):
+        '''Zero acquisition timer'''
+        self.labelHead['counter'][0].setText('Not running'.format(
+            self.acquisitions))
+        self.labelHead['timer'][0].setText(
+            'Elapsed: {:02.0f} : {:02.0f} : {:02.0f}'.format(0, 0, 0))
 
 
 if __name__ == '__main__':

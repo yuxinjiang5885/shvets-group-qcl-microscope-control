@@ -49,11 +49,13 @@ WN_NRANGE_QCL4 = [defaults.MIN_WN_QCL4_INVCM + WN_MAR_INVCM, # Restricted
 class experiment(QObject):
     '''Directory management, calls scan and sweep routines.
        Runs in a separate thread.'''
+    acquisitionTimer = pyqtSignal(int)
     finished = pyqtSignal()
-    finishedOne = pyqtSignal()
+    finishedOne = pyqtSignal(int)
     finishedMulti = pyqtSignal()
     outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
     outParams = pyqtSignal(object) # Return parameters for re-use with "re"
+    startedOne = pyqtSignal(int)
     stopped = False
 
     def __init__(self):
@@ -67,27 +69,23 @@ class experiment(QObject):
         MAX_N_ACQ = 3 # Troubleshooting
         ### Use sweep for multiple acquistions
         self.parameters.sweeping = True
-        ### For the first acquisition, use "run"
-        # self.parameters.acquisitions += 1
-        # print('Acquisition {:.0f}'.format(self.parameters.acquisitions))
-        # self.run()
-        # self.finishedOne.emit()
-        # while timer() - startRun < self.parameters.acquisitions * self.parameters.timeInterval and not self.stopped:
-        #         print('Waiting. Elapsed: {:.0f} s.'.format(timer() - startRun))
-        #         time.sleep(1)
         while not self.stopped:
             print('Acquisition {:.0f}'.format(self.parameters.acquisitions + 1))
+            self.startedOne.emit(self.parameters.acquisitions)
             if self.parameters.acquisitions == 0:
                 self.run() # For the first acquisition, use "run"
             else:
                 self.repeat() # For subsequent acquisitions, use "repeat
             self.parameters.acquisitions += 1
-            self.finishedOne.emit()
-            if self.parameters.acquisitions > MAX_N_ACQ: # Troubleshooting
-                print('Exceeded maximum number of acquisitions')
-                self.stopped = True
+            self.finishedOne.emit(self.parameters.acquisitions)
+            ### Troubleshooting
+            # if self.parameters.acquisitions > MAX_N_ACQ:
+            #     print('Exceeded maximum number of acquisitions')
+            #     self.stopped = True
+            ### Wait interval before starting next acquisition
             while timer() - startRun < self.parameters.acquisitions * self.parameters.timeInterval and not self.stopped:
-                print('Waiting. Elapsed: {:.0f} s.'.format(timer() - startRun))
+                self.acquisitionTimer.emit(timer() - startRun)
+                # print('Waiting. Elapsed: {:.0f} s.'.format(timer() - startRun))
                 time.sleep(1)
         self.stopped = False
         self.parameters.acquisitions = 0
