@@ -63,26 +63,34 @@ class experiment(QObject):
 
     def multiple(self):
         '''Multiple acquisitions'''
-        print('Acquisitions every {:.0f} minutes.'.format(self.parameters.timeInterval / 60))
+        startRun = timer()
         MAX_N_ACQ = 3 # Troubleshooting
         ### Use sweep for multiple acquistions
         self.parameters.sweeping = True
         ### For the first acquisition, use "run"
-        self.parameters.acquisitions += 1
-        print('Acquisition {:.0f}'.format(self.parameters.acquisitions))
-        self.run()
-        self.finishedOne.emit()
+        # self.parameters.acquisitions += 1
+        # print('Acquisition {:.0f}'.format(self.parameters.acquisitions))
+        # self.run()
+        # self.finishedOne.emit()
+        # while timer() - startRun < self.parameters.acquisitions * self.parameters.timeInterval and not self.stopped:
+        #         print('Waiting. Elapsed: {:.0f} s.'.format(timer() - startRun))
+        #         time.sleep(1)
         while not self.stopped:
+            print('Acquisition {:.0f}'.format(self.parameters.acquisitions + 1))
+            if self.parameters.acquisitions == 0:
+                self.run() # For the first acquisition, use "run"
+            else:
+                self.repeat() # For subsequent acquisitions, use "repeat
             self.parameters.acquisitions += 1
-            print('Acquisition {:.0f}'.format(self.parameters.acquisitions))
-            self.repeat()
             self.finishedOne.emit()
-            # while timer() - startRun < self.acquisitions * timeInterval:
-            #     # print('Waiting... {} s'.format(timer() - startRun))
-            #     time.sleep(1)
             if self.parameters.acquisitions > MAX_N_ACQ: # Troubleshooting
                 print('Exceeded maximum number of acquisitions')
                 self.stopped = True
+            while timer() - startRun < self.parameters.acquisitions * self.parameters.timeInterval and not self.stopped:
+                print('Waiting. Elapsed: {:.0f} s.'.format(timer() - startRun))
+                time.sleep(1)
+        self.stopped = False
+        self.parameters.acquisitions = 0
         self.finishedMulti.emit()
 
     def repeat(self):
@@ -242,7 +250,6 @@ class experiment(QObject):
             data = self.scan()
         self.outData.emit(data)
         self.outParams.emit(self.parameters)
-        # self.outRanges.emit(self.parameters.qcl, self.parameters.ranges, self.parameters.sweepLimits)
         self.finished.emit()
 
     def scan(self):
@@ -305,6 +312,10 @@ class experiment(QObject):
         currentFolder = currentDirSplit[-1]
         np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
         return data
+
+    def stop(self):
+        '''Set stop flag. For use with "multiple" only.'''
+        self.stopped = True
 
     def sweep(self):
         '''Run a sweep using the MIRcat's built-in function.'''

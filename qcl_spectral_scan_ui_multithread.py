@@ -108,6 +108,7 @@ class mainWindow(QMainWindow):
         ### Create GUI
         self.make_gui()
         self.multiMenu = multipleAcquisitionsWindow(self)
+        self.multiMenu.btn['Start'][0].clicked.connect(lambda: self.multiple())
         self.statusbar.showMessage('Ready')
 
     def about(self):
@@ -207,9 +208,9 @@ class mainWindow(QMainWindow):
         self.statusbar.setStyleSheet(STYLE_BAR)
         self.statusbar.showMessage('Initializing ...')
         ### "Actions" menu
-        exitAction = QAction(QIcon(None), 'Exit', self)
+        exitAction = QAction(QIcon(None), 'Quit', self)
         exitAction.setShortcut('Ctrl+Q')
-        exitAction.setStatusTip('Exit application')
+        exitAction.setStatusTip('Quit application')
         exitAction.triggered.connect(lambda: self.close())
         changeUnits = QAction(QIcon(None), 'Change units', self)
         changeUnits.setShortcut('Ctrl+U')
@@ -506,6 +507,8 @@ class mainWindow(QMainWindow):
         ### Run acquisitions until "Stop" is clicked
         self.thread = QThread()
         self.worker = experiment()
+        self.multiMenu.btn['Stop'][0].clicked.connect(self.worker.stop)
+        self.multiMenu.labelHead['counter'][0].setText('Running')
         self.worker.parameters = self.parameters
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.multiple)
@@ -524,14 +527,14 @@ class mainWindow(QMainWindow):
         self.worker.outParams.connect(self.update_parameters)
         ### Unlock GUI controls
         self.worker.finishedMulti.connect(lambda: self.lock_controls(lock=False))
+        self.worker.finishedMulti.connect(lambda: self.statusbar.showMessage('Ready'))
         ### Uncheck UI buttons
         self.worker.finishedMulti.connect(lambda: self.multiMenu.btn['Start'][0].setChecked(False))
-        ### TODO: connect stop
+        self.worker.finishedMulti.connect(lambda: self.multiMenu.btn['Stop'][0].setChecked(False))
 
     def multiple_acq_menu(self):
         '''Multiple acquisitions menu'''
         self.multiMenu.show()
-        self.multiMenu.btn['Start'][0].clicked.connect(lambda: self.multiple())
 
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
@@ -876,7 +879,7 @@ class multipleAcquisitionsWindow(QMainWindow):
         super().__init__(None, Qt.WindowStaysOnTopHint)
         # self.latestExperiment = [] # Placeholder for latest experiment instance
         self.make_gui()
-        self.acquisitions = 0
+        self.acquisitions = 0 # Controls acuisition counter only
 
     def center_window(self):
         '''Center main application window on screen'''
@@ -891,8 +894,9 @@ class multipleAcquisitionsWindow(QMainWindow):
 
     def increase(self):
         '''Increase acquisitions counter by 1'''
-        self.acquisitions += self.acquisitions
-        self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
+        self.acquisitions += 1
+        self.labelHead['counter'][0].setText('Running. Done: {:.0f}'.format(self.acquisitions))
+        self.repaint()
 
     def make_gui(self):
         '''Draw controls'''
@@ -905,9 +909,9 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
         self.center_window()
         ### Actions
-        exitAction = QAction(QIcon(None), 'Exit', self)
+        exitAction = QAction(QIcon(None), 'Quit', self)
         exitAction.setShortcut('Ctrl+Q')
-        # exitAction.setStatusTip('Exit application')
+        # exitAction.setStatusTip('Quit application')
         exitAction.triggered.connect(lambda: self.close())
         ### Menus
         self.menubar = self.menuBar()
@@ -946,7 +950,7 @@ class multipleAcquisitionsWindow(QMainWindow):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Labels
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
-        self.labelHead['counter'] = [QLabel('Acquisitions: 0'), 0, 0, 1, 1]
+        self.labelHead['counter'] = [QLabel('Not running'), 0, 0, 1, 1]
         self.labelHead['timeInterval'] = [QLabel('Time Interval (min)'), 1, 0, 1, 1]
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
@@ -956,7 +960,7 @@ class multipleAcquisitionsWindow(QMainWindow):
     def zero(self):
         '''Zero acquisition counter'''
         self.acquisitions = 0
-        self.labelHead['counter'][0].setText('Acquisitions: {:.0f}'.format(self.acquisitions))
+        self.labelHead['counter'][0].setText('Not running'.format(self.acquisitions))
 
 
 if __name__ == '__main__':
