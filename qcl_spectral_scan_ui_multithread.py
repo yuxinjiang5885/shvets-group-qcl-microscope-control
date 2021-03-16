@@ -37,7 +37,8 @@ from PyQt5.QtWidgets import (QAction,
                              QPushButton,
                              QWidget,
                              QSizePolicy,
-                             QTextEdit)
+                             QTextEdit,
+                             QVBoxLayout)
 
 
 class experimentParameters():
@@ -64,8 +65,23 @@ class experimentParameters():
         self.units = 'um' # By default, wavelengths in micrometers
         self.useRef = False # By default, do not use reference
 
-class laserStartupDialog(QMessageBox):
-    '''Show a dialog informing user laser is starting up.'''
+
+class laserInitializer(QObject):
+    '''Initialize laser'''
+    laserInitialized = pyqtSignal() # Emitted when laser is initialized
+    laserInstance = pyqtSignal(object) # Returns laser instance
+
+    def __init__(self):
+        super().__init__()
+
+    def laser_initialize(self):
+        laser0 = laser() # Initialize laser
+        self.laserInstance.emit(laser0)
+        self.laserInitialized.emit()
+
+
+class laserStartupDialog(QDialog):
+    '''Show a dialog when laser is starting up.'''
 
     def __init__(self):
         super().__init__()
@@ -79,11 +95,21 @@ class laserStartupDialog(QMessageBox):
         self.move(qtRectangle.topLeft())
 
     def make_dialog(self):
+        '''Setup dialog window.
+           Main UI window is disabled until laser is initialized.'''
+        ### Window parameters
         self.setWindowTitle('MIRcat Control Panel (Multi-thread)')
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
-        self.setText('Initializing MIRcat laser. Please wait.')
-        # self.center_window()
-        self.show()
+        self.setGeometry(0, 0, 200, 50)
+        self.setStyleSheet(STYLE_CONTAINER)
+        self.setWindowModality(Qt.ApplicationModal) # Disable rest of UI
+        ### Dialog text
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+        self.textBox = QLabel('Initializing MIRcat laser. Please wait.')
+        self.textBox.setStyleSheet(STYLE_LABEL_ALT)
+        self.layout.addWidget(self.textBox)
+        self.center_window()
 
 
 class mainWindow(QMainWindow):
@@ -91,15 +117,29 @@ class mainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        ### Initialize laser
+        self.laser = []
+        self.thread = QThread()
+        self.laserWorker = laserInitializer()
+        self.laserWorker.moveToThread(self.thread)
+        self.thread.started.connect(self.laserWorker.laser_initialize)
+        self.laserWorker.laserInitialized.connect(self.thread.quit)
+        self.laserWorker.laserInitialized.connect(self.laserWorker.deleteLater)
+        self.laserWorker.laserInstance.connect(self.laser_set)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.start()
+        ### Show startup dialog
         startupDialog = laserStartupDialog() # Closes when startup finishes
-        self.laser = laser() # Initialize laser
-        ### Troubleshooting: UI will load immediately, laser won't work.
-        # self.laser = []
+        self.laserWorker.laserInitialized.connect(lambda: startupDialog.done(0))
+        # startupDialog.show()
+        startupDialog.exec()
+        ### Set class parameters
         self.parameters = experimentParameters() # For passing to "run" and "repeat"
-        self.thread = [] # Placeholder for last-used thread
-        self.useRef = False # By default, do not use reference
-        self.wlUnits = 'um' # Wavelength units
-        self.worker = [] # Placeholder for last-used worker
+        # self.useRef = False # By default, do not use reference
+        self.wlUnits = 'um' # Wavelength/number units
+        ### Thread and worker placeholders
+        # self.thread = [] # Placeholder for last-used thread
+        # self.worker = [] # Placeholder for last-used worker
         ### Create GUI
         self.make_gui()
         self.multiMenu = multipleAcquisitionsWindow(self)
@@ -108,9 +148,10 @@ class mainWindow(QMainWindow):
 
     def about(self):
         '''Show dialog when "about" is clicked.'''
-        aboutFile = 'docs/mircat_ui_about.html'
+        aboutFile = 'docs/mircat_ui_multithread_about.html'
         with open(aboutFile) as f:
             content = f.read()
+            # content = content.encode('UTF-8')
         QMessageBox.about(self, 'About', content)
 
     def arm(self):
@@ -182,6 +223,10 @@ class mainWindow(QMainWindow):
     def laser_off(self):
         '''Turn laser off.'''
         pass
+
+    def laser_set(self, laserInstance):
+        '''Set laser instance'''
+        self.laser = laserInstance
 
     def lock_controls(self, lock=True):
         '''Disable all buttons while operations are performed.'''
@@ -545,6 +590,41 @@ class mainWindow(QMainWindow):
         '''Multiple acquisitions menu'''
         self.multiMenu.show()
 
+    def plot(self, data):
+        ### Reverse data for plotting
+        ### Deprecated, direction handling is now elsewhere
+        if self.wlUnits == 'invcm':
+            # plotData = np.flip(data, 0)
+            plotData = data
+        else:
+            plotData = data
+        ### Paint plots
+        self.spectrumCanvas.clear_plots()
+        self.spectrumCanvasT.clear_plots()
+        # self.spectrumCanvas.flush_events()
+        try:
+            self.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+            # self.spectrumCanvas.axes.set_ylim(min(plotData[:, 1]), max(plotData[-1, 0]))
+            self.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
+            if self.btn['RefEnable'][0].isChecked():
+                self.parameters.useRef = True
+                if self.wlUnits == 'invcm':
+                    # plotData = np.flip(data, 0)
+                    # plotRef = np.flip(self.parameters.reference, 0)
+                    plotData = data
+                    plotRef = self.parameters.reference
+                else:
+                    plotData = data
+                    plotRef = self.parameters.reference
+                # self.spectrumCanvasT.flush_events()
+                self.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+                self.spectrumCanvasT.plot_line(plotData[:, 0],
+                                                      plotData[:, 3]/plotRef[:, 3])
+            else:
+                self.parameters.useRef = False
+        except Exception as exc:
+            print('Failed to plot data:\n{}'.format(exc))
+
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
         self.lock_controls(lock=True)
@@ -586,41 +666,6 @@ class mainWindow(QMainWindow):
             self.inputField[qclNoStrSetWl][0].setStyleSheet(STYLE_INPUT)
             self.labelInstr[qclNoStrCurr].setStyleSheet(STYLE_LABEL_READ)
             self.labelInstr[qclNoStrWl].setStyleSheet(STYLE_LABEL_READ)
-
-    def plot(self, data):
-        ### Reverse data for plotting
-        ### Deprecated, direction handling is now elsewhere
-        if self.wlUnits == 'invcm':
-            # plotData = np.flip(data, 0)
-            plotData = data
-        else:
-            plotData = data
-        ### Paint plots
-        self.spectrumCanvas.clear_plots()
-        self.spectrumCanvasT.clear_plots()
-        # self.spectrumCanvas.flush_events()
-        try:
-            self.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-            # self.spectrumCanvas.axes.set_ylim(min(plotData[:, 1]), max(plotData[-1, 0]))
-            self.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
-            if self.btn['RefEnable'][0].isChecked():
-                self.parameters.useRef = True
-                if self.wlUnits == 'invcm':
-                    # plotData = np.flip(data, 0)
-                    # plotRef = np.flip(self.parameters.reference, 0)
-                    plotData = data
-                    plotRef = self.parameters.reference
-                else:
-                    plotData = data
-                    plotRef = self.parameters.reference
-                # self.spectrumCanvasT.flush_events()
-                self.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-                self.spectrumCanvasT.plot_line(plotData[:, 0],
-                                                      plotData[:, 3]/plotRef[:, 3])
-            else:
-                self.parameters.useRef = False
-        except Exception as exc:
-            print('Failed to plot data:\n{}'.format(exc))
 
     def reference_enable(self):
         '''Enable use of reference'''
