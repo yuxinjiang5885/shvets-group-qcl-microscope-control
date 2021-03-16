@@ -133,6 +133,14 @@ class mainWindow(QMainWindow):
         self.laserWorker.laserInitialized.connect(lambda: startupDialog.done(0))
         # startupDialog.show()
         startupDialog.exec()
+        ### Prepare text for "about" dialog
+        try:
+            self.aboutText = ''
+            aboutFile = 'docs/mircat_ui_multithread_about.html'
+            with open(aboutFile) as f:
+                self.aboutText = f.read()
+        except Exception as exc:
+            print('Falied to load "about" text:\n{}'.format(exc))
         ### Set class parameters
         self.parameters = experimentParameters() # For passing to "run" and "repeat"
         # self.useRef = False # By default, do not use reference
@@ -148,11 +156,7 @@ class mainWindow(QMainWindow):
 
     def about(self):
         '''Show dialog when "about" is clicked.'''
-        aboutFile = 'docs/mircat_ui_multithread_about.html'
-        with open(aboutFile) as f:
-            content = f.read()
-            # content = content.encode('UTF-8')
-        QMessageBox.about(self, 'About', content)
+        QMessageBox.about(self, 'About', self.aboutText)
 
     def arm(self):
         '''Arm or disarm laser laser'''
