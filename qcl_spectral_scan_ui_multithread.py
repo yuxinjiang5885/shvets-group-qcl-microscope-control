@@ -592,7 +592,7 @@ class mainWindow(QMainWindow):
 
     def plot(self, data):
         ### Reverse data for plotting
-        ### Deprecated, direction handling is now elsewhere
+        ### Deprecated, direction handling is now in routines
         if self.wlUnits == 'invcm':
             # plotData = np.flip(data, 0)
             plotData = data

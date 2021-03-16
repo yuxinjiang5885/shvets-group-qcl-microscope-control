@@ -46,6 +46,7 @@ WN_NRANGE_QCL3 = [defaults.MIN_WN_QCL3_INVCM, # Already restricted in definition
 WN_NRANGE_QCL4 = [defaults.MIN_WN_QCL4_INVCM + WN_MAR_INVCM, # Restricted
                   defaults.MAX_WN_QCL4_INVCM - WN_MAR_INVCM] # Restricted
 
+
 class experiment(QObject):
     '''Directory management, calls scan and sweep routines.
        Runs in a separate thread.'''
@@ -301,6 +302,10 @@ class experiment(QObject):
         print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
                                                               len(wavelengths)))
         print('Scan complete (%.3f s).' % (endRun-startRun))
+        ### Flip data order if it was reversed by repeat
+        if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
+             or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
+            data = np.flip(data, 0)
         ### Save data as text file
         currentDir = os.getcwd()
         if platform.system() == 'Windows':
@@ -380,6 +385,10 @@ class experiment(QObject):
         print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
                                                               len(wavelengths)))
         print('Sweep complete (%.3f s).' % (endRun-startRun))
+        ### Flip data order if it was reversed by repeat
+        if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
+             or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
+            data = np.flip(data, 0)
         ### Save data as text file
         currentDir = os.getcwd()
         if platform.system() == 'Windows':
