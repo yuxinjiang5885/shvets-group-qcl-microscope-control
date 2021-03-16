@@ -95,12 +95,7 @@ class mainWindow(QMainWindow):
         self.laser = laser() # Initialize laser
         ### Troubleshooting: UI will load immediately, laser won't work.
         # self.laser = []
-        ### Variables for parameters and data
-        # self.data = [] # Latest acquired data
-        # self.latestDir = '' # Latest experiment directory
-        # self.latestExperiment = [] # Placeholder for latest experiment instance
         self.parameters = experimentParameters() # For passing to "run" and "repeat"
-        # self.refDir = '' # Reference experiment directory
         self.thread = [] # Placeholder for last-used thread
         self.useRef = False # By default, do not use reference
         self.wlUnits = 'um' # Wavelength units
@@ -609,10 +604,12 @@ class mainWindow(QMainWindow):
             # self.spectrumCanvas.axes.set_ylim(min(plotData[:, 1]), max(plotData[-1, 0]))
             self.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
             if self.btn['RefEnable'][0].isChecked():
-                self.useRef = True
+                self.parameters.useRef = True
                 if self.wlUnits == 'invcm':
-                    plotData = np.flip(data, 0)
-                    plotRef = np.flip(self.reference, 0)
+                    # plotData = np.flip(data, 0)
+                    # plotRef = np.flip(self.parameters.reference, 0)
+                    plotData = data
+                    plotRef = self.parameters.reference
                 else:
                     plotData = data
                     plotRef = self.parameters.reference
@@ -621,7 +618,7 @@ class mainWindow(QMainWindow):
                 self.spectrumCanvasT.plot_line(plotData[:, 0],
                                                       plotData[:, 3]/plotRef[:, 3])
             else:
-                self.useRef = False
+                self.parameters.useRef = False
         except Exception as exc:
             print('Failed to plot data:\n{}'.format(exc))
 
@@ -645,6 +642,7 @@ class mainWindow(QMainWindow):
             data = np.loadtxt(filePath)
             self.spectrumCanvasRef.axes.set_xlim(data[0, 0], data[-1, 0])
             self.spectrumCanvasRef.plot_line(data[:, 0], data[:, 3])
+            self.parameters.reference = data
             self.parameters.refDir = refDir
         except Exception as exc:
             print('Could not read reference spectrum data:\n{}'.format(exc))

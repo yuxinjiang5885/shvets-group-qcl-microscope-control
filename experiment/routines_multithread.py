@@ -66,7 +66,6 @@ class experiment(QObject):
     def multiple(self):
         '''Multiple acquisitions'''
         startRun = timer()
-        MAX_N_ACQ = 3 # Troubleshooting
         ### Use sweep for multiple acquistions
         self.parameters.sweeping = True
         while not self.stopped:
@@ -79,6 +78,7 @@ class experiment(QObject):
             self.parameters.acquisitions += 1
             self.finishedOne.emit(self.parameters.acquisitions)
             ### Troubleshooting
+            # MAX_N_ACQ = 3 # Troubleshooting
             # if self.parameters.acquisitions > MAX_N_ACQ:
             #     print('Exceeded maximum number of acquisitions')
             #     self.stopped = True
