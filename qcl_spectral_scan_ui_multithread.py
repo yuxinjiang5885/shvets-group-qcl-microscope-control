@@ -13,16 +13,17 @@ import sys
 import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 import time
 from timeit import default_timer as timer, timeit
-from experiment.defaults import *
+# from experiment.defaults import *
+import experiment.defaults as defaults
 from experiment.routines_multithread import experiment
 from ui.plot_widgets import mplCanvas
 from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
-import experiment.defaults as defaults
 from PyQt5.QtGui import QIcon, QFont, QWindow
 from PyQt5.QtWidgets import (QAction,
                              QApplication,
@@ -39,7 +40,7 @@ from PyQt5.QtWidgets import (QAction,
                              QSizePolicy,
                              QTextEdit,
                              QVBoxLayout)
-
+rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
 
 class experimentParameters():
     '''Holds experiment parameters'''
@@ -101,13 +102,17 @@ class laserStartupDialog(QDialog):
         self.setWindowTitle('MIRcat Control Panel (Multi-thread)')
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
         self.setGeometry(0, 0, 200, 50)
-        self.setStyleSheet(STYLE_CONTAINER)
+        self.font = QFont()
+        self.font.setFamily(defaults.FONT_FAMILY)
+        self.font.setPointSize(defaults.FONT_SIZE)
+        self.setStyleSheet(defaults.STYLE_CONTAINER)
         self.setWindowModality(Qt.ApplicationModal) # Disable rest of UI
         ### Dialog text
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
         self.textBox = QLabel('Initializing MIRcat laser. Please wait.')
-        self.textBox.setStyleSheet(STYLE_LABEL_ALT)
+        self.textBox.setFont(self.font)
+        self.textBox.setStyleSheet(defaults.STYLE_LABEL_ALT)
         self.layout.addWidget(self.textBox)
         self.center_window()
 
@@ -141,7 +146,7 @@ class mainWindow(QMainWindow):
         except Exception as exc:
             print('Falied to load "about" text:\n{}'.format(exc))
         ### Set class parameters
-        self.parameters = experimentParameters() # For passing to "run" and "repeat"
+        self.parameters = experimentParameters() # Passed to "run" and "repeat"
         # self.useRef = False # By default, do not use reference
         self.wlUnits = 'um' # Wavelength/number units
         ### Thread and worker placeholders
@@ -164,7 +169,8 @@ class mainWindow(QMainWindow):
         self.repaint()
         if self.btn['Arm'][0].isChecked():
                 if self.activeQcl == 0:
-                    self.statusbar.showMessage('No QCL selected', MSG_TIMEOUT)
+                    self.statusbar.showMessage('No QCL selected',
+                                               defaults.MSG_TIMEOUT)
                     self.btn['Arm'][0].setChecked(False)
                     self.lock_controls(lock=False)
                     return
@@ -214,7 +220,7 @@ class mainWindow(QMainWindow):
         if self.btn['Emission'][0].isChecked():
             if not self.btn['Arm'][0].isChecked():
                 self.btn['Emission'][0].setChecked(False)
-                self.statusbar.showMessage('Not armed', MSG_TIMEOUT)
+                self.statusbar.showMessage('Not armed', defaults.MSG_TIMEOUT)
             else:
                 self.btn['Emission'][0].setText('DISABLE')
                 self.laser.enable()
@@ -241,14 +247,14 @@ class mainWindow(QMainWindow):
         '''Create main GUI window.'''
         self.setGeometry(0, 0, 1400, 960)
         font = QFont()
-        font.setFamily(FONT_FAMILY)
-        font.setPointSize(FONT_SIZE)
+        font.setFamily(defaults.FONT_FAMILY)
+        font.setPointSize(defaults.FONT_SIZE)
         # self.setWindowModality(Qt.ApplicationModal)
         ### Create bars
         self.menubar = self.menuBar()
-        self.menubar.setStyleSheet(STYLE_BAR)
+        self.menubar.setStyleSheet(defaults.STYLE_BAR)
         self.statusbar = self.statusBar()
-        self.statusbar.setStyleSheet(STYLE_BAR)
+        self.statusbar.setStyleSheet(defaults.STYLE_BAR)
         self.statusbar.showMessage('Initializing ...')
         ### "Actions" menu
         exitAction = QAction(QIcon(None), 'Quit', self)
@@ -276,8 +282,9 @@ class mainWindow(QMainWindow):
         multipleAcqMenu.triggered.connect(lambda: self.multiple_acq_menu())
         ### "Options" menu
         optionsMenu = self.menubar.addMenu('Options')
-        self.repeatShowAction = QAction(QIcon(None), 'Plot data when using "Repeat"', self, checkable=True)
-        self.repeatShowAction.setStatusTip('Plot data when using the repeat function')
+        self.repeatShowAction = QAction(QIcon(None),
+                          'Plot data when using "Repeat"', self, checkable=True)
+        self.repeatShowAction.setStatusTip('Update plots when using "Repeat"')
         optionsMenu.addAction(self.repeatShowAction)
         ### "About" menu
         aboutAction = QAction(QIcon(None), 'About', self)
@@ -291,18 +298,18 @@ class mainWindow(QMainWindow):
         self.center_window()
         # Configure grid layout
         self.container = QWidget()
-        self.container.setStyleSheet(STYLE_CONTAINER)
+        self.container.setStyleSheet(defaults.STYLE_CONTAINER)
         self.setCentralWidget(self.container)
         self.grid = QGridLayout()
         self.container.setLayout(self.grid)
         self.grid.setSpacing(10)
-        for row in range(0, NUMBER_OF_ROWS): # Set row spacing
+        for row in range(0, defaults.NUMBER_OF_ROWS): # Set row spacing
             # self.grid.setRowMinimumHeight(row, ROW_HEIGHT)
             if row in [0]:
                 self.grid.setRowStretch(row, 8)
             else:
                 self.grid.setRowStretch(row, 1)
-        for col in range(0, NUMBER_OF_COLS): # Set column spacing
+        for col in range(0, defaults.NUMBER_OF_COLS): # Set column spacing
             if col in [1, 3, 5]: # QCL settings
                 self.grid.setColumnStretch(col, 2)
             if col in [2, 4, 6]: # Scl setting labels
@@ -320,7 +327,8 @@ class mainWindow(QMainWindow):
         self.grid.addWidget(self.spectrumCanvas, 0, 0, 1, 5)
         ### Plot: current reference
         self.spectrumCanvasRef = mplCanvas(width=5, height=4)
-        self.spectrumCanvasRef.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.spectrumCanvasRef.setSizePolicy(QSizePolicy.Fixed,
+                                                              QSizePolicy.Fixed)
         self.spectrumCanvasRef.axes.set_xlabel('Wavelength (μm)')
         self.spectrumCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
         self.spectrumCanvasRef.axes.set_title('Current Reference')
@@ -345,16 +353,13 @@ class mainWindow(QMainWindow):
         # self.btn['WlUnits'] = [QPushButton('Units: μm'), 10, 5, 2, 1]
         # self.btn['WlUnits'][0].setToolTip('Switch wavelength units')
         self.btn['Tune'] = [QPushButton('Tune'), 4, 7, 2, 1]
-        self.btn['Tune'][0].setToolTip('Tune laser to displayed wavelength for selected QCL')
+        self.btn['Tune'][0].setToolTip(
+                          'Tune laser to displayed wavelength for selected QCL')
         self.btn['Arm'] = [QPushButton('Arm'), 2, 7, 2, 1]
         self.btn['Arm'][0].setToolTip('Arm/Disarm laser')
         self.btn['Emission'] = [QPushButton('Enable'), 6, 7, 2, 1]
         self.btn['Emission'][0].setToolTip('Enable/disable laser emission')
-        # self.btn['ScanAutoEnable'] = [QPushButton('Laser\nAuto-Enable'), 8, 7, 2, 1]
-        # self.btn['ScanAutoEnable'][0].setToolTip('Automatically enable laser during scan (slow)')
-        # self.btn['Triggering'] = [QPushButton('Triggering'), 12, 7, 2, 1]
-        # self.btn['Triggering'][0].setToolTip('Enable/disable triggering')
-        # Buttons: reference
+        ### Buttons: reference
         self.btn['RefEnable'] = [QPushButton('Reference'), 10, 7, 2, 1]
         self.btn['RefEnable'][0].setToolTip('Enable/disable use of reference')
         self.btn['RefSet'] = [QPushButton('Set Reference'), 11, 8, 1, 1]
@@ -362,7 +367,8 @@ class mainWindow(QMainWindow):
         self.btn['RefSave'] = [QPushButton('Save Reference'), 11, 9, 1, 1]
         self.btn['RefSave'][0].setToolTip('Save latest spectrum path for later')
         self.btn['RefRecall'] = [QPushButton('Recall Reference'), 11, 10, 1, 1]
-        self.btn['RefRecall'][0].setToolTip('Recall saved spectrum path and set as reference')
+        self.btn['RefRecall'][0].setToolTip(
+                              'Recall saved spectrum path and set as reference')
         ### Buttons: start sweep, start scan, stop scan
         self.btn['Sweep'] = [QPushButton('Sweep'), 12, 8, 2, 1]
         self.btn['Sweep'][0].setToolTip('Start sweep')
@@ -378,64 +384,80 @@ class mainWindow(QMainWindow):
             k[0].setFont(font)
             k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             if x in ['QCL1', 'QCL2', 'QCL3', 'QCL4']:
-                k[0].setStyleSheet(STYLE_BUTTON)
+                k[0].setStyleSheet(defaults.STYLE_BUTTON)
             elif x in ['WlUnits']:
-                k[0].setStyleSheet(STYLE_UNITBUTTON)
+                k[0].setStyleSheet(defaults.STYLE_UNITBUTTON)
             else:
-                k[0].setStyleSheet(STYLE_ARMED)
+                k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Input fields: current, current percentage, wavelength
         paramStrings = ['SetCurrent', 'SetCurrPc', 'SetWl']
         self.inputField = dict() # to collect all input fields
-        startupText = [MAX_CURR_QCL1_MILLIAMP, MAX_CURR_QCL2_MILLIAMP, MAX_CURR_QCL3_MILLIAMP,
-                       MAX_CURR_QCL4_MILLIAMP, 100, 100, 100, 100, MIN_WL_QCL1_UM,
-                       MIN_WL_QCL2_UM, MIN_WL_QCL3_UM, MIN_WL_QCL4_UM]
+        startupText = [defaults.MAX_CURR_QCL1_MILLIAMP,
+                       defaults.MAX_CURR_QCL2_MILLIAMP,
+                       defaults.MAX_CURR_QCL3_MILLIAMP,
+                       defaults.MAX_CURR_QCL4_MILLIAMP,
+                       100, 100, 100, 100,
+                       defaults.MIN_WL_QCL1_UM,
+                       defaults.MIN_WL_QCL2_UM,
+                       defaults.MIN_WL_QCL3_UM,
+                       defaults.MIN_WL_QCL4_UM]
         startupFormat = ['{:.0f}', '{:.0f}', '{:.2f}'] # Current, %, wavelength
         for param in range(0, len(paramStrings)):
-            for qcl in range(1, NUMBER_OF_QCLS + 1):
+            for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
                 col = param * 2 + 1 # even columns starting at 1 (the second)
                 row = qcl * 2 # odd rows starting at 2 (the third)
                 fieldString = 'QCL{}{}'.format(qcl, paramStrings[param])
-                itemNo = param * NUMBER_OF_QCLS + qcl - 1
+                itemNo = param * defaults.NUMBER_OF_QCLS + qcl - 1
                 startupString = '{}'.format(startupFormat[param]).format(
                                                             startupText[itemNo])
-                self.inputField[fieldString] = [QLineEdit(startupString), row, col, 1, 1]
-                self.inputField[fieldString][0].setToolTip('DO NOT USE: set in MIRcatControl')
+                self.inputField[fieldString] = [QLineEdit(startupString),
+                                                                 row, col, 1, 1]
+                # self.inputField[fieldString][0].setToolTip(
+                #                            'DO NOT USE: set in MIRcatControl')
         ### Input fields: experiment controls
-        self.inputField['WlStart'] = [QLineEdit('{}'.format(DEF_WL_START_UM)), 3, 8, 1, 1]
+        self.inputField['WlStart'] = [QLineEdit('{}'.format(
+                                    defaults.DEF_WL_START_UM)), 3, 8, 1, 1]
         self.inputField['WlStart'][0].setToolTip('First scan wavelength')
-        self.inputField['WlEnd'] = [QLineEdit('{}'.format(DEF_WL_END_UM)), 3, 9, 1, 1]
+        self.inputField['WlEnd'] = [QLineEdit('{}'.format(
+                                    defaults.DEF_WL_END_UM)), 3, 9, 1, 1]
         self.inputField['WlEnd'][0].setToolTip('Last scan wavelength')
-        self.inputField['WlStep'] = [QLineEdit('{}'.format(DEF_WL_STEP_UM)), 3, 10, 1, 1]
+        self.inputField['WlStep'] = [QLineEdit('{}'.format(
+                                    defaults.DEF_WL_STEP_UM)), 3, 10, 1, 1]
         self.inputField['WlStep'][0].setToolTip('Scan wavelength step')
-        self.inputField['SamplingRate'] = [QLineEdit('{}'.format(DEF_SAMPLERATE)), 9, 8, 1, 1]
-        self.inputField['SamplingRate'][0].setToolTip('Acquisition card sampling rate')
-        self.inputField['SamplesPerWl'] = [QLineEdit('{}'.format(DEF_SAMPLES)), 9, 9, 1, 1]
-        self.inputField['SamplesPerWl'][0].setToolTip('Samples read by acquisition card at every step')
-        self.inputField['Speed'] = [QLineEdit('{}'.format(MAX_SWEEP_SPEED_UM)), 9, 10, 1, 1]
+        self.inputField['SamplingRate'] = [QLineEdit('{}'.format(
+                                    defaults.DEF_SAMPLERATE)), 9, 8, 1, 1]
+        self.inputField['SamplingRate'][0].setToolTip(
+                                    'Acquisition card sampling rate')
+        self.inputField['SamplesPerWl'] = [QLineEdit('{}'.format(
+                                    defaults.DEF_SAMPLES)), 9, 9, 1, 1]
+        self.inputField['SamplesPerWl'][0].setToolTip(
+                                    'Voltage points per wavelength/number step')
+        self.inputField['Speed'] = [QLineEdit('{}'.format(
+                                    defaults.MAX_SWEEP_SPEED_UM)), 9, 10, 1, 1]
         self.inputField['Speed'][0].setToolTip('Sweep speed')
         ### Input fields: reference
-        self.inputField['RefPath'] = [QLineEdit('C:\\Data\\_experiment_data'), 10, 8, 1, 3]
+        self.inputField['RefPath'] = [QLineEdit('C:\\Data\\_experiment_data'),
+                                    10, 8, 1, 3]
         ### Create all input fields
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
-            k[0].setStyleSheet(STYLE_INPUT)
+            k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Labels: headers, in a dict for ease of positioning
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
         self.labelHead['QCLMod'] = [QLabel('QCL Modules'), 1, 0, 1, 1]
         self.labelHead['QCLCurr'] = [QLabel('QCL Currents'), 1, 1, 1, 4]
         self.labelHead['QCLWav'] = [QLabel('QCL Wavelengths'), 1, 5, 1, 2]
-        self.labelHead['LasControls'] = [QLabel('Laser/Experiment Settings and Controls'), 1, 7, 1, 4]
-        # self.labelHead['ExpControls'] = [QLabel('Scan/Reference Settings'), 1, 8, 1, 3]
+        self.labelHead['LasControls'] = [QLabel(
+                          'Laser/Experiment Settings and Controls'), 1, 7, 1, 4]
         self.labelHead['Notes'] = [QLabel('Experiment Notes'), 11, 0, 1, 1]
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
-            k[0].setStyleSheet(STYLE_LABEL_EMPH)
+            k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: experiment controls sub-headers
         self.labelSubHead = dict() # [label, row, col, rowSpan, colSpan]
-        # self.labelSubHead['RefPath'] = [QLabel('Reference Path'), 10, 7, 1, 1]
         self.labelSubHead['WlStart'] = [QLabel('Wl. Start (μm)'), 2, 8, 1, 1]
         self.labelSubHead['WlEnd'] = [QLabel('Wl. End (μm)'), 2, 9, 1, 1]
         self.labelSubHead['WlStep'] = [QLabel('Wl. Step (μm)'), 2, 10, 1, 1]
@@ -445,29 +467,31 @@ class mainWindow(QMainWindow):
         self.labelSubHead['YStart'] = [QLabel('Stg. Y Start (μm)'), 6, 8, 1, 1]
         self.labelSubHead['YEnd'] = [QLabel('Stg. Y End (μm)'), 6, 9, 1, 1]
         self.labelSubHead['YStep'] = [QLabel('Stg. Y Step (μm)'), 6, 10, 1, 1]
-        self.labelSubHead['SamplingRate'] = [QLabel('Sampl. Rate (Hz)'), 8, 8, 1, 1]
-        self.labelSubHead['SamplesPerWl'] = [QLabel('Sampl. per Wl.'), 8, 9, 1, 1]
+        self.labelSubHead['SamplingRate'] = [QLabel('Sampl. Rate (Hz)'),
+                                            8, 8, 1, 1]
+        self.labelSubHead['SamplesPerWl'] = [QLabel('Sampl. per Wl.'),
+                                            8, 9, 1, 1]
         self.labelSubHead['Speed'] = [QLabel('Speed (μm/s)'), 8, 10, 1, 1]
         for _, k in self.labelSubHead.items(): # Arrange labels in grid
             k[0].setFont(font)
-            k[0].setStyleSheet(STYLE_LABEL_EMPH)
+            k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: instrument readings, in a dict for reference by other methods
         self.labelInstr = dict() # [label, row, col, rowSpan, colSpan]
         # Labels: read currents
-        for qcl in range(1, NUMBER_OF_QCLS + 1):
+        for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
             labelString = 'QCL{:d}Current'.format(qcl)
             self.labelInstr[labelString] = QLabel('n/a')
             self.labelInstr[labelString].setFont(font)
-            self.labelInstr[labelString].setStyleSheet(STYLE_LABEL_READ)
+            self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ)
             self.labelInstr[labelString].setToolTip('Reading from laser')
             self.grid.addWidget(self.labelInstr[labelString], 2*qcl+1, 1, 1, 4)
         # Labels: read wavelengths (blank at startup)
-        for qcl in range(1, NUMBER_OF_QCLS + 1):
+        for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
             labelString = 'QCL{:d}Wavelength'.format(qcl)
             self.labelInstr[labelString] = QLabel('n/a')
             self.labelInstr[labelString].setFont(font)
-            self.labelInstr[labelString].setStyleSheet(STYLE_LABEL_READ)
+            self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ)
             self.labelInstr[labelString].setToolTip('Reading from laser')
             self.grid.addWidget(self.labelInstr[labelString], 2*qcl+1, 5, 1, 2)
         # Labels: current controls
@@ -477,14 +501,14 @@ class mainWindow(QMainWindow):
             for row in range(2, 9, 2): # every other row
                 labelObject = QLabel(unitLabelStrings[label])
                 labelObject.setFont(font)
-                labelObject.setStyleSheet(STYLE_LABEL_UNIT)
+                labelObject.setStyleSheet(defaults.STYLE_LABEL_UNIT)
                 self.grid.addWidget(labelObject, row, col, 1, 1)
         # Labels: wavelength units
-        for qcl in range(1, NUMBER_OF_QCLS + 1):
+        for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
             labelString = 'QCL{:d}WlUnit'.format(qcl)
             self.labelInstr[labelString] = QLabel('μm    ')
             self.labelInstr[labelString].setFont(font)
-            self.labelInstr[labelString].setStyleSheet(STYLE_LABEL_UNIT)
+            self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_UNIT)
             self.grid.addWidget(self.labelInstr[labelString], 2*qcl, 6, 1, 1)
         # Compile relevant GUI elements to pass to other classes
         # GUIElem['expNo'] = outfld['ExpCur'][0]
@@ -492,8 +516,8 @@ class mainWindow(QMainWindow):
         # Text field for experiment notes
         self.notes = QTextEdit('')
         self.notes.setFont(font)
-        self.notes.setStyleSheet(STYLE_TEXT)
-        self.notes.setToolTip('Text written here will be saved to a separate file')
+        self.notes.setStyleSheet(defaults.STYLE_TEXT)
+        self.notes.setToolTip('Text written here will be saved to a "notes" file')
         self.grid.addWidget(self.notes, 12, 0, 2, 6)
         # Connect buttons to actions
         self.btn['QCL1'][0].clicked.connect(lambda: self.qcl(1))
@@ -507,14 +531,17 @@ class mainWindow(QMainWindow):
         self.btn['Start'][0].clicked.connect(lambda: self.run_experiment())
         self.btn['Sweep'][0].clicked.connect(lambda: self.run_experiment())
         self.btn['Repeat'][0].clicked.connect(lambda: self.repeat_experiment())
-        self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(self.parameters.latestDir))
+        self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(
+                                                    self.parameters.latestDir))
         self.activeQcl = 0 # None selected on startup
         self.show()
 
     def multiple(self):
         '''Multiple acquisitions'''
-        self.parameters.timeInterval = 60 * float(self.multiMenu.inputField['timeInterval'][0].text())
-        print('Acquisitions every {:.0f} minutes.'.format(self.parameters.timeInterval / 60))
+        self.parameters.timeInterval = 60 * float(
+                            self.multiMenu.inputField['timeInterval'][0].text())
+        print('Acquisitions every {:.0f} minutes.'.format(
+                                             self.parameters.timeInterval / 60))
         self.multiMenu.labelHead['counter'][0].setText('Acquisitions: 0')
         ### Initial checks
         if not self.btn['Arm'][0].isChecked():
@@ -548,7 +575,7 @@ class mainWindow(QMainWindow):
         self.lock_controls()
         self.statusbar.showMessage('Busy: multiple acquisitions')
         ### Change multiple menu UI styles
-        self.multiMenu.labelHead['counter'][0].setStyleSheet(STYLE_LABEL_ALT)
+        self.multiMenu.labelHead['counter'][0].setStyleSheet(defaults.STYLE_LABEL_ALT)
         # self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_ALT)
         ### Run acquisitions until "Stop" is clicked
         self.thread = QThread()
@@ -564,30 +591,39 @@ class mainWindow(QMainWindow):
         self.thread.start()
         ### Acquisition timer
         self.worker.acquisitionTimer.connect(self.multiMenu.update_timer)
-        self.worker.startedOne.connect(lambda: self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_READ))
-        self.worker.finishedOne.connect(lambda: self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_ALT))
+        self.worker.startedOne.connect(lambda: self.multiMenu.labelHead[
+            'timer'][0].setStyleSheet(defaults.STYLE_LABEL_READ))
+        self.worker.finishedOne.connect(lambda: self.multiMenu.labelHead[
+            'timer'][0].setStyleSheet(defaults.STYLE_LABEL_ALT))
         self.worker.finishedMulti.connect(self.multiMenu.zero_timer)
         ### Increment counter/zero counter
         self.worker.startedOne.connect(self.multiMenu.update_counter_running)
-        self.worker.startedOne.connect(lambda: self.multiMenu.labelHead['counter'][0].setStyleSheet(STYLE_LABEL_ALT))
+        self.worker.startedOne.connect(lambda: self.multiMenu.labelHead[
+            'counter'][0].setStyleSheet(defaults.STYLE_LABEL_ALT))
         self.worker.finishedOne.connect(self.multiMenu.update_counter_waiting)
-        self.worker.finishedOne.connect(lambda: self.multiMenu.labelHead['counter'][0].setStyleSheet(STYLE_LABEL_READ))
+        self.worker.finishedOne.connect(lambda: self.multiMenu.labelHead[
+            'counter'][0].setStyleSheet(defaults.STYLE_LABEL_READ))
         self.worker.finishedMulti.connect(self.multiMenu.zero_counter)
         ### Plot data
         self.worker.outData.connect(self.plot)
         ### Save UI screenshot
-        self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
+        self.worker.finished.connect(lambda: self.grab().save(
+                                                    'screenshot.png', 'png'))
         ### Save current QCLs, ranges and limits for use with "repeat" function
         self.worker.outParams.connect(self.update_parameters)
         ### Reset multiple menu UI styles
-        self.worker.finishedMulti.connect(lambda: self.multiMenu.labelHead['counter'][0].setStyleSheet(STYLE_LABEL_READ))
-        self.worker.finishedMulti.connect(lambda: self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_READ))
+        self.worker.finishedMulti.connect(lambda: self.multiMenu.labelHead[
+            'counter'][0].setStyleSheet(defaults.STYLE_LABEL_READ))
+        self.worker.finishedMulti.connect(lambda: self.multiMenu.labelHead[
+            'timer'][0].setStyleSheet(defaults.STYLE_LABEL_READ))
         ### Unlock GUI controls
         self.worker.finishedMulti.connect(lambda: self.lock_controls(lock=False))
         self.worker.finishedMulti.connect(lambda: self.statusbar.showMessage('Ready'))
         ### Uncheck UI buttons
-        self.worker.finishedMulti.connect(lambda: self.multiMenu.btn['Start'][0].setChecked(False))
-        self.worker.finishedMulti.connect(lambda: self.multiMenu.btn['Stop'][0].setChecked(False))
+        self.worker.finishedMulti.connect(lambda: self.multiMenu.btn[
+            'Start'][0].setChecked(False))
+        self.worker.finishedMulti.connect(lambda: self.multiMenu.btn[
+            'Stop'][0].setChecked(False))
 
     def multiple_acq_menu(self):
         '''Multiple acquisitions menu'''
@@ -607,7 +643,8 @@ class mainWindow(QMainWindow):
         # self.spectrumCanvas.flush_events()
         try:
             self.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-            # self.spectrumCanvas.axes.set_ylim(min(plotData[:, 1]), max(plotData[-1, 0]))
+            # self.spectrumCanvas.axes.set_ylim(min(
+            # plotData[:, 1]), max(plotData[-1, 0]))
             self.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
             if self.btn['RefEnable'][0].isChecked():
                 self.parameters.useRef = True
@@ -656,19 +693,27 @@ class mainWindow(QMainWindow):
         if selected:
             self.btn[qclNoStr][0].setChecked(True)
             self.btn[qclNoStr][0].setText('QCL {:.0f} ON'.format(qclNo))
-            self.inputField[qclNoStrSetCurr][0].setStyleSheet(STYLE_INPUT_ALT)
-            self.inputField[qclNoStrSetCurrPc][0].setStyleSheet(STYLE_INPUT_ALT)
-            self.inputField[qclNoStrSetWl][0].setStyleSheet(STYLE_INPUT_ALT)
-            self.labelInstr[qclNoStrCurr].setStyleSheet(STYLE_LABEL_ALT)
-            self.labelInstr[qclNoStrWl].setStyleSheet(STYLE_LABEL_ALT)
+            self.inputField[qclNoStrSetCurr][0].setStyleSheet(
+                defaults.STYLE_INPUT_ALT)
+            self.inputField[qclNoStrSetCurrPc][0].setStyleSheet(
+                defaults.STYLE_INPUT_ALT)
+            self.inputField[qclNoStrSetWl][0].setStyleSheet(
+                defaults.STYLE_INPUT_ALT)
+            self.labelInstr[qclNoStrCurr].setStyleSheet(
+                defaults.STYLE_LABEL_ALT)
+            self.labelInstr[qclNoStrWl].setStyleSheet(defaults.STYLE_LABEL_ALT)
         else:
             self.btn[qclNoStr][0].setChecked(False)
             self.btn[qclNoStr][0].setText('QCL {:.0f} Off'.format(qclNo))
-            self.inputField[qclNoStrSetCurr][0].setStyleSheet(STYLE_INPUT)
-            self.inputField[qclNoStrSetCurrPc][0].setStyleSheet(STYLE_INPUT)
-            self.inputField[qclNoStrSetWl][0].setStyleSheet(STYLE_INPUT)
-            self.labelInstr[qclNoStrCurr].setStyleSheet(STYLE_LABEL_READ)
-            self.labelInstr[qclNoStrWl].setStyleSheet(STYLE_LABEL_READ)
+            self.inputField[qclNoStrSetCurr][0].setStyleSheet(
+                defaults.STYLE_INPUT)
+            self.inputField[qclNoStrSetCurrPc][0].setStyleSheet(
+                defaults.STYLE_INPUT)
+            self.inputField[qclNoStrSetWl][0].setStyleSheet(
+                defaults.STYLE_INPUT)
+            self.labelInstr[qclNoStrCurr].setStyleSheet(
+                defaults.STYLE_LABEL_READ)
+            self.labelInstr[qclNoStrWl].setStyleSheet(defaults.STYLE_LABEL_READ)
 
     def reference_enable(self):
         '''Enable use of reference'''
@@ -685,7 +730,7 @@ class mainWindow(QMainWindow):
         self.btn['RefSet'][0].setChecked(False)
         try: # Must follow conventions of experiment routine to find data
             dataPathParts = os.path.split(dataPath)
-            fileName = '{}{}'.format(dataPathParts[-1], DEF_FILENAME)
+            fileName = '{}{}'.format(dataPathParts[-1], defaults.DEF_FILENAME)
             filePath = os.path.join(dataPath, fileName)
             data = np.loadtxt(filePath)
             self.spectrumCanvasRef.axes.set_xlim(data[0, 0], data[-1, 0])
@@ -793,7 +838,7 @@ class mainWindow(QMainWindow):
         self.repaint()
         if not self.btn['Arm'][0].isChecked():
             self.btn['Tune'][0].setChecked(False)
-            self.statusbar.showMessage('Not armed', MSG_TIMEOUT)
+            self.statusbar.showMessage('Not armed', defaults.MSG_TIMEOUT)
         else:
             qclNoStrSetWl = 'QCL{:.0f}SetWl'.format(self.activeQcl)
             self.btn['Tune'][0].setText('Tuning ...')
@@ -850,10 +895,10 @@ class mainWindow(QMainWindow):
             if not qcl:
                 outWl = convertedWl_invcm
             else:
-                if convertedWl_invcm > WL_MINIMUMS_INVCM[qcl-1]:
-                    outWl = WL_MINIMUMS_INVCM[qcl-1]
-                elif convertedWl_invcm < WL_MAXIMUMS_INVCM[qcl-1]:
-                    outWl = WL_MAXIMUMS_INVCM[qcl-1]
+                if convertedWl_invcm > defaults.WL_MINIMUMS_INVCM[qcl-1]:
+                    outWl = defaults.WL_MINIMUMS_INVCM[qcl-1]
+                elif convertedWl_invcm < defaults.WL_MAXIMUMS_INVCM[qcl-1]:
+                    outWl = defaults.WL_MAXIMUMS_INVCM[qcl-1]
                 else:
                     outWl = convertedWl_invcm
         # Convert cm^-1 to um
@@ -863,10 +908,10 @@ class mainWindow(QMainWindow):
             if not qcl:
                 outWl = convertedWl_um
             else:
-                if convertedWl_um < WL_MINIMUMS_UM[qcl-1]:
-                    outWl = WL_MINIMUMS_UM[qcl-1]
-                elif convertedWl_um > WL_MAXIMUMS_UM[qcl-1]:
-                    outWl = WL_MAXIMUMS_UM[qcl-1]
+                if convertedWl_um < defaults.WL_MINIMUMS_UM[qcl-1]:
+                    outWl = defaults.WL_MINIMUMS_UM[qcl-1]
+                elif convertedWl_um > defaults.WL_MAXIMUMS_UM[qcl-1]:
+                    outWl = defaults.WL_MAXIMUMS_UM[qcl-1]
                 else:
                     outWl = convertedWl_um
         return outWl
@@ -883,7 +928,7 @@ class mainWindow(QMainWindow):
             self.wlUnits = 'invcm'
             # self.btn['WlUnits'][0].setText('Units: cm⁻¹')
             # Relabel QCL fields
-            for qcl in range(1, NUMBER_OF_QCLS + 1):
+            for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
                 labelString = 'QCL{:d}WlUnit'.format(qcl)
                 self.labelInstr[labelString].setText('cm⁻¹  ')
                 inputFieldString = 'QCL{}SetWl'.format(qcl)
@@ -902,15 +947,18 @@ class mainWindow(QMainWindow):
                 wlString = '{:.1f}'.format(convertedWl)
                 self.inputField[wlLabel][0].setText(wlString)
             # Set maximum sweep speed
-            self.inputField['Speed'][0].setText('{:.0f}'.format(MAX_SWEEP_SPEED_INVCM))
+            self.inputField['Speed'][0].setText('{:.0f}'.format(
+                defaults.MAX_SWEEP_SPEED_INVCM))
             # Can't unambiguously convert step
             self.inputField['WlStep'][0].setText('100')
             self.spectrumCanvas.axes.set_xlabel('Wavenumber (cm⁻¹)')
+            self.spectrumCanvasRef.axes.set_xlabel('Wavenumber (cm⁻¹)')
+            self.spectrumCanvasT.axes.set_xlabel('Wavenumber (cm⁻¹)')
         # Switch units from cm^-1 to um
         elif self.wlUnits == 'invcm':
             self.wlUnits = 'um'
             # self.btn['WlUnits'][0].setText('Units: μm  ')
-            for qcl in range(1, NUMBER_OF_QCLS + 1):
+            for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
                 labelString = 'QCL{:d}WlUnit'.format(qcl)
                 self.labelInstr[labelString].setText('μm    ')
                 inputFieldString = 'QCL{}SetWl'.format(qcl)
@@ -929,10 +977,13 @@ class mainWindow(QMainWindow):
                 wlString = '{:.1f}'.format(convertedWl)
                 self.inputField[wlLabel][0].setText(wlString)
             # Set maximum sweep speed
-            self.inputField['Speed'][0].setText('{:.2f}'.format(MAX_SWEEP_SPEED_UM))
+            self.inputField['Speed'][0].setText('{:.2f}'.format(
+                defaults.MAX_SWEEP_SPEED_UM))
             # Can't unambiguously convert step
             self.inputField['WlStep'][0].setText('0.1')
             self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
+            self.spectrumCanvasRef.axes.set_xlabel('Wavelength (μm)')
+            self.spectrumCanvasT.axes.set_xlabel('Wavelength (μm)')
 
 
 class multipleAcquisitionsWindow(QMainWindow):
@@ -959,8 +1010,8 @@ class multipleAcquisitionsWindow(QMainWindow):
         '''Draw controls'''
         self.setGeometry(0, 0, 250, 350)
         font = QFont()
-        font.setFamily(FONT_FAMILY)
-        font.setPointSize(FONT_SIZE)
+        font.setFamily(defaults.FONT_FAMILY)
+        font.setPointSize(defaults.FONT_SIZE)
         ### Set title, icon and center window
         self.setWindowTitle('Multiple Acquisitions')
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
@@ -972,12 +1023,12 @@ class multipleAcquisitionsWindow(QMainWindow):
         exitAction.triggered.connect(lambda: self.close())
         ### Menus
         self.menubar = self.menuBar()
-        self.menubar.setStyleSheet(STYLE_BAR)
+        self.menubar.setStyleSheet(defaults.STYLE_BAR)
         fileMenu = self.menubar.addMenu('Actions')
         fileMenu.addAction(exitAction)
         ### Configure grid layout
         self.container = QWidget()
-        self.container.setStyleSheet(STYLE_CONTAINER)
+        self.container.setStyleSheet(defaults.STYLE_CONTAINER)
         self.setCentralWidget(self.container)
         self.grid = QGridLayout()
         self.container.setLayout(self.grid)
@@ -995,15 +1046,16 @@ class multipleAcquisitionsWindow(QMainWindow):
             k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
             k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            k[0].setStyleSheet(STYLE_ARMED)
+            k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Input fields
         self.inputField = dict() # to collect all input fields
         self.inputField['timeInterval'] = [QLineEdit('{}'.format(5)), 4, 0, 1, 1]
-        self.inputField['timeInterval'][0].setToolTip('Multiple acquisition time interval')
+        self.inputField['timeInterval'][0].setToolTip(
+            'Multiple acquisition time interval')
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
-            k[0].setStyleSheet(STYLE_INPUT)
+            k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Labels
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
@@ -1012,18 +1064,20 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.labelHead['timeInterval'] = [QLabel('Time Interval (min)'), 3, 0, 1, 1]
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
-            k[0].setStyleSheet(STYLE_LABEL_READ)
+            k[0].setStyleSheet(defaults.STYLE_LABEL_READ)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        self.labelHead['timeInterval'][0].setStyleSheet(STYLE_LABEL_EMPH)
+        self.labelHead['timeInterval'][0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
 
     def update_counter_running(self, acquisitions):
         '''Increment acquisitions counter by 1'''
-        self.labelHead['counter'][0].setText('Running. Done: {:.0f}'.format(acquisitions))
+        self.labelHead['counter'][0].setText('Running. Done: {:.0f}'.format(
+            acquisitions))
         self.repaint()
 
     def update_counter_waiting(self, acquisitions):
         '''Increment acquisitions counter by 1'''
-        self.labelHead['counter'][0].setText('Waiting. Done: {:.0f}'.format(acquisitions))
+        self.labelHead['counter'][0].setText('Waiting. Done: {:.0f}'.format(
+            acquisitions))
         self.repaint()
 
     def update_timer(self, elapsed_s):
