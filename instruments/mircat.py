@@ -393,7 +393,7 @@ class laser():
         else:
             sdkWlUnits = MIRcatSDK_UNITS_MICRONS
             unitString = 'μm'
-            # Send tune command
+        # Send tune command
         SDK.MIRcatSDK_TuneToWW(c_float(wl), sdkWlUnits, c_uint8(qcl))
         # Check tune setting
         wlTune = c_float()
@@ -412,6 +412,7 @@ class laser():
         print() # clear line
         # Read tuned wavelength
         wlRead = self.get_wavelength()
-        print('Tuned QCL {} to {:.3f} {}.'.format(qclTune.value, wlRead, unitString))
+        # print('Tuned QCL {} to {:.3f} {}.'.format(qclTune.value, wlRead, unitString))
+        print('Tuned QCL {} to {:.3f} μm.'.format(qclTune.value, wlRead))
 
 

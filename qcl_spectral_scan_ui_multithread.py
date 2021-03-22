@@ -131,7 +131,6 @@ class mainWindow(QMainWindow):
         ### Show startup dialog
         startupDialog = laserStartupDialog() # Closes when startup finishes
         self.laserWorker.laserInitialized.connect(lambda: startupDialog.done(0))
-        # startupDialog.show()
         startupDialog.exec()
         ### Prepare text for "about" dialog
         try:
@@ -790,19 +789,22 @@ class mainWindow(QMainWindow):
     def tune(self):
         '''Tune laser to input wavelength of currently selected QCL.'''
         self.lock_controls(lock=True)
+        self.statusbar.showMessage('Busy')
+        self.repaint()
         if not self.btn['Arm'][0].isChecked():
             self.btn['Tune'][0].setChecked(False)
             self.statusbar.showMessage('Not armed', MSG_TIMEOUT)
         else:
             qclNoStrSetWl = 'QCL{:.0f}SetWl'.format(self.activeQcl)
             self.btn['Tune'][0].setText('Tuning ...')
+            self.repaint()
             targetWl = float(self.inputField[qclNoStrSetWl][0].text())
             self.laser.tune(self.activeQcl, targetWl, self.wlUnits)
             self.update_qcl_reading(self.activeQcl)
             self.btn['Tune'][0].setText('Tune')
-            self.statusbar.showMessage('Ready')
         self.btn['Tune'][0].setChecked(False)
         self.lock_controls(lock=False)
+        self.statusbar.showMessage('Ready')
 
     def tune_fast(self, targetWl):
         '''Version of "tune" with less overhead. Use with caution.'''

@@ -322,6 +322,8 @@ class experiment(QObject):
 
     def sweep(self):
         '''Run a sweep using the MIRcat's built-in function.'''
+        ### Troubleshooting
+        SDK.MIRcatSDK_StopScanInProgress() # Make sure previous sweep has ended
         ### Preamble
         print('Sweep started ...')
         print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
