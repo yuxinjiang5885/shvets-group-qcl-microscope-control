@@ -3,7 +3,7 @@ qcl_spectral_scan_ui_multithread
 Giovanni Sartorello (srtgnn@gmail.com)
 UI for QCL scanning spectroscopy experiments
 Multi-threaded version of "qcl_spectral_scan_ui"
-Python 3.8.3 on Windows 10
+Python 3.9.6 on Windows 10
 Created 2021-Mar-03
 '''
 
@@ -81,6 +81,138 @@ class laserInitializer(QObject):
         self.laserInitialized.emit()
 
 
+class laserSettingWindow(QMainWindow):
+    '''GUI for laser settings'''
+
+    def __init__(self, mainGUI):
+        super().__init__(None, Qt.WindowStaysOnTopHint)
+        self.make_gui()
+
+    def center_window(self):
+        '''Center main application window on screen'''
+        qtRectangle = self.frameGeometry()
+        centerPoint = QDesktopWidget().availableGeometry().center()
+        qtRectangle.moveCenter(centerPoint)
+        self.move(qtRectangle.topLeft())
+
+    def closeEvent(self, event): # Redefined from parent QMainWindow
+        '''Show warning dialog on close.'''
+        event.accept()
+
+    def make_gui(self):
+        '''Draw controls'''
+        self.setGeometry(0, 0, 1400, 400)
+        font = QFont()
+        font.setFamily(defaults.FONT_FAMILY)
+        font.setPointSize(defaults.FONT_SIZE)
+        ### Set title, icon and center window
+        self.setWindowTitle('Laser Settings')
+        self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
+        self.center_window()
+        ### Actions
+        exitAction = QAction(QIcon(None), 'Close Window', self)
+        exitAction.setShortcut('Ctrl+W')
+        exitAction.setStatusTip('Close window')
+        exitAction.triggered.connect(lambda: self.close())
+        ### Menus
+        self.menubar = self.menuBar()
+        self.menubar.setStyleSheet(defaults.STYLE_BAR)
+        fileMenu = self.menubar.addMenu('Actions')
+        fileMenu.addAction(exitAction)
+        ### Configure grid layout
+        self.container = QWidget()
+        self.container.setStyleSheet(defaults.STYLE_CONTAINER)
+        self.setCentralWidget(self.container)
+        self.grid = QGridLayout()
+        self.container.setLayout(self.grid)
+        self.grid.setSpacing(10)
+        ### Labels: QCL modules
+        self.labels = dict() # [label, row, col, rowSpan, colSpan]
+        self.labels['QCL1'] = [QLabel('1'), 1, 0, 2, 1]
+        self.labels['QCL2'] = [QLabel('2'), 3, 0, 2, 1]
+        self.labels['QCL3'] = [QLabel('3'), 5, 0, 2, 1]
+        self.labels['QCL4'] = [QLabel('4'), 7, 0, 2, 1]
+        ### Labels: header
+        self.labels['QCL'] = [QLabel('QCL'), 0, 0, 1, 1]
+        self.labels['PulseRate'] = [QLabel('Pulse Rate'), 0, 1, 1, 2]
+        self.labels['PulseWidth'] = [QLabel('Pulse Width'), 0, 3, 1, 2]
+        self.labels['DutyCycle'] = [QLabel('Duty Cycle'), 0, 5, 1, 1]
+        self.labels['Current'] = [QLabel('Current'), 0, 7, 1, 4]
+        for _, k in self.labels.items(): # Arrange labels in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        # Labels: units
+        unitLabelStrings = ['Hz    ', 'ns    ', 'mA    ', '%    ']
+        unitLabelStringCols = [2, 4, 8, 10] # Columns where unit labels go
+        for x, label in enumerate(unitLabelStrings):
+            col = unitLabelStringCols[x]
+            for row in range(1, 8, 2): # Every other row
+                labelObject = QLabel(label)
+                labelObject.setFont(font)
+                labelObject.setStyleSheet(defaults.STYLE_LABEL_UNIT)
+                self.grid.addWidget(labelObject, row, col, 1, 1)
+        ### Buttons
+        self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
+        SetQclLabel = 'Set\nPulse'
+        SetQclCurrLabel = 'Set\nCurrent'
+        self.btn['SetQCL1'] = [QPushButton(SetQclLabel), 1, 6, 2, 1]
+        self.btn['SetQCL2'] = [QPushButton(SetQclLabel), 3, 6, 2, 1]
+        self.btn['SetQCL3'] = [QPushButton(SetQclLabel), 5, 6, 2, 1]
+        self.btn['SetQCL4'] = [QPushButton(SetQclLabel), 7, 6, 2, 1]
+        self.btn['SetCurrQCL1'] = [QPushButton(SetQclCurrLabel), 1, 11, 2, 1]
+        self.btn['SetCurrQCL2'] = [QPushButton(SetQclCurrLabel), 3, 11, 2, 1]
+        self.btn['SetCurrQCL3'] = [QPushButton(SetQclCurrLabel), 5, 11, 2, 1]
+        self.btn['SetCurrQCL4'] = [QPushButton(SetQclCurrLabel), 7, 11, 2, 1]
+        for x, k in self.btn.items(): # Arrange buttons in grid
+            k[0].setCheckable(True)
+            k[0].setFocusPolicy(Qt.NoFocus)
+            k[0].setFont(font)
+            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            k[0].setStyleSheet(defaults.STYLE_ARMED)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Input fields: pulse rate and width, duty cycle, current (mA and %)
+        self.inputField = dict() # to collect all input fields
+        paramStrings = ['SetPulseRate', 'SetPulseWidth', 'SetDutyCycle',
+                                                      'SetCurrent', 'SetCurrPc']
+        startupText = [defaults.MAX_CURR_QCL1_MILLIAMP,
+                       defaults.MAX_CURR_QCL2_MILLIAMP,
+                       defaults.MAX_CURR_QCL3_MILLIAMP,
+                       defaults.MAX_CURR_QCL4_MILLIAMP,
+                       100, 100, 100, 100,]
+        startupFormat = ['{:.0f}', '{:.0f}'] # Current, current percentage
+        for param in range(0, len(paramStrings)):
+            for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
+                col = param * 2 + 1 # every other column starting at 1 (the second)
+                row = 2 * qcl - 1 # every other row starting at 1 (the second)
+                fieldString = 'QCL{}{}'.format(qcl, paramStrings[param])
+                itemNo = param * defaults.NUMBER_OF_QCLS + qcl - 1
+                # startupString = '{:.0f}'.format(startupText[itemNo])
+                self.inputField[fieldString] = [QLineEdit('-'),
+                                                                 row, col, 1, 1]
+        ### Input fields
+        # self.inputField = dict() # to collect all input fields
+        # self.inputField['timeInterval'] = [QLineEdit('{}'.format(5)), 4, 0, 1, 1]
+        # self.inputField['timeInterval'][0].setToolTip(
+        #     'Multiple acquisition time interval')
+        for _, k in self.inputField.items(): # Arrange in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_INPUT)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Labels
+        # self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
+        # self.labelHead['counter'] = [QLabel('Not running'), 0, 0, 1, 1]
+        # self.labelHead['timer'] = [QLabel('Elapsed: 00 : 00 : 00'), 1, 0, 1, 1]
+        # self.labelHead['timeInterval'] = [QLabel('Time Interval (min)'), 3, 0, 1, 1]
+        # for _, k in self.labelHead.items(): # Arrange labels in grid
+        #     k[0].setFont(font)
+        #     k[0].setStyleSheet(defaults.STYLE_LABEL_READ)
+        #     self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        # self.labelHead['timeInterval'][0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        for row in range(0, 9): # Set row spacing
+            self.grid.setRowStretch(row, 1)
+
+
 class laserStartupDialog(QDialog):
     '''Show a dialog when laser is starting up.'''
 
@@ -154,6 +286,7 @@ class mainWindow(QMainWindow):
         # self.worker = [] # Placeholder for last-used worker
         ### Create GUI
         self.make_gui()
+        self.laserMenu = laserSettingWindow(self)
         self.multiMenu = multipleAcquisitionsWindow(self)
         self.multiMenu.btn['Start'][0].clicked.connect(lambda: self.multiple())
         self.statusbar.showMessage('Ready')
@@ -237,6 +370,10 @@ class mainWindow(QMainWindow):
         '''Set laser instance'''
         self.laser = laserInstance
 
+    def laser_settings_menu(self):
+        '''Multiple acquisitions menu'''
+        self.laserMenu.show()
+
     def lock_controls(self, lock=True):
         '''Disable all buttons while operations are performed.'''
         enabled = not lock # For the sake of clarity
@@ -265,14 +402,21 @@ class mainWindow(QMainWindow):
         changeUnits.setShortcut('Ctrl+U')
         changeUnits.setStatusTip('Change units')
         changeUnits.triggered.connect(lambda: self.wl_units())
-        laserOff = QAction(QIcon(None), 'Laser off', self)
-        laserOff.setShortcut('Ctrl+Alt+L')
-        laserOff.setStatusTip('Power down laser (Not Implemented)')
-        laserOff.triggered.connect(lambda: print('Action not implemented'))
         fileMenu = self.menubar.addMenu('Actions')
-        fileMenu.addAction(laserOff)
         fileMenu.addAction(exitAction)
         fileMenu.addAction(changeUnits)
+        ### "Laser" menu
+        laserSettings = QAction(QIcon(None), 'Laser settings', self)
+        laserSettings.setShortcut('Ctrl+L')
+        laserSettings.setStatusTip('Quit application')
+        laserSettings.triggered.connect(lambda: self.laser_settings_menu())
+        laserOff = QAction(QIcon(None), 'Laser off', self)
+        laserOff.setShortcut('Ctrl+Alt+O')
+        laserOff.setStatusTip('Power down laser (Not Implemented)')
+        laserOff.triggered.connect(lambda: print('Action not implemented'))
+        laserMenu = self.menubar.addMenu('Laser')
+        laserMenu.addAction(laserSettings)
+        laserMenu.addAction(laserOff)
         ### "Multiple" menu
         multipleMenu = self.menubar.addMenu('Multiple')
         multipleAcqMenu = QAction(QIcon(None), 'Timed multiple acquisitions', self)
@@ -1017,9 +1161,9 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
         self.center_window()
         ### Actions
-        exitAction = QAction(QIcon(None), 'Quit', self)
-        exitAction.setShortcut('Ctrl+Q')
-        # exitAction.setStatusTip('Quit application')
+        exitAction = QAction(QIcon(None), 'Close Window', self)
+        exitAction.setShortcut('Ctrl+W')
+        exitAction.setStatusTip('Close window')
         exitAction.triggered.connect(lambda: self.close())
         ### Menus
         self.menubar = self.menuBar()
