@@ -241,6 +241,10 @@ STYLE_LABEL_READ = '''QLabel {{
         color:{};
         qproperty-alignment: AlignCenter;
     }}'''.format(GS_COLORS['text-lo'])
+STYLE_LABEL_READ_ALT = '''QLabel {{
+        color:{};
+        qproperty-alignment: AlignLeft;
+    }}'''.format(GS_COLORS['text-hi'])
 STYLE_LABEL_UNIT = '''QLabel {{
         color:{};
         qproperty-alignment: AlignLeft;

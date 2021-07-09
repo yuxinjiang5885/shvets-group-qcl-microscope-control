@@ -86,6 +86,7 @@ class laserSettingWindow(QMainWindow):
 
     def __init__(self, mainGUI):
         super().__init__(None, Qt.WindowStaysOnTopHint)
+        self.laser = mainGUI.laser
         self.make_gui()
 
     def center_window(self):
@@ -99,9 +100,20 @@ class laserSettingWindow(QMainWindow):
         '''Show warning dialog on close.'''
         event.accept()
 
+    def get_qcl_parameters(self, qcl):
+        '''Read parameters of QCL module "qcl".'''
+        parameters = dict()
+        parameters['QCLCurrent'] = self.laser.get_current(qcl)
+        parameters['QCLPulseRate'] = self.laser.get_pulse_rate(qcl)
+        parameters['QCLPulseWidth'] = self.laser.get_pulse_width(qcl)
+        parameters['TECTemperature'] = self.laser.get_temperature(qcl)
+        # qclWavelength_um = self.laser.get_wavelength()
+        # qclWavenumber_invcm = (1/qclWavelength_um)*1E4
+        return parameters
+
     def make_gui(self):
         '''Draw controls'''
-        self.setGeometry(0, 0, 1400, 400)
+        self.setGeometry(0, 0, 1000, 400)
         font = QFont()
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE)
@@ -110,14 +122,19 @@ class laserSettingWindow(QMainWindow):
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
         self.center_window()
         ### Actions
+        updateAction = QAction(QIcon(None), 'Update Readings', self)
+        updateAction.setShortcut('Ctrl+U')
+        updateAction.setStatusTip('Update QCL parameter readings')
+        updateAction.triggered.connect(lambda: self.update_readings())
         exitAction = QAction(QIcon(None), 'Close Window', self)
         exitAction.setShortcut('Ctrl+W')
-        exitAction.setStatusTip('Close window')
+        exitAction.setStatusTip('Close laser settings window')
         exitAction.triggered.connect(lambda: self.close())
         ### Menus
         self.menubar = self.menuBar()
         self.menubar.setStyleSheet(defaults.STYLE_BAR)
         fileMenu = self.menubar.addMenu('Actions')
+        fileMenu.addAction(updateAction)
         fileMenu.addAction(exitAction)
         ### Configure grid layout
         self.container = QWidget()
@@ -128,42 +145,36 @@ class laserSettingWindow(QMainWindow):
         self.grid.setSpacing(10)
         ### Labels: QCL modules
         self.labels = dict() # [label, row, col, rowSpan, colSpan]
-        self.labels['QCL1'] = [QLabel('1'), 1, 0, 2, 1]
-        self.labels['QCL2'] = [QLabel('2'), 3, 0, 2, 1]
-        self.labels['QCL3'] = [QLabel('3'), 5, 0, 2, 1]
-        self.labels['QCL4'] = [QLabel('4'), 7, 0, 2, 1]
+        for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
+            labelName = 'QCL{:.0f}'.format(qcl)
+            labelText = '{:.0f}'.format(qcl)
+            row = 2 * qcl - 1 # Every other row, starting at 1
+            self.labels[labelName] = [QLabel(labelText), row, 0, 2, 1]
         ### Labels: header
         self.labels['QCL'] = [QLabel('QCL'), 0, 0, 1, 1]
         self.labels['PulseRate'] = [QLabel('Pulse Rate'), 0, 1, 1, 2]
         self.labels['PulseWidth'] = [QLabel('Pulse Width'), 0, 3, 1, 2]
-        self.labels['DutyCycle'] = [QLabel('Duty Cycle'), 0, 5, 1, 1]
-        self.labels['Current'] = [QLabel('Current'), 0, 7, 1, 4]
+        self.labels['Current'] = [QLabel('Current'), 0, 5, 1, 4]
         for _, k in self.labels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: units
         unitLabelStrings = ['Hz    ', 'ns    ', 'mA    ', '%    ']
-        unitLabelStringCols = [2, 4, 8, 10] # Columns where unit labels go
-        for x, label in enumerate(unitLabelStrings):
-            col = unitLabelStringCols[x]
+        for x, labelText in enumerate(unitLabelStrings):
+            col = x * 2 + 2 # Every other column, starting at 2
             for row in range(1, 8, 2): # Every other row
-                labelObject = QLabel(label)
+                labelObject = QLabel(labelText)
                 labelObject.setFont(font)
                 labelObject.setStyleSheet(defaults.STYLE_LABEL_UNIT)
                 self.grid.addWidget(labelObject, row, col, 1, 1)
         ### Buttons
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
-        SetQclLabel = 'Set\nPulse'
-        SetQclCurrLabel = 'Set\nCurrent'
-        self.btn['SetQCL1'] = [QPushButton(SetQclLabel), 1, 6, 2, 1]
-        self.btn['SetQCL2'] = [QPushButton(SetQclLabel), 3, 6, 2, 1]
-        self.btn['SetQCL3'] = [QPushButton(SetQclLabel), 5, 6, 2, 1]
-        self.btn['SetQCL4'] = [QPushButton(SetQclLabel), 7, 6, 2, 1]
-        self.btn['SetCurrQCL1'] = [QPushButton(SetQclCurrLabel), 1, 11, 2, 1]
-        self.btn['SetCurrQCL2'] = [QPushButton(SetQclCurrLabel), 3, 11, 2, 1]
-        self.btn['SetCurrQCL3'] = [QPushButton(SetQclCurrLabel), 5, 11, 2, 1]
-        self.btn['SetCurrQCL4'] = [QPushButton(SetQclCurrLabel), 7, 11, 2, 1]
+        for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
+            btnName = 'QCL{:.0f}SetParameters'.format(qcl)
+            btnText = '  Set QCL {:.0f} Parameters  '.format(qcl)
+            row = 2 * qcl - 1 # Every other row, starting at 1
+            self.btn[btnName] = [QPushButton(btnText), row, 9, 2, 1]
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
             k[0].setFocusPolicy(Qt.NoFocus)
@@ -173,44 +184,57 @@ class laserSettingWindow(QMainWindow):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Input fields: pulse rate and width, duty cycle, current (mA and %)
         self.inputField = dict() # to collect all input fields
-        paramStrings = ['SetPulseRate', 'SetPulseWidth', 'SetDutyCycle',
-                                                      'SetCurrent', 'SetCurrPc']
-        startupText = [defaults.MAX_CURR_QCL1_MILLIAMP,
-                       defaults.MAX_CURR_QCL2_MILLIAMP,
-                       defaults.MAX_CURR_QCL3_MILLIAMP,
-                       defaults.MAX_CURR_QCL4_MILLIAMP,
-                       100, 100, 100, 100,]
-        startupFormat = ['{:.0f}', '{:.0f}'] # Current, current percentage
+        paramStrings = ['SetPulseRate', 'SetPulseWidth', 'SetCurrent', 'SetCurrPc']
         for param in range(0, len(paramStrings)):
             for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
-                col = param * 2 + 1 # every other column starting at 1 (the second)
-                row = 2 * qcl - 1 # every other row starting at 1 (the second)
-                fieldString = 'QCL{}{}'.format(qcl, paramStrings[param])
+                col = param * 2 + 1 # every other column, starting at 1.
+                row = 2 * qcl - 1 # every other row, starting at 1.
+                fieldName = 'QCL{}{}'.format(qcl, paramStrings[param])
                 itemNo = param * defaults.NUMBER_OF_QCLS + qcl - 1
-                # startupString = '{:.0f}'.format(startupText[itemNo])
-                self.inputField[fieldString] = [QLineEdit('-'),
-                                                                 row, col, 1, 1]
-        ### Input fields
-        # self.inputField = dict() # to collect all input fields
-        # self.inputField['timeInterval'] = [QLineEdit('{}'.format(5)), 4, 0, 1, 1]
-        # self.inputField['timeInterval'][0].setToolTip(
-        #     'Multiple acquisition time interval')
+                # fieldText = '{:.0f}'.format(startupText[itemNo])
+                self.inputField[fieldName] = [QLineEdit(''), row, col, 1, 1]
         for _, k in self.inputField.items(): # Arrange in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        ### Labels
-        # self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
-        # self.labelHead['counter'] = [QLabel('Not running'), 0, 0, 1, 1]
-        # self.labelHead['timer'] = [QLabel('Elapsed: 00 : 00 : 00'), 1, 0, 1, 1]
-        # self.labelHead['timeInterval'] = [QLabel('Time Interval (min)'), 3, 0, 1, 1]
-        # for _, k in self.labelHead.items(): # Arrange labels in grid
-        #     k[0].setFont(font)
-        #     k[0].setStyleSheet(defaults.STYLE_LABEL_READ)
-        #     self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        # self.labelHead['timeInterval'][0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        ### Labels for QCL parameter readings
+        self.readingLabels = dict()
+        paramNames = ['PulseRate', 'PulseWidth', 'Current', 'CurrentPercent']
+        for x, param in enumerate(paramNames):
+            for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
+                row = 2 * qcl # Every other row, starting at 2.
+                col = 2 * x + 1 # Every other column, starting at 1.
+                labelName = 'QCL{}{}'.format(qcl, param)
+                self.readingLabels[labelName] = [QLabel(''), row, col, 1, 2]
+        for _, k in self.readingLabels.items(): # Arrange labels in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         for row in range(0, 9): # Set row spacing
             self.grid.setRowStretch(row, 1)
+        self.update_readings()
+
+    def update_readings(self):
+        '''Update QCL modules parameter readings.'''
+        paramNames = ['PulseRate', 'PulseWidth', 'Current', 'CurrentPercent']
+        paramText = ['Hz', 'ns', 'mA', '%']
+        currentMax = [defaults.MAX_CURR_QCL1_MILLIAMP,
+                      defaults.MAX_CURR_QCL2_MILLIAMP,
+                      defaults.MAX_CURR_QCL3_MILLIAMP,
+                      defaults.MAX_CURR_QCL4_MILLIAMP]
+        for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
+            pulseRate = self.laser.get_pulse_rate(qcl) # Hz
+            pulseWidth = self.laser.get_pulse_width(qcl) # ns
+            current = self.laser.get_current(qcl) # mA
+            currentPercent = current / currentMax[qcl - 1] * 100
+            dutyCycle = pulseRate * pulseWidth * 1E-9
+            paramReadings = [pulseRate, pulseWidth, current, currentPercent]
+            for x, param in enumerate(paramNames):
+                row = 2 * qcl # Every other row, starting at 2.
+                col = 2 * x + 1 # Every other column, starting at 1.
+                labelName = 'QCL{}{}'.format(qcl, param)
+                labelText = '{:.0f} {}'.format(paramReadings[x], paramText[x])
+                self.readingLabels[labelName][0].setText(labelText)
 
 
 class laserStartupDialog(QDialog):
@@ -373,6 +397,7 @@ class mainWindow(QMainWindow):
     def laser_settings_menu(self):
         '''Multiple acquisitions menu'''
         self.laserMenu.show()
+        self.laserMenu.update_readings()
 
     def lock_controls(self, lock=True):
         '''Disable all buttons while operations are performed.'''
@@ -534,31 +559,17 @@ class mainWindow(QMainWindow):
             else:
                 k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        ### Input fields: current, current percentage, wavelength
-        paramStrings = ['SetCurrent', 'SetCurrPc', 'SetWl']
+        ### Input fields: wavelength
         self.inputField = dict() # to collect all input fields
-        startupText = [defaults.MAX_CURR_QCL1_MILLIAMP,
-                       defaults.MAX_CURR_QCL2_MILLIAMP,
-                       defaults.MAX_CURR_QCL3_MILLIAMP,
-                       defaults.MAX_CURR_QCL4_MILLIAMP,
-                       100, 100, 100, 100,
-                       defaults.MIN_WL_QCL1_UM,
+        startupText = [defaults.MIN_WL_QCL1_UM,
                        defaults.MIN_WL_QCL2_UM,
                        defaults.MIN_WL_QCL3_UM,
                        defaults.MIN_WL_QCL4_UM]
-        startupFormat = ['{:.0f}', '{:.0f}', '{:.2f}'] # Current, %, wavelength
-        for param in range(0, len(paramStrings)):
-            for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
-                col = param * 2 + 1 # even columns starting at 1 (the second)
+        for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
                 row = qcl * 2 # odd rows starting at 2 (the third)
-                fieldString = 'QCL{}{}'.format(qcl, paramStrings[param])
-                itemNo = param * defaults.NUMBER_OF_QCLS + qcl - 1
-                startupString = '{}'.format(startupFormat[param]).format(
-                                                            startupText[itemNo])
-                self.inputField[fieldString] = [QLineEdit(startupString),
-                                                                 row, col, 1, 1]
-                # self.inputField[fieldString][0].setToolTip(
-                #                            'DO NOT USE: set in MIRcatControl')
+                fieldName = 'QCL{}SetWl'.format(qcl)
+                fieldText = '{}'.format(startupText[qcl - 1])
+                self.inputField[fieldName] = [QLineEdit(fieldText), row, 5, 1, 1]
         ### Input fields: experiment controls
         self.inputField['WlStart'] = [QLineEdit('{}'.format(
                                     defaults.DEF_WL_START_UM)), 3, 8, 1, 1]
@@ -591,7 +602,7 @@ class mainWindow(QMainWindow):
         ### Labels: headers, in a dict for ease of positioning
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
         self.labelHead['QCLMod'] = [QLabel('QCL Modules'), 1, 0, 1, 1]
-        self.labelHead['QCLCurr'] = [QLabel('QCL Currents'), 1, 1, 1, 4]
+        # self.labelHead['QCLCurr'] = [QLabel('QCL Currents'), 1, 1, 1, 4]
         self.labelHead['QCLWav'] = [QLabel('QCL Wavelengths'), 1, 5, 1, 2]
         self.labelHead['LasControls'] = [QLabel(
                           'Laser/Experiment Settings and Controls'), 1, 7, 1, 4]
@@ -627,7 +638,7 @@ class mainWindow(QMainWindow):
             labelString = 'QCL{:d}Current'.format(qcl)
             self.labelInstr[labelString] = QLabel('n/a')
             self.labelInstr[labelString].setFont(font)
-            self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ)
+            self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
             self.labelInstr[labelString].setToolTip('Reading from laser')
             self.grid.addWidget(self.labelInstr[labelString], 2*qcl+1, 1, 1, 4)
         # Labels: read wavelengths (blank at startup)
@@ -635,18 +646,9 @@ class mainWindow(QMainWindow):
             labelString = 'QCL{:d}Wavelength'.format(qcl)
             self.labelInstr[labelString] = QLabel('n/a')
             self.labelInstr[labelString].setFont(font)
-            self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ)
+            self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
             self.labelInstr[labelString].setToolTip('Reading from laser')
             self.grid.addWidget(self.labelInstr[labelString], 2*qcl+1, 5, 1, 2)
-        # Labels: current controls
-        unitLabelStrings = ['mA    ', '%     ']
-        for label in range(0, len(unitLabelStrings)):
-            col = label * 2 + 2 # odd columns starting at 2 (the third)
-            for row in range(2, 9, 2): # every other row
-                labelObject = QLabel(unitLabelStrings[label])
-                labelObject.setFont(font)
-                labelObject.setStyleSheet(defaults.STYLE_LABEL_UNIT)
-                self.grid.addWidget(labelObject, row, col, 1, 1)
         # Labels: wavelength units
         for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
             labelString = 'QCL{:d}WlUnit'.format(qcl)
@@ -830,34 +832,24 @@ class mainWindow(QMainWindow):
         '''Apply style to QCL button and related controls.'''
         qclNoStr = 'QCL{:.0f}'.format(qclNo)
         qclNoStrCurr = 'QCL{:.0f}Current'.format(qclNo)
-        qclNoStrSetCurr = 'QCL{:.0f}SetCurrent'.format(qclNo)
-        qclNoStrSetCurrPc = 'QCL{:.0f}SetCurrPc'.format(qclNo)
         qclNoStrSetWl = 'QCL{:.0f}SetWl'.format(qclNo)
         qclNoStrWl = 'QCL{:.0f}Wavelength'.format(qclNo)
         if selected:
             self.btn[qclNoStr][0].setChecked(True)
             self.btn[qclNoStr][0].setText('QCL {:.0f} ON'.format(qclNo))
-            self.inputField[qclNoStrSetCurr][0].setStyleSheet(
-                defaults.STYLE_INPUT_ALT)
-            self.inputField[qclNoStrSetCurrPc][0].setStyleSheet(
-                defaults.STYLE_INPUT_ALT)
             self.inputField[qclNoStrSetWl][0].setStyleSheet(
                 defaults.STYLE_INPUT_ALT)
             self.labelInstr[qclNoStrCurr].setStyleSheet(
-                defaults.STYLE_LABEL_ALT)
-            self.labelInstr[qclNoStrWl].setStyleSheet(defaults.STYLE_LABEL_ALT)
+                defaults.STYLE_LABEL_READ_ALT)
+            self.labelInstr[qclNoStrWl].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
         else:
             self.btn[qclNoStr][0].setChecked(False)
             self.btn[qclNoStr][0].setText('QCL {:.0f} Off'.format(qclNo))
-            self.inputField[qclNoStrSetCurr][0].setStyleSheet(
-                defaults.STYLE_INPUT)
-            self.inputField[qclNoStrSetCurrPc][0].setStyleSheet(
-                defaults.STYLE_INPUT)
             self.inputField[qclNoStrSetWl][0].setStyleSheet(
                 defaults.STYLE_INPUT)
             self.labelInstr[qclNoStrCurr].setStyleSheet(
-                defaults.STYLE_LABEL_READ)
-            self.labelInstr[qclNoStrWl].setStyleSheet(defaults.STYLE_LABEL_READ)
+                defaults.STYLE_LABEL_READ_ALT)
+            self.labelInstr[qclNoStrWl].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
 
     def reference_enable(self):
         '''Enable use of reference'''
@@ -1163,7 +1155,7 @@ class multipleAcquisitionsWindow(QMainWindow):
         ### Actions
         exitAction = QAction(QIcon(None), 'Close Window', self)
         exitAction.setShortcut('Ctrl+W')
-        exitAction.setStatusTip('Close window')
+        exitAction.setStatusTip('Close multiple acquisitions window')
         exitAction.triggered.connect(lambda: self.close())
         ### Menus
         self.menubar = self.menuBar()

@@ -246,6 +246,10 @@ class laser():
                 pDwellTime.value,
                 pAfterOffTime.value])
 
+    def set_qcl_parameters(self, qcl, pulseRate_Hz, pulseWidth_ns, current_mA):
+        '''Set qcl module parameters.'''
+        pass
+
     def set_wl_trigger_parameters(self, start, end, interval, units = 'um'):
         '''Set the wavelength trigger parameters.'''
         pbPulseMode = MIRcatSDK_PULSE_MODE_INTERNAL
