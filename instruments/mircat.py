@@ -248,7 +248,14 @@ class laser():
 
     def set_qcl_parameters(self, qcl, pulseRate_Hz, pulseWidth_ns, current_mA):
         '''Set qcl module parameters.'''
-        pass
+        bQcl = c_uint8(qcl)
+        fPulseRateInHz = c_float(pulseRate_Hz)
+        fPulseWidthInNanoSec = c_float(pulseWidth_ns)
+        fCurrentInMilliAmps = c_float(current_mA)
+        SDK.MIRcatSDK_SetQCLParams(bQcl,
+                                   fPulseRateInHz,
+                                   fPulseWidthInNanoSec,
+                                   fCurrentInMilliAmps);
 
     def set_wl_trigger_parameters(self, start, end, interval, units = 'um'):
         '''Set the wavelength trigger parameters.'''

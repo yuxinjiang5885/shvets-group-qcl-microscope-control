@@ -175,13 +175,19 @@ class laserSettingWindow(QMainWindow):
             btnText = '  Set QCL {:.0f} Parameters  '.format(qcl)
             row = 2 * qcl - 1 # Every other row, starting at 1
             self.btn[btnName] = [QPushButton(btnText), row, 9, 2, 1]
-        for x, k in self.btn.items(): # Arrange buttons in grid
+        for x, (_, k) in enumerate(self.btn.items()): # Arrange buttons in grid
             k[0].setCheckable(True)
             k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
             k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+            # k[0].clicked.connect(lambda: self.set_qcl_parameters(x+1))
+        ### Connect buttons.
+        self.btn['QCL1SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(1))
+        self.btn['QCL2SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(2))
+        self.btn['QCL3SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(3))
+        self.btn['QCL4SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(4))
         ### Input fields: pulse rate and width, duty cycle, current (mA and %)
         self.inputField = dict() # to collect all input fields
         paramStrings = ['SetPulseRate', 'SetPulseWidth', 'SetCurrent', 'SetCurrPc']
@@ -213,6 +219,11 @@ class laserSettingWindow(QMainWindow):
         for row in range(0, 9): # Set row spacing
             self.grid.setRowStretch(row, 1)
         self.update_readings()
+
+    def set_qcl_parameters(self, qcl):
+        '''Read parameters for qcl module "qcl" from UI and set.'''
+        print(qcl)
+        # self.laser.set_qcl_parameters(qcl, pulseRate_Hz, pulseWidth_ns, current_mA)
 
     def update_readings(self):
         '''Update QCL modules parameter readings.'''
@@ -814,7 +825,7 @@ class mainWindow(QMainWindow):
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
         self.lock_controls(lock=True)
-        for qclNo in range(1, 5): # Set styles to highlight active QCL
+        for qclNo in range(1, defaults.NUMBER_OF_QCLS + 1): # Set styles to highlight active QCL
             if qclNo == qclSelectNo:
                 # Check button and highlight controls
                 self.qcl_style(qclNo, True)
