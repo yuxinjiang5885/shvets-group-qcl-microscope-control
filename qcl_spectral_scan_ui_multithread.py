@@ -86,6 +86,7 @@ class laserSettingWindow(QMainWindow):
 
     def __init__(self, mainGUI):
         super().__init__(None, Qt.WindowStaysOnTopHint)
+        self.paramNames = ['PulseRate', 'PulseWidth', 'Current', 'CurrentPercent']
         self.laser = mainGUI.laser
         self.make_gui()
 
@@ -122,9 +123,9 @@ class laserSettingWindow(QMainWindow):
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
         self.center_window()
         ### Actions
-        updateAction = QAction(QIcon(None), 'Update Readings', self)
-        updateAction.setShortcut('Ctrl+U')
-        updateAction.setStatusTip('Update QCL parameter readings')
+        updateAction = QAction(QIcon(None), 'Refresh Readings', self)
+        updateAction.setShortcut('Ctrl+R')
+        updateAction.setStatusTip('Refresh QCL parameter readings')
         updateAction.triggered.connect(lambda: self.update_readings())
         exitAction = QAction(QIcon(None), 'Close Window', self)
         exitAction.setShortcut('Ctrl+W')
@@ -190,13 +191,12 @@ class laserSettingWindow(QMainWindow):
         self.btn['QCL4SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(4))
         ### Input fields: pulse rate and width, duty cycle, current (mA and %)
         self.inputField = dict() # to collect all input fields
-        paramStrings = ['SetPulseRate', 'SetPulseWidth', 'SetCurrent', 'SetCurrPc']
-        for param in range(0, len(paramStrings)):
+        for param in range(0, len(self.paramNames)):
             for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
                 col = param * 2 + 1 # every other column, starting at 1.
                 row = 2 * qcl - 1 # every other row, starting at 1.
-                fieldName = 'QCL{}{}'.format(qcl, paramStrings[param])
-                itemNo = param * defaults.NUMBER_OF_QCLS + qcl - 1
+                fieldName = 'QCL{}Set{}'.format(qcl, self.paramNames[param])
+                # itemNo = param * defaults.NUMBER_OF_QCLS + qcl - 1
                 # fieldText = '{:.0f}'.format(startupText[itemNo])
                 self.inputField[fieldName] = [QLineEdit(''), row, col, 1, 1]
         for _, k in self.inputField.items(): # Arrange in grid
@@ -205,8 +205,7 @@ class laserSettingWindow(QMainWindow):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Labels for QCL parameter readings
         self.readingLabels = dict()
-        paramNames = ['PulseRate', 'PulseWidth', 'Current', 'CurrentPercent']
-        for x, param in enumerate(paramNames):
+        for x, param in enumerate(self.paramNames):
             for qcl in range(1, defaults.NUMBER_OF_QCLS + 1):
                 row = 2 * qcl # Every other row, starting at 2.
                 col = 2 * x + 1 # Every other column, starting at 1.
@@ -222,12 +221,30 @@ class laserSettingWindow(QMainWindow):
 
     def set_qcl_parameters(self, qcl):
         '''Read parameters for qcl module "qcl" from UI and set.'''
-        print(qcl)
-        # self.laser.set_qcl_parameters(qcl, pulseRate_Hz, pulseWidth_ns, current_mA)
+        print('Updating parameters for QCL module {:.0f}.'.format(qcl))
+        btnName = 'QCL{:.0f}SetParameters'.format(qcl)
+        btnText = '  Setting ...  '.format(qcl)
+        self.btn[btnName][0].setText(btnText)
+        ### Read currently set parameters
+        initialPulseRate_Hz = self.laser.get_pulse_rate(qcl) # Hz
+        initialPulseWidth_ns = self.laser.get_pulse_width(qcl) # ns
+        initialCurrent_mA = self.laser.get_current(qcl) # mA
+        ### Read desired inputs
+        fieldName = 'QCL{}SetPulseRate'.format(qcl)
+        pulseRate_Hz = float(self.inputField[fieldName][0].text())
+        fieldName = 'QCL{}SetPulseWidth'.format(qcl)
+        pulseWidth_ns = float(self.inputField[fieldName][0].text())
+        fieldName = 'QCL{}SetCurrent'.format(qcl)
+        current_mA = float(self.inputField[fieldName][0].text())
+        # fieldName = 'QCL{}SetCurrPc'.format(qcl)
+        self.laser.set_qcl_parameters(qcl, pulseRate_Hz, pulseWidth_ns, initialCurrent_mA)
+        btnText = '  Set QCL {:.0f} Parameters  '.format(qcl)
+        self.btn[btnName][0].setChecked(False)
+        self.btn[btnName][0].setText(btnText)
+
 
     def update_readings(self):
         '''Update QCL modules parameter readings.'''
-        paramNames = ['PulseRate', 'PulseWidth', 'Current', 'CurrentPercent']
         paramText = ['Hz', 'ns', 'mA', '%']
         currentMax = [defaults.MAX_CURR_QCL1_MILLIAMP,
                       defaults.MAX_CURR_QCL2_MILLIAMP,
@@ -240,12 +257,14 @@ class laserSettingWindow(QMainWindow):
             currentPercent = current / currentMax[qcl - 1] * 100
             dutyCycle = pulseRate * pulseWidth * 1E-9
             paramReadings = [pulseRate, pulseWidth, current, currentPercent]
-            for x, param in enumerate(paramNames):
-                row = 2 * qcl # Every other row, starting at 2.
-                col = 2 * x + 1 # Every other column, starting at 1.
+            for x, param in enumerate(self.paramNames):
+                ### Update reading labels
                 labelName = 'QCL{}{}'.format(qcl, param)
                 labelText = '{:.0f} {}'.format(paramReadings[x], paramText[x])
                 self.readingLabels[labelName][0].setText(labelText)
+                ### Update input fields
+                fieldName = 'QCL{}Set{}'.format(qcl, self.paramNames[x])
+                self.inputField[fieldName][0].setText('{:.0f}'.format(paramReadings[x]))
 
 
 class laserStartupDialog(QDialog):
