@@ -237,11 +237,11 @@ class laserSettingWindow(QMainWindow):
         fieldName = 'QCL{}SetCurrent'.format(qcl)
         current_mA = float(self.inputField[fieldName][0].text())
         # fieldName = 'QCL{}SetCurrPc'.format(qcl)
-        self.laser.set_qcl_parameters(qcl, pulseRate_Hz, pulseWidth_ns, initialCurrent_mA)
+        self.laser.set_qcl_parameters(qcl, pulseRate_Hz, pulseWidth_ns, current_mA)
         btnText = '  Set QCL {:.0f} Parameters  '.format(qcl)
         self.btn[btnName][0].setChecked(False)
         self.btn[btnName][0].setText(btnText)
-
+        self.update_readings()
 
     def update_readings(self):
         '''Update QCL modules parameter readings.'''
@@ -1039,8 +1039,8 @@ class mainWindow(QMainWindow):
         qclPulseWidth = self.laser.get_pulse_width(qcl)
         tecTemp = self.laser.get_temperature(qcl)
         labelString = 'QCL{:d}Current'.format(qcl)
-        labelText = '{:.2f}°C | {:d} mA | {:.0f} ns @ {:.0f} Hz'.format(tecTemp,
-                                        qclCurrent, qclPulseWidth, qclPulseRate)
+        labelText = '{:.2f}°C | {:.0f} mA | {:.0f} ns @ {:.0f} Hz'.format(
+                               tecTemp, qclCurrent, qclPulseWidth, qclPulseRate)
         self.labelInstr[labelString].setText(labelText)
         qclWl = self.laser.get_wavelength()
         if self.wlUnits=='um':

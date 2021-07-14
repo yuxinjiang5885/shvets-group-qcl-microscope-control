@@ -46,19 +46,20 @@ class laser():
 
     def __init__(self):
         '''Initialize laser.'''
-        # Get API info and connect
+        ### Get API info and connect
         self.get_api_info(silent=False)
         self.connect()
-        # Get number of installed QCL modules
-        self.numQcls = c_uint8(0)
-        self.get_qcl_no(silent=False)
-        # Check interlock status
+        ### Get number of installed QCL modules
+        self.numQCL = self.get_qcl_no(silent=False)
+        ### Check interlock status
         self.isInterlockSet = c_bool(False)
         self.check_interlock()
-        # Check key switch position
+        ### Check key switch position
         self.isKeySwitchSet = c_bool(False)
         self.check_key_switch()
-        # Other class variables
+        ### Get current maxima
+        self.currMax = self.get_current_maxima(silent=False)
+        ### Other class variables
         self.isArmed = c_bool(False)
         self.isEmitting = c_bool(False)
         self.isTuned = c_bool(False)
@@ -78,7 +79,7 @@ class laser():
         '''Arm laser and wait for temperatures to stabilize.'''
         '''To be removed. Use arm() then stabilize() instead.'''
         print('Arming ...')
-        ArmAndWaitForTemp(SDK, self.numQcls)
+        ArmAndWaitForTemp(SDK, self.numQCL)
         print('Laser armed.')
         self.isArmed = c_bool(True)
 
@@ -183,11 +184,28 @@ class laser():
             print('MIRcatSDK API: failed to get info ({}).'.format(ret))
             self.exit_program()
 
-    def get_current(self, tec):
-        '''Return the current of TEC "tec" in mA.'''
-        tecCur = c_uint16(0)
-        SDK.MIRcatSDK_GetTecCurrent(c_uint8(tec), byref(tecCur))
-        return tecCur.value
+    def get_current(self, qcl):
+        '''Return the current of QCL module "qcl" in mA.'''
+        qclCur = c_float(0)
+        SDK.MIRcatSDK_GetQCLCurrent(c_uint8(qcl), byref(qclCur))
+        return qclCur.value
+
+    def get_current_maxima(self, silent=True):
+        '''Compile current maxima for all QCL modules'''
+        currMaxima = []
+        for x in range(0, self.numQCL):
+            qcl = x + 1
+            currMaxima.append(self.get_current_maximum_pulsed(qcl))
+            if not silent:
+                print('QCL module {:.0f} maximum current: {:.0f} mA'.format(
+                                                            qcl, currMaxima[x]))
+        return currMaxima
+
+    def get_current_maximum_pulsed(self, qcl):
+        '''Return maximum pulsed current for QCL module "qcl".'''
+        max_curr_mA = c_uint16(0)
+        SDK.MIRcatSDK_GetQCLMaxPulsedCurrent(c_uint8(qcl), byref(max_curr_mA))
+        return max_curr_mA.value
 
     def get_pulse_rate(self, qcl):
         '''Return the pulse rate of QCL "qcl" in Hz.'''
@@ -209,9 +227,11 @@ class laser():
 
     def get_qcl_no(self, silent=True):
         '''Get number of installed QCL modules.'''
-        SDK.MIRcatSDK_GetNumInstalledQcls(byref(self.numQcls))
+        numQCL = c_uint8(0)
+        SDK.MIRcatSDK_GetNumInstalledQcls(byref(numQCL))
         if not silent:
-            print('Installed QCL modules: {}.'.format(self.numQcls.value))
+            print('Installed QCL modules: {}.'.format(numQCL.value))
+        return numQCL.value
 
     def get_wavelength(self):
         '''Get actual wavelength from laser.'''
@@ -290,7 +310,7 @@ class laser():
         tecCur = c_uint16(0)
         qclTemp = c_float(0)
         while not atTemp.value:
-            for x in range(1, self.numQcls.value + 1):
+            for x in range(1, self.numQCL + 1):
                 SDK.MIRcatSDK_GetQCLTemperature(c_uint8(x), byref(qclTemp))
                 SDK.MIRcatSDK_GetTecCurrent(c_uint8(x), byref(tecCur))
                 print('QCL {}: {:.2f} °C, {} mA. '.format(x, qclTemp.value,
@@ -391,8 +411,8 @@ class laser():
            Does not check for wavelength validity.
            Refer to MIRcat SDK documentation for details of the variables'''
         # Check QCL validity
-        if qcl < 1 or qcl > self.numQcls.value:
-            print('QCL {} invalid (choose 1--{}).'.format(qcl, self.numQcls))
+        if qcl < 1 or qcl > self.numQCL:
+            print('QCL {} invalid (choose 1--{}).'.format(qcl, self.numQCL))
             return
         # Set wavelength unit
         if wlUnits in ['um']:
