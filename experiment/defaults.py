@@ -56,6 +56,10 @@ DEFAULT_COLORMAP = plt.cm.Spectral # Default colormap
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
 DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
 
+### MIRcat default pulse parameters
+MIN_PULSERATE_HZ = 100
+MIN_PULSEWIDTH_NS = 20
+
 ### MIRcat default wavelength parameters
 ### Limits changed to have maximum power in overlap regions
 MIN_WL_QCL1_UM = 5.12 # um

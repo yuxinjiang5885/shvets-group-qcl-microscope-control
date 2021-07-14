@@ -254,6 +254,10 @@ class laserSettingWindow(QMainWindow):
         if current_mA == initialCurrent_mA and current_pc != initialCurrent_pc:
             current_mA = maximumCurrent / 100 * current_pc
         ### Sanitize inputs
+        if pulseRate_Hz < defaults.MIN_PULSERATE_HZ:
+            pulseRate_Hz = defaults.MIN_PULSERATE_HZ
+        if pulseWidth_ns < defaults.MIN_PULSEWIDTH_NS:
+            pulseWidth_ns = defaults.MIN_PULSEWIDTH_NS
         if current_mA < 0:
             current_mA = 0
         if current_mA > maximumCurrent:
