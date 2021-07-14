@@ -222,22 +222,45 @@ class laserSettingWindow(QMainWindow):
     def set_qcl_parameters(self, qcl):
         '''Read parameters for qcl module "qcl" from UI and set.'''
         print('Updating parameters for QCL module {:.0f}.'.format(qcl))
+        ### Set button text
         btnName = 'QCL{:.0f}SetParameters'.format(qcl)
         btnText = '  Setting ...  '.format(qcl)
         self.btn[btnName][0].setText(btnText)
-        ### Read currently set parameters
+        ### Read maximum current for selected QCL module
+        maximumCurrent = self.laser.get_current_maximum_pulsed(qcl)
+        ### Read QCL module parameters, as currently set
         initialPulseRate_Hz = self.laser.get_pulse_rate(qcl) # Hz
         initialPulseWidth_ns = self.laser.get_pulse_width(qcl) # ns
         initialCurrent_mA = self.laser.get_current(qcl) # mA
+        initialCurrent_pc = maximumCurrent / 100 * initialCurrent_mA
         ### Read desired inputs
-        fieldName = 'QCL{}SetPulseRate'.format(qcl)
-        pulseRate_Hz = float(self.inputField[fieldName][0].text())
-        fieldName = 'QCL{}SetPulseWidth'.format(qcl)
-        pulseWidth_ns = float(self.inputField[fieldName][0].text())
-        fieldName = 'QCL{}SetCurrent'.format(qcl)
-        current_mA = float(self.inputField[fieldName][0].text())
-        # fieldName = 'QCL{}SetCurrPc'.format(qcl)
+        try:
+            fieldName = 'QCL{}SetPulseRate'.format(qcl)
+            pulseRate_Hz = float(self.inputField[fieldName][0].text())
+            fieldName = 'QCL{}SetPulseWidth'.format(qcl)
+            pulseWidth_ns = float(self.inputField[fieldName][0].text())
+            fieldName = 'QCL{}SetCurrent'.format(qcl)
+            current_mA = float(self.inputField[fieldName][0].text())
+            fieldName = 'QCL{}SetCurrentPercent'.format(qcl)
+            current_pc = float(self.inputField[fieldName][0].text())
+        except Exception as exc:
+            print('Could not read input parameters:\n{}'.format(exc))
+            btnText = '  Set QCL {:.0f} Parameters  '.format(qcl)
+            self.btn[btnName][0].setChecked(False)
+            self.btn[btnName][0].setText(btnText)
+            self.update_readings()
+            return
+        ### If percentage setting has been changed, use it to set current
+        if current_mA == initialCurrent_mA and current_pc != initialCurrent_pc:
+            current_mA = maximumCurrent / 100 * current_pc
+        ### Sanitize inputs
+        if current_mA < 0:
+            current_mA = 0
+        if current_mA > maximumCurrent:
+            current_mA = maximumCurrent
+        ### Set parameters
         self.laser.set_qcl_parameters(qcl, pulseRate_Hz, pulseWidth_ns, current_mA)
+        ### Reset button text and update readings
         btnText = '  Set QCL {:.0f} Parameters  '.format(qcl)
         self.btn[btnName][0].setChecked(False)
         self.btn[btnName][0].setText(btnText)
@@ -250,7 +273,8 @@ class laserSettingWindow(QMainWindow):
             pulseRate = self.laser.get_pulse_rate(qcl) # Hz
             pulseWidth = self.laser.get_pulse_width(qcl) # ns
             current = self.laser.get_current(qcl) # mA
-            currentPercent = current / self.laser.currMax[qcl - 1] * 100
+            maximumCurrent = self.laser.get_current_maximum_pulsed(qcl)
+            currentPercent = current / maximumCurrent * 100
             dutyCycle = pulseRate * pulseWidth * 1E-9
             paramReadings = [pulseRate, pulseWidth, current, currentPercent]
             for x, param in enumerate(self.paramNames):

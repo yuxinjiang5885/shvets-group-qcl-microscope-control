@@ -58,7 +58,7 @@ class laser():
         self.isKeySwitchSet = c_bool(False)
         self.check_key_switch()
         ### Get current maxima
-        self.currMax = self.get_current_maxima(silent=False)
+        self.currentMaxima = self.get_current_maxima(silent=False)
         ### Other class variables
         self.isArmed = c_bool(False)
         self.isEmitting = c_bool(False)
