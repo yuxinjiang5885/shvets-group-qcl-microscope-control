@@ -1057,10 +1057,10 @@ class mainWindow(QMainWindow):
             if not qcl:
                 outWl = convertedWl_invcm
             else:
-                if convertedWl_invcm > defaults.WL_MINIMUMS_INVCM[qcl-1]:
-                    outWl = defaults.WL_MINIMUMS_INVCM[qcl-1]
-                elif convertedWl_invcm < defaults.WL_MAXIMUMS_INVCM[qcl-1]:
-                    outWl = defaults.WL_MAXIMUMS_INVCM[qcl-1]
+                if convertedWl_invcm > defaults.WN_MINIMUMS_INVCM[qcl-1]:
+                    outWl = defaults.WN_MINIMUMS_INVCM[qcl-1]
+                elif convertedWl_invcm < defaults.WN_MAXIMUMS_INVCM[qcl-1]:
+                    outWl = defaults.WN_MAXIMUMS_INVCM[qcl-1]
                 else:
                     outWl = convertedWl_invcm
         # Convert cm^-1 to um

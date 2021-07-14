@@ -102,7 +102,7 @@ MAX_WN_QCL4_INVCM = 885.0 # cm^-1
 # DEF_PULSEWIDTH_NS = 500 # ns
 
 ### QCL wavelength/qavenumber ranges
-WL_MAXIMUMS_INVCM = [MAX_WN_QCL1_INVCM,
+WN_MAXIMUMS_INVCM = [MAX_WN_QCL1_INVCM,
                      MAX_WN_QCL2_INVCM,
                      MAX_WN_QCL3_INVCM,
                      MAX_WN_QCL4_INVCM]
@@ -110,7 +110,7 @@ WL_MAXIMUMS_UM = [MAX_WL_QCL1_UM,
                   MAX_WL_QCL2_UM,
                   MAX_WL_QCL3_UM,
                   MAX_WL_QCL4_UM]
-WL_MINIMUMS_INVCM = [MIN_WN_QCL1_INVCM,
+WN_MINIMUMS_INVCM = [MIN_WN_QCL1_INVCM,
                      MIN_WN_QCL2_INVCM,
                      MIN_WN_QCL3_INVCM,
                      MIN_WN_QCL4_INVCM]
