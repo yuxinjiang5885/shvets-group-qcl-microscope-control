@@ -228,6 +228,7 @@ class laserSettingWindow(QMainWindow):
         self.btn[btnName][0].setText(btnText)
         ### Read maximum current for selected QCL module
         maximumCurrent = self.laser.get_current_maximum_pulsed(qcl)
+        [pulseRateMax_Hz, pulseWidthMax_ns, dutyCycleMax] = self.laser.get_pulse_limits(qcl)
         ### Read QCL module parameters, as currently set
         initialPulseRate_Hz = self.laser.get_pulse_rate(qcl) # Hz
         initialPulseWidth_ns = self.laser.get_pulse_width(qcl) # ns
@@ -256,12 +257,21 @@ class laserSettingWindow(QMainWindow):
         ### Sanitize inputs
         if pulseRate_Hz < defaults.MIN_PULSERATE_HZ:
             pulseRate_Hz = defaults.MIN_PULSERATE_HZ
+        if pulseRate_Hz > pulseRateMax_Hz:
+            pulseRate_Hz = pulseRateMax_Hz
         if pulseWidth_ns < defaults.MIN_PULSEWIDTH_NS:
             pulseWidth_ns = defaults.MIN_PULSEWIDTH_NS
+        if pulseWidth_ns > pulseWidthMax_ns:
+            pulseWidth_ns = pulseWidthMax_ns
         if current_mA < 0:
             current_mA = 0
         if current_mA > maximumCurrent:
             current_mA = maximumCurrent
+        ### Reduce pulse rate if duty cycle is too high
+        dutyCycle = pulseRate_Hz * pulseWidth_ns * 1e-9 * 100
+        if dutyCycle > dutyCycleMax:
+            pulseRate_Hz = dutyCycleMax / (pulseWidth_ns * 1e-9 * 100)
+            print('Requested duty cycle is too high, pulse rate has been reduced.')
         ### Set parameters
         self.laser.set_qcl_parameters(qcl, pulseRate_Hz, pulseWidth_ns, current_mA)
         ### Reset button text and update readings

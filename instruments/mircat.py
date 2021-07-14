@@ -57,8 +57,8 @@ class laser():
         ### Check key switch position
         self.isKeySwitchSet = c_bool(False)
         self.check_key_switch()
-        ### Get current maxima
-        self.currentMaxima = self.get_current_maxima(silent=False)
+        ### Get current maximums
+        self.currentMaxima = self.get_current_maximums(silent=False)
         ### Other class variables
         self.isArmed = c_bool(False)
         self.isEmitting = c_bool(False)
@@ -190,8 +190,8 @@ class laser():
         SDK.MIRcatSDK_GetQCLCurrent(c_uint8(qcl), byref(qclCur))
         return qclCur.value
 
-    def get_current_maxima(self, silent=True):
-        '''Compile current maxima for all QCL modules'''
+    def get_current_maximums(self, silent=True):
+        '''Compile current maximums for all QCL modules'''
         currMaxima = []
         for x in range(0, self.numQCL):
             qcl = x + 1
@@ -206,6 +206,17 @@ class laser():
         max_curr_mA = c_uint16(0)
         SDK.MIRcatSDK_GetQCLMaxPulsedCurrent(c_uint8(qcl), byref(max_curr_mA))
         return max_curr_mA.value
+
+    def get_pulse_limits(self, qcl):
+        '''Get pulse rate, pulse width and duty cycle maximums.'''
+        pulseRateMax_Hz = c_float(0)
+        pulseWidthMax_ns = c_float(0)
+        dutyCycleMax = c_float(0)
+        SDK.MIRcatSDK_GetQCLPulseLimits(c_uint8(qcl),
+                                        byref(pulseRateMax_Hz),
+                                        byref(pulseWidthMax_ns),
+                                        byref(dutyCycleMax))
+        return [pulseRateMax_Hz.value, pulseWidthMax_ns.value, dutyCycleMax.value]
 
     def get_pulse_rate(self, qcl):
         '''Return the pulse rate of QCL "qcl" in Hz.'''
