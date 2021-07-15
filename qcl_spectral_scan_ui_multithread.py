@@ -188,8 +188,10 @@ class laserSettingWindow(QMainWindow):
             k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+            ### Connecting here will connect all to the last QCL.
             # k[0].clicked.connect(lambda: self.set_qcl_parameters(x+1))
         ### Connect buttons.
+        ### Connecting one-by-one as workaround
         self.btn['QCL1SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(1))
         self.btn['QCL2SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(2))
         self.btn['QCL3SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(3))
@@ -224,7 +226,20 @@ class laserSettingWindow(QMainWindow):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         for row in range(0, 9): # Set row spacing
             self.grid.setRowStretch(row, 1)
+        ### Populate UI with updated readings
         self.update_readings()
+        ### Connect pulse rate/width inputs
+        ### Update duty cycle when pulse rate/width inputs are changed
+        ### Connecting one-by-one as workaround
+        ### This is placed last to avoid triggering it while readings are blank
+        self.inputField['QCL1SetPulseRate'][0].textChanged.connect(lambda:self.update_duty_cycle(1))
+        self.inputField['QCL2SetPulseRate'][0].textChanged.connect(lambda:self.update_duty_cycle(2))
+        self.inputField['QCL3SetPulseRate'][0].textChanged.connect(lambda:self.update_duty_cycle(3))
+        self.inputField['QCL4SetPulseRate'][0].textChanged.connect(lambda:self.update_duty_cycle(4))
+        self.inputField['QCL1SetPulseWidth'][0].textChanged.connect(lambda:self.update_duty_cycle(1))
+        self.inputField['QCL2SetPulseWidth'][0].textChanged.connect(lambda:self.update_duty_cycle(2))
+        self.inputField['QCL3SetPulseWidth'][0].textChanged.connect(lambda:self.update_duty_cycle(3))
+        self.inputField['QCL4SetPulseWidth'][0].textChanged.connect(lambda:self.update_duty_cycle(4))
 
     def set_qcl_parameters(self, qcl):
         '''Read parameters for qcl module "qcl" from UI and set.'''
@@ -286,6 +301,20 @@ class laserSettingWindow(QMainWindow):
         self.btn[btnName][0].setChecked(False)
         self.btn[btnName][0].setText(btnText)
         self.update_readings()
+
+    def update_duty_cycle(self, qcl):
+        '''Update duty cycle when pulse rate/width are changed.'''
+        try:
+            fieldName = 'QCL{}SetPulseRate'.format(qcl)
+            pulseRate_Hz = float(self.inputField[fieldName][0].text())
+            fieldName = 'QCL{}SetPulseWidth'.format(qcl)
+            pulseWidth_ns = float(self.inputField[fieldName][0].text())
+            dutyCycle = pulseRate_Hz * pulseWidth_ns * 1e-9 * 100
+            fieldName = 'QCL{}SetDutyCycle'.format(qcl)
+            self.inputField[fieldName][0].setText('{:.0f}'.format(dutyCycle))
+        except Exception as exc:
+            print('Could not calculate duty cycle:\n{}'.format(exc))
+            return
 
     def update_readings(self):
         '''Update QCL modules parameter readings.'''
