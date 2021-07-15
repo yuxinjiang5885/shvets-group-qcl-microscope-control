@@ -86,7 +86,11 @@ class laserSettingWindow(QMainWindow):
 
     def __init__(self, mainGUI):
         super().__init__(None, Qt.WindowStaysOnTopHint)
-        self.paramNames = ['PulseRate', 'PulseWidth', 'Current', 'CurrentPercent']
+        self.paramNames = ['PulseRate',
+                           'PulseWidth',
+                           'DutyCycle',
+                           'Current',
+                           'CurrentPercent']
         self.laser = mainGUI.laser
         self.make_gui()
 
@@ -114,7 +118,7 @@ class laserSettingWindow(QMainWindow):
 
     def make_gui(self):
         '''Draw controls'''
-        self.setGeometry(0, 0, 1000, 400)
+        self.setGeometry(0, 0, 1100, 400)
         font = QFont()
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE)
@@ -152,16 +156,17 @@ class laserSettingWindow(QMainWindow):
             row = 2 * qcl - 1 # Every other row, starting at 1
             self.labels[labelName] = [QLabel(labelText), row, 0, 2, 1]
         ### Labels: header
-        self.labels['QCL'] = [QLabel('QCL'), 0, 0, 1, 1]
+        self.labels['QCL    '] = [QLabel('QCL'), 0, 0, 1, 1]
         self.labels['PulseRate'] = [QLabel('Pulse Rate'), 0, 1, 1, 2]
         self.labels['PulseWidth'] = [QLabel('Pulse Width'), 0, 3, 1, 2]
-        self.labels['Current'] = [QLabel('Current'), 0, 5, 1, 4]
+        self.labels['DutyCycle'] = [QLabel('Duty Cycle'), 0, 5, 1, 2]
+        self.labels['Current'] = [QLabel('Current'), 0, 7, 1, 4]
         for _, k in self.labels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: units
-        unitLabelStrings = ['Hz    ', 'ns    ', 'mA    ', '%    ']
+        unitLabelStrings = ['Hz    ', 'ns    ', '%    ', 'mA    ', '%    ']
         for x, labelText in enumerate(unitLabelStrings):
             col = x * 2 + 2 # Every other column, starting at 2
             for row in range(1, 8, 2): # Every other row
@@ -175,7 +180,7 @@ class laserSettingWindow(QMainWindow):
             btnName = 'QCL{:.0f}SetParameters'.format(qcl)
             btnText = '  Set QCL {:.0f} Parameters  '.format(qcl)
             row = 2 * qcl - 1 # Every other row, starting at 1
-            self.btn[btnName] = [QPushButton(btnText), row, 9, 2, 1]
+            self.btn[btnName] = [QPushButton(btnText), row, 11, 2, 1]
         for x, (_, k) in enumerate(self.btn.items()): # Arrange buttons in grid
             k[0].setCheckable(True)
             k[0].setFocusPolicy(Qt.NoFocus)
@@ -191,24 +196,26 @@ class laserSettingWindow(QMainWindow):
         self.btn['QCL4SetParameters'][0].clicked.connect(lambda: self.set_qcl_parameters(4))
         ### Input fields: pulse rate and width, duty cycle, current (mA and %)
         self.inputField = dict() # to collect all input fields
-        for param in range(0, len(self.paramNames)):
+        for x, param in enumerate(self.paramNames):
+            col = x * 2 + 1 # every other column, starting at 1.
             for qcl in range(1, self.laser.numQCL + 1):
-                col = param * 2 + 1 # every other column, starting at 1.
                 row = 2 * qcl - 1 # every other row, starting at 1.
-                fieldName = 'QCL{}Set{}'.format(qcl, self.paramNames[param])
-                # itemNo = param * self.laser.numQCL + qcl - 1
-                # fieldText = '{:.0f}'.format(startupText[itemNo])
+                fieldName = 'QCL{}Set{}'.format(qcl, param)
                 self.inputField[fieldName] = [QLineEdit(''), row, col, 1, 1]
-        for _, k in self.inputField.items(): # Arrange in grid
+        for n, k in self.inputField.items(): # Arrange in grid
             k[0].setFont(font)
-            k[0].setStyleSheet(defaults.STYLE_INPUT)
+            if 'DutyCycle' in n: # It is a duty cycle control
+                k[0].setStyleSheet(defaults.STYLE_INPUT_LOCKED)
+                k[0].setReadOnly(True)
+            else:
+                k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Labels for QCL parameter readings
         self.readingLabels = dict()
         for x, param in enumerate(self.paramNames):
+            col = x * 2 + 1 # every other column, starting at 1.
             for qcl in range(1, self.laser.numQCL + 1):
                 row = 2 * qcl # Every other row, starting at 2.
-                col = 2 * x + 1 # Every other column, starting at 1.
                 labelName = 'QCL{}{}'.format(qcl, param)
                 self.readingLabels[labelName] = [QLabel(''), row, col, 1, 2]
         for _, k in self.readingLabels.items(): # Arrange labels in grid
@@ -282,15 +289,15 @@ class laserSettingWindow(QMainWindow):
 
     def update_readings(self):
         '''Update QCL modules parameter readings.'''
-        paramText = ['Hz', 'ns', 'mA', '%']
+        paramText = ['Hz', 'ns', '%', 'mA', '%']
         for qcl in range(1, self.laser.numQCL + 1):
             pulseRate = self.laser.get_pulse_rate(qcl) # Hz
             pulseWidth = self.laser.get_pulse_width(qcl) # ns
             current = self.laser.get_current(qcl) # mA
             maximumCurrent = self.laser.get_current_maximum_pulsed(qcl)
             currentPercent = current / maximumCurrent * 100
-            dutyCycle = pulseRate * pulseWidth * 1E-9
-            paramReadings = [pulseRate, pulseWidth, current, currentPercent]
+            dutyCycle = pulseRate * pulseWidth * 1E-9 * 100
+            paramReadings = [pulseRate, pulseWidth, dutyCycle, current, currentPercent]
             for x, param in enumerate(self.paramNames):
                 ### Update reading labels
                 labelName = 'QCL{}{}'.format(qcl, param)

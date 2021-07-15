@@ -32,6 +32,7 @@ GS_COLORS = {'background': '#1f1f1f',
              'text': '#b9b9b9',
              'text-alt': '#141414',
              'text-lo': '#989898',
+             'text-lo-alt': '#505050',
              'text-hi': '#cf8730',
              'warning': '#d75a3e'}
 SOLARIZED = {'base03' : '#002b36',
@@ -57,6 +58,7 @@ DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
 DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
 
 ### MIRcat default pulse parameters
+### These cannot be queried from the laser
 MIN_PULSERATE_HZ = 100
 MIN_PULSEWIDTH_NS = 20
 
@@ -238,6 +240,13 @@ STYLE_INPUT = '''QLineEdit {{
         border-radius: 5px;
         qproperty-alignment: AlignCenter;
     }}'''.format(GS_COLORS['text-lo'],
+                 GS_COLORS['border'])
+STYLE_INPUT_LOCKED = '''QLineEdit {{
+        color: {};
+        border: 2px solid {};
+        border-radius: 5px;
+        qproperty-alignment: AlignCenter;
+    }}'''.format(GS_COLORS['text-lo-alt'],
                  GS_COLORS['border'])
 STYLE_INPUT_ALT = '''QLineEdit {{
         background-color: {};
