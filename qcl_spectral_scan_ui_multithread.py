@@ -312,6 +312,10 @@ class laserSettingWindow(QMainWindow):
             dutyCycle = pulseRate_Hz * pulseWidth_ns * 1e-9 * 100
             fieldName = 'QCL{}SetDutyCycle'.format(qcl)
             self.inputField[fieldName][0].setText('{:.0f}'.format(dutyCycle))
+            if dutyCycle > 20:
+                self.inputField[fieldName][0].setStyleSheet(defaults.STYLE_INPUT_LOCKED_WARN)
+            else:
+                self.inputField[fieldName][0].setStyleSheet(defaults.STYLE_INPUT_LOCKED)
         except Exception as exc:
             print('Could not calculate duty cycle:\n{}'.format(exc))
             return

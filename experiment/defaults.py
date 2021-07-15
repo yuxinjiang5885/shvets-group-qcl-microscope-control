@@ -248,6 +248,13 @@ STYLE_INPUT_LOCKED = '''QLineEdit {{
         qproperty-alignment: AlignCenter;
     }}'''.format(GS_COLORS['text-lo-alt'],
                  GS_COLORS['border'])
+STYLE_INPUT_LOCKED_WARN = '''QLineEdit {{
+        color: {};
+        border: 2px solid {};
+        border-radius: 5px;
+        qproperty-alignment: AlignCenter;
+    }}'''.format(GS_COLORS['warning'],
+                 GS_COLORS['border'])
 STYLE_INPUT_ALT = '''QLineEdit {{
         background-color: {};
         color: {};
