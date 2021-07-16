@@ -7,6 +7,7 @@ Python 3.8.3 on Windows 10
 Created 2020-Oct-20
 '''
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
 # from matplotlib.figure import Figure
@@ -32,6 +33,24 @@ class mplCanvas(FigCanvas):
         plot = self.axes.plot(X, Y, color=color)
         self.plots.append(plot[0])
         self.figure.canvas.draw()
+
+    def recolor(self, axesColor = [0, 0, 0], backgroundColor = [1, 1, 1]):
+        '''Recolor axes and background'''
+        # with plt.rc_context({'axes.edgecolor':'orange', 'xtick.color':'red', 'ytick.color':'green', 'figure.facecolor':'white'}):
+        # mpl.rcParams['text.color'] = 'w'
+        # mpl.rcParams['xtick.color'] = 'w'
+        # mpl.rcParams['ytick.color'] = 'w'
+        # mpl.rcParams['axes.labelcolor'] = 'w'
+        self.axes.spines['bottom'].set_color(axesColor)
+        self.axes.spines['left'].set_color(axesColor)
+        self.axes.spines['right'].set_color(axesColor)
+        self.axes.spines['top'].set_color(axesColor)
+        self.axes.xaxis.label.set_color(axesColor)
+        self.axes.yaxis.label.set_color(axesColor)
+        self.axes.tick_params(axis='both', colors=axesColor)
+        self.axes.set_facecolor(backgroundColor)
+        self.figure.patch.set_facecolor(backgroundColor)
+        self.draw()
 
 
 # class plotCanvas(FigCanvas): # Widget for holding plots

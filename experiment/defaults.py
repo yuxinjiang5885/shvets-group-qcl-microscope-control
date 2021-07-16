@@ -15,10 +15,16 @@ PCI_CH_Y = b'Dev1/ai1'
 PCI_TRIG = b'/Dev1/PFI12'
 
 ### Color dictionaries
-newTab10 = {'blue' : '#4e79a7', 'orange' : '#f28e2b', 'red' : '#e15759',
-            'cyan' : '#76b7b2', 'green' : '#59a14e', 'yellow' : '#edc949',
-            'violet' : '#b07aa2', 'pink' : '#ff9da7', 'brown' : '#9c755f',
-            'gray' : '#bab0ac'} # New Tableau 10 palette
+NEW_TAB10 = {'blue' : '#4e79a7',
+             'orange' : '#f28e2b',
+             'red' : '#e15759',
+             'cyan' : '#76b7b2',
+             'green' : '#59a14e',
+             'yellow' : '#edc949',
+             'violet' : '#b07aa2',
+             'pink' : '#ff9da7',
+             'brown' : '#9c755f',
+             'gray' : '#bab0ac'} # New Tableau 10 palette
 GS_COLORS = {'background': '#1f1f1f',
              'bg-alt': '#e6e6e6',
              'bg-warn': '#d75a3e',
@@ -51,7 +57,15 @@ SOLARIZED = {'base03' : '#002b36',
              'blue': '#268bd2',
              'cyan': '#2aa198',
              'green': '#859900'}
-DEFAULT_COLORMAP = plt.cm.Spectral # Default colormap
+
+### Individual colors
+DARK_PLOT_AXES = GS_COLORS['text']
+DARK_PLOT_BACKGROUND = GS_COLORS['background']
+DEFAULT_PLOT_AXES = '#000000'
+DEFAULT_PLOT_BACKGROUND = '#FFFFFF'
+
+### Colormaps
+# DEFAULT_COLORMAP = plt.cm.Spectral
 
 ### Directories
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'

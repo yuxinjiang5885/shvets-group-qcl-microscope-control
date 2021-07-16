@@ -555,10 +555,15 @@ class mainWindow(QMainWindow):
         multipleAcqMenu.triggered.connect(lambda: self.multiple_acq_menu())
         ### "Options" menu
         optionsMenu = self.menubar.addMenu('Options')
-        self.repeatShowAction = QAction(QIcon(None),
+        self.repeatShow = QAction(QIcon(None),
                           'Plot data when using "Repeat"', self, checkable=True)
-        self.repeatShowAction.setStatusTip('Update plots when using "Repeat"')
-        optionsMenu.addAction(self.repeatShowAction)
+        self.repeatShow.setStatusTip('Update plots when using "Repeat"')
+        optionsMenu.addAction(self.repeatShow)
+        self.darkMode = QAction(QIcon(None), 'Dark mode', self, checkable=True)
+        self.darkMode.setShortcut('Ctrl+D')
+        self.darkMode.setStatusTip('Dark mode for plots')
+        optionsMenu.addAction(self.darkMode)
+        self.darkMode.triggered.connect(lambda: self.plot_dark_mode())
         ### "About" menu
         aboutAction = QAction(QIcon(None), 'About', self)
         aboutAction.setStatusTip('About')
@@ -914,6 +919,20 @@ class mainWindow(QMainWindow):
                 self.parameters.useRef = False
         except Exception as exc:
             print('Failed to plot data:\n{}'.format(exc))
+
+    def plot_dark_mode(self):
+        '''Use dark background in plots.'''
+        if self.darkMode.isChecked():
+            darkAxes = defaults.DARK_PLOT_AXES
+            darkBackground = defaults.DARK_PLOT_BACKGROUND
+            self.spectrumCanvas.recolor(darkAxes, darkBackground)
+            self.spectrumCanvasRef.recolor(darkAxes, darkBackground)
+            self.spectrumCanvasT.recolor(darkAxes, darkBackground)
+        else:
+            print('not checked')
+            self.spectrumCanvas.recolor()
+            self.spectrumCanvasRef.recolor()
+            self.spectrumCanvasT.recolor()
 
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
