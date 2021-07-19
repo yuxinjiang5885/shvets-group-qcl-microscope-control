@@ -58,7 +58,7 @@ class laser():
         self.isKeySwitchSet = c_bool(False)
         self.check_key_switch()
         ### Get current maximums
-        self.currentMaxima = self.get_current_maximums(silent=False)
+        # self.currentMaxima = self.get_current_maximums(silent=False)
         ### Other class variables
         self.isArmed = c_bool(False)
         self.isEmitting = c_bool(False)
@@ -190,16 +190,16 @@ class laser():
         SDK.MIRcatSDK_GetQCLCurrent(c_uint8(qcl), byref(qclCur))
         return qclCur.value
 
-    def get_current_maximums(self, silent=True):
-        '''Compile current maximums for all QCL modules'''
-        currMaxima = []
-        for x in range(0, self.numQCL):
-            qcl = x + 1
-            currMaxima.append(self.get_current_maximum_pulsed(qcl))
-            if not silent:
-                print('QCL module {:.0f} maximum current: {:.0f} mA'.format(
-                                                            qcl, currMaxima[x]))
-        return currMaxima
+    # def get_current_maximums(self, silent=True):
+    #     '''Compile current maximums for all QCL modules'''
+    #     currMaxima = []
+    #     for x in range(0, self.numQCL):
+    #         qcl = x + 1
+    #         currMaxima.append(self.get_current_maximum_pulsed(qcl))
+    #         if not silent:
+    #             print('QCL module {:.0f} maximum current: {:.0f} mA'.format(
+    #                                                         qcl, currMaxima[x]))
+    #     return currMaxima
 
     def get_current_maximum_pulsed(self, qcl):
         '''Return maximum pulsed current for QCL module "qcl".'''

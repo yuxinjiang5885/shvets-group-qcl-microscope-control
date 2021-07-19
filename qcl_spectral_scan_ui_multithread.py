@@ -24,7 +24,7 @@ from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
-from PyQt5.QtGui import QIcon, QFont, QWindow
+from PyQt5.QtGui import QIntValidator, QIcon, QFont, QWindow
 from PyQt5.QtWidgets import (QAction,
                              QApplication,
                              QDesktopWidget,
@@ -212,6 +212,25 @@ class laserSettingWindow(QMainWindow):
             else:
                 k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Input fields: set validators
+        for qcl in range(1, self.laser.numQCL + 1):
+            currentMax_mA = self.laser.get_current_maximum_pulsed(qcl)
+            [pulseRateMax_Hz, pulseWidthMax_ns, _] = self.laser.get_pulse_limits(qcl)
+            ### Pulse rate validator
+            fieldName = 'QCL{}SetPulseRate'.format(qcl, param)
+            validator = QIntValidator(bottom=0, top=int(pulseRateMax_Hz))
+            self.inputField[fieldName][0].setValidator(validator)
+            ### Pulse width validator
+            fieldName = 'QCL{}SetPulseWidth'.format(qcl, param)
+            validator = QIntValidator(bottom=0, top=int(pulseWidthMax_ns))
+            self.inputField[fieldName][0].setValidator(validator)
+            ### Current validators
+            fieldName = 'QCL{}SetCurrent'.format(qcl, param)
+            validator = QIntValidator(bottom=0, top=int(currentMax_mA))
+            self.inputField[fieldName][0].setValidator(validator)
+            fieldName = 'QCL{}SetCurrentPercent'.format(qcl, param)
+            validator = QIntValidator(bottom=0, top=100)
+            self.inputField[fieldName][0].setValidator(validator)
         ### Labels for QCL parameter readings
         self.readingLabels = dict()
         for x, param in enumerate(self.paramNames):
@@ -249,13 +268,13 @@ class laserSettingWindow(QMainWindow):
         btnText = '  Setting ...  '.format(qcl)
         self.btn[btnName][0].setText(btnText)
         ### Read maximum current for selected QCL module
-        maximumCurrent = self.laser.get_current_maximum_pulsed(qcl)
+        currentMax_mA = self.laser.get_current_maximum_pulsed(qcl)
         [pulseRateMax_Hz, pulseWidthMax_ns, dutyCycleMax] = self.laser.get_pulse_limits(qcl)
         ### Read QCL module parameters, as currently set
         initialPulseRate_Hz = self.laser.get_pulse_rate(qcl) # Hz
         initialPulseWidth_ns = self.laser.get_pulse_width(qcl) # ns
         initialCurrent_mA = self.laser.get_current(qcl) # mA
-        initialCurrent_pc = maximumCurrent / 100 * initialCurrent_mA
+        initialCurrent_pc = currentMax_mA / 100 * initialCurrent_mA
         ### Read desired inputs
         try:
             fieldName = 'QCL{}SetPulseRate'.format(qcl)
@@ -275,7 +294,7 @@ class laserSettingWindow(QMainWindow):
             return
         ### If percentage setting has been changed, use it to set current
         if current_mA == initialCurrent_mA and current_pc != initialCurrent_pc:
-            current_mA = maximumCurrent / 100 * current_pc
+            current_mA = currentMax_mA / 100 * current_pc
         ### Sanitize inputs
         if pulseRate_Hz < defaults.MIN_PULSERATE_HZ:
             pulseRate_Hz = defaults.MIN_PULSERATE_HZ
@@ -287,8 +306,8 @@ class laserSettingWindow(QMainWindow):
             pulseWidth_ns = pulseWidthMax_ns
         if current_mA < 0:
             current_mA = 0
-        if current_mA > maximumCurrent:
-            current_mA = maximumCurrent
+        if current_mA > currentMax_mA:
+            current_mA = currentMax_mA
         ### Reduce pulse rate if duty cycle is too high
         dutyCycle = pulseRate_Hz * pulseWidth_ns * 1e-9 * 100
         if dutyCycle > dutyCycleMax:
@@ -327,8 +346,8 @@ class laserSettingWindow(QMainWindow):
             pulseRate = self.laser.get_pulse_rate(qcl) # Hz
             pulseWidth = self.laser.get_pulse_width(qcl) # ns
             current = self.laser.get_current(qcl) # mA
-            maximumCurrent = self.laser.get_current_maximum_pulsed(qcl)
-            currentPercent = current / maximumCurrent * 100
+            currentMax_mA = self.laser.get_current_maximum_pulsed(qcl)
+            currentPercent = current / currentMax_mA * 100
             dutyCycle = pulseRate * pulseWidth * 1E-9 * 100
             paramReadings = [pulseRate, pulseWidth, dutyCycle, current, currentPercent]
             for x, param in enumerate(self.paramNames):
