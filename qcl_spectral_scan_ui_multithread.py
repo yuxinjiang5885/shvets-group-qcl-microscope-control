@@ -597,27 +597,27 @@ class mainWindow(QMainWindow):
             else:
                 self.grid.setColumnStretch(col, 20)
         ### Plot: latest spectrum
-        self.spectrumCanvas = mplCanvas(width=5, height=4)
-        self.spectrumCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
-        self.spectrumCanvas.axes.set_ylabel('Lock-in Mag. (V)')
-        self.spectrumCanvas.axes.set_title('Latest Spectrum')
-        self.grid.addWidget(self.spectrumCanvas, 0, 0, 1, 5)
+        self.plotCanvas = mplCanvas(width=5, height=4)
+        self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.plotCanvas.axes.set_xlabel('Wavelength (μm)')
+        self.plotCanvas.axes.set_ylabel('Lock-in Mag. (V)')
+        self.plotCanvas.axes.set_title('Latest Spectrum')
+        self.grid.addWidget(self.plotCanvas, 0, 0, 1, 5)
         ### Plot: current reference
-        self.spectrumCanvasRef = mplCanvas(width=5, height=4)
-        self.spectrumCanvasRef.setSizePolicy(QSizePolicy.Fixed,
+        self.plotCanvasRef = mplCanvas(width=5, height=4)
+        self.plotCanvasRef.setSizePolicy(QSizePolicy.Fixed,
                                                               QSizePolicy.Fixed)
-        self.spectrumCanvasRef.axes.set_xlabel('Wavelength (μm)')
-        self.spectrumCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
-        self.spectrumCanvasRef.axes.set_title('Current Reference')
-        self.grid.addWidget(self.spectrumCanvasRef, 0, 5, 1, 3)
+        self.plotCanvasRef.axes.set_xlabel('Wavelength (μm)')
+        self.plotCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
+        self.plotCanvasRef.axes.set_title('Current Reference')
+        self.grid.addWidget(self.plotCanvasRef, 0, 5, 1, 3)
         ### Plot: transmittance
-        self.spectrumCanvasT = mplCanvas(width=5, height=4)
-        self.spectrumCanvasT.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.spectrumCanvasT.axes.set_xlabel('Wavelength (μm)')
-        self.spectrumCanvasT.axes.set_ylabel('Transmittance')
-        self.spectrumCanvasT.axes.set_title('Transmittance (Latest/Reference)')
-        self.grid.addWidget(self.spectrumCanvasT, 0, 8, 1, 3)
+        self.plotCanvasT = mplCanvas(width=5, height=4)
+        self.plotCanvasT.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.plotCanvasT.axes.set_xlabel('Wavelength (μm)')
+        self.plotCanvasT.axes.set_ylabel('Transmittance')
+        self.plotCanvasT.axes.set_title('Transmittance (Latest/Reference)')
+        self.grid.addWidget(self.plotCanvasT, 0, 8, 1, 3)
         ### Buttons: select QCL, laser arm, tune, enable emission
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['QCL1'] = [QPushButton('QCL 1 Off'), 2, 0, 2, 1]
@@ -893,14 +893,19 @@ class mainWindow(QMainWindow):
         else:
             plotData = data
         ### Paint plots
-        self.spectrumCanvas.clear_plots()
-        self.spectrumCanvasT.clear_plots()
-        # self.spectrumCanvas.flush_events()
+        self.plotCanvas.clear_plots()
+        self.plotCanvasT.clear_plots()
+        # self.plotCanvas.flush_events()
         try:
-            self.spectrumCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-            # self.spectrumCanvas.axes.set_ylim(min(
+            self.plotCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+            # self.plotCanvas.axes.set_ylim(min(
             # plotData[:, 1]), max(plotData[-1, 0]))
-            self.spectrumCanvas.plot_line(plotData[:, 0], plotData[:, 3])
+            if self.darkMode.isChecked():
+                colorPick = defaults.PLOT_COLOR_DARK
+            else:
+                colorPick = defaults.PLOT_COLOR
+            self.plotCanvas.plot_line(plotData[:, 0], plotData[:, 3],
+                                           color = colorPick)
             if self.btn['RefEnable'][0].isChecked():
                 self.parameters.useRef = True
                 if self.wlUnits == 'invcm':
@@ -911,10 +916,15 @@ class mainWindow(QMainWindow):
                 else:
                     plotData = data
                     plotRef = self.parameters.reference
-                # self.spectrumCanvasT.flush_events()
-                self.spectrumCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-                self.spectrumCanvasT.plot_line(plotData[:, 0],
-                                                      plotData[:, 3]/plotRef[:, 3])
+                # self.plotCanvasT.flush_events()
+                self.plotCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+                if self.darkMode.isChecked():
+                    colorPick = defaults.PLOT_COLOR_T_DARK
+                else:
+                    colorPick = defaults.PLOT_COLOR_T
+                self.plotCanvasT.plot_line(plotData[:, 0],
+                                               plotData[:, 3]/plotRef[:, 3],
+                                               color = colorPick)
             else:
                 self.parameters.useRef = False
         except Exception as exc:
@@ -925,15 +935,17 @@ class mainWindow(QMainWindow):
         if self.darkMode.isChecked():
             darkAxes = defaults.DARK_PLOT_AXES
             darkBackground = defaults.DARK_PLOT_BACKGROUND
-            self.spectrumCanvas.recolor(darkAxes, darkBackground)
-            self.spectrumCanvasRef.recolor(darkAxes, darkBackground)
-            self.spectrumCanvasT.recolor(darkAxes, darkBackground)
+            self.plotCanvas.recolor(darkAxes, darkBackground,
+                                              defaults.PLOT_COLOR_DARK)
+            self.plotCanvasRef.recolor(darkAxes, darkBackground,
+                                             defaults.PLOT_COLOR_REF_DARK)
+            self.plotCanvasT.recolor(darkAxes, darkBackground,
+                                         defaults.PLOT_COLOR_T_DARK)
         else:
-            print('not checked')
-            self.spectrumCanvas.recolor()
-            self.spectrumCanvasRef.recolor()
-            self.spectrumCanvasT.recolor()
 
+            self.plotCanvas.recolor(plotColor = defaults.PLOT_COLOR)
+            self.plotCanvasRef.recolor(plotColor = defaults.PLOT_COLOR_REF)
+            self.plotCanvasT.recolor(plotColor = defaults.PLOT_COLOR_T)
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
         self.lock_controls(lock=True)
@@ -985,15 +997,20 @@ class mainWindow(QMainWindow):
         '''Set latest spectrum as reference.'''
         dataPath = refDir # Reference experiment directory
         self.inputField['RefPath'][0].setText('{}'.format(dataPath))
-        self.spectrumCanvasRef.clear_plots()
+        self.plotCanvasRef.clear_plots()
         self.btn['RefSet'][0].setChecked(False)
         try: # Must follow conventions of experiment routine to find data
             dataPathParts = os.path.split(dataPath)
             fileName = '{}{}'.format(dataPathParts[-1], defaults.DEF_FILENAME)
             filePath = os.path.join(dataPath, fileName)
             data = np.loadtxt(filePath)
-            self.spectrumCanvasRef.axes.set_xlim(data[0, 0], data[-1, 0])
-            self.spectrumCanvasRef.plot_line(data[:, 0], data[:, 3])
+            self.plotCanvasRef.axes.set_xlim(data[0, 0], data[-1, 0])
+            if self.darkMode.isChecked():
+                colorPick = defaults.PLOT_COLOR_REF_DARK
+            else:
+                colorPick = defaults.PLOT_COLOR_REF
+            self.plotCanvasRef.plot_line(data[:, 0], data[:, 3],
+                                                              color = colorPick)
             self.parameters.reference = data
             self.parameters.refDir = refDir
         except Exception as exc:
@@ -1181,7 +1198,7 @@ class mainWindow(QMainWindow):
         # if self.btn['WlUnits'][0].isChecked:
         #     self.btn['WlUnits'][0].setChecked(False)
         # Invert plot x axis
-        # self.spectrumCanvas.axes.invert_xaxis()
+        # self.plotCanvas.axes.invert_xaxis()
         # Switch units from um to cm^-1
         if self.wlUnits == 'um':
             self.wlUnits = 'invcm'
@@ -1210,9 +1227,9 @@ class mainWindow(QMainWindow):
                 defaults.MAX_SWEEP_SPEED_INVCM))
             # Can't unambiguously convert step
             self.inputField['WlStep'][0].setText('100')
-            self.spectrumCanvas.axes.set_xlabel('Wavenumber (cm⁻¹)')
-            self.spectrumCanvasRef.axes.set_xlabel('Wavenumber (cm⁻¹)')
-            self.spectrumCanvasT.axes.set_xlabel('Wavenumber (cm⁻¹)')
+            self.plotCanvas.axes.set_xlabel('Wavenumber (cm⁻¹)')
+            self.plotCanvasRef.axes.set_xlabel('Wavenumber (cm⁻¹)')
+            self.plotCanvasT.axes.set_xlabel('Wavenumber (cm⁻¹)')
         # Switch units from cm^-1 to um
         elif self.wlUnits == 'invcm':
             self.wlUnits = 'um'
@@ -1240,9 +1257,9 @@ class mainWindow(QMainWindow):
                 defaults.MAX_SWEEP_SPEED_UM))
             # Can't unambiguously convert step
             self.inputField['WlStep'][0].setText('0.1')
-            self.spectrumCanvas.axes.set_xlabel('Wavelength (μm)')
-            self.spectrumCanvasRef.axes.set_xlabel('Wavelength (μm)')
-            self.spectrumCanvasT.axes.set_xlabel('Wavelength (μm)')
+            self.plotCanvas.axes.set_xlabel('Wavelength (μm)')
+            self.plotCanvasRef.axes.set_xlabel('Wavelength (μm)')
+            self.plotCanvasT.axes.set_xlabel('Wavelength (μm)')
 
 
 class multipleAcquisitionsWindow(QMainWindow):

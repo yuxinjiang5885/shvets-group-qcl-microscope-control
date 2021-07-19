@@ -34,8 +34,9 @@ class mplCanvas(FigCanvas):
         self.plots.append(plot[0])
         self.figure.canvas.draw()
 
-    def recolor(self, axesColor = [0, 0, 0], backgroundColor = [1, 1, 1]):
-        '''Recolor axes and background'''
+    def recolor(self, axesColor = [0, 0, 0], backgroundColor = [1, 1, 1],
+                      plotColor = [0.5, 0.5, 0.5]):
+        '''Recolor axes, labels, ticks and background'''
         # with plt.rc_context({'axes.edgecolor':'orange', 'xtick.color':'red', 'ytick.color':'green', 'figure.facecolor':'white'}):
         # mpl.rcParams['text.color'] = 'w'
         # mpl.rcParams['xtick.color'] = 'w'
@@ -48,8 +49,12 @@ class mplCanvas(FigCanvas):
         self.axes.xaxis.label.set_color(axesColor)
         self.axes.yaxis.label.set_color(axesColor)
         self.axes.tick_params(axis='both', colors=axesColor)
+        title = self.axes.get_title()
+        self.axes.set_title(title, color = axesColor)
         self.axes.set_facecolor(backgroundColor)
         self.figure.patch.set_facecolor(backgroundColor)
+        if len(self.plots) > 0:
+            self.plots[0].set_color(plotColor)
         self.draw()
 
 
