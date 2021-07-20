@@ -194,11 +194,6 @@ STYLE_ARMED = '''QPushButton {{
                  GS_COLORS['text-alt'],
                  GS_COLORS['hover'],
                  GS_COLORS['hover-warn'])
-STYLE_BAR = ''' QMenuBar {{
-        background-color: {};
-        color: {};
-    }}'''.format(GS_COLORS['menu'],
-                 GS_COLORS['text'])
 STYLE_BUTTON = '''QPushButton {{
         background-color: {};
         border: 2px solid {};
@@ -223,7 +218,7 @@ STYLE_BUTTON = '''QPushButton {{
                  GS_COLORS['text-alt'],
                  GS_COLORS['hover'],
                  GS_COLORS['hover-alt'])
-STYLE_UNITBUTTON = '''QPushButton {{
+STYLE_BUTTON_UNIT = '''QPushButton {{
         background-color: {};
         border: 2px solid {};
         border-radius: 5px;
@@ -301,6 +296,21 @@ STYLE_LABEL_UNIT = '''QLabel {{
         qproperty-alignment: AlignLeft;
         qproperty-alignment: AlignMiddle;
     }}'''.format(GS_COLORS['text-lo'])
+STYLE_MENU = ''' QMenu {{
+        background-color: {};
+        color: {};
+    }}'''.format(GS_COLORS['menu'],
+                 GS_COLORS['text'])
+STYLE_MENUBAR = ''' QMenuBar {{
+        background-color: {};
+        color: {};
+    }}'''.format(GS_COLORS['menu'],
+                 GS_COLORS['text'])
+STYLE_STATUSBAR = ''' QStatusBar {{
+        background: {};
+        color: {};
+    }}'''.format(GS_COLORS['menu'],
+                 GS_COLORS['text'])
 STYLE_TEXT = '''QTextEdit {{
         color: {};
         border: 2px solid {};

@@ -137,8 +137,9 @@ class laserSettingWindow(QMainWindow):
         exitAction.triggered.connect(lambda: self.close())
         ### Menus
         self.menubar = self.menuBar()
-        self.menubar.setStyleSheet(defaults.STYLE_BAR)
+        self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)
         fileMenu = self.menubar.addMenu('Actions')
+        fileMenu.setStyleSheet(defaults.STYLE_MENU)
         fileMenu.addAction(updateAction)
         fileMenu.addAction(exitAction)
         ### Configure grid layout
@@ -537,9 +538,9 @@ class mainWindow(QMainWindow):
         # self.setWindowModality(Qt.ApplicationModal)
         ### Create bars
         self.menubar = self.menuBar()
-        self.menubar.setStyleSheet(defaults.STYLE_BAR)
+        self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)
         self.statusbar = self.statusBar()
-        self.statusbar.setStyleSheet(defaults.STYLE_BAR)
+        self.statusbar.setStyleSheet(defaults.STYLE_STATUSBAR)
         self.statusbar.showMessage('Initializing ...')
         ### "Actions" menu
         exitAction = QAction(QIcon(None), 'Quit', self)
@@ -551,6 +552,7 @@ class mainWindow(QMainWindow):
         changeUnits.setStatusTip('Change units')
         changeUnits.triggered.connect(lambda: self.wl_units())
         fileMenu = self.menubar.addMenu('Actions')
+        fileMenu.setStyleSheet(defaults.STYLE_MENU)
         fileMenu.addAction(exitAction)
         fileMenu.addAction(changeUnits)
         ### "Laser" menu
@@ -563,10 +565,12 @@ class mainWindow(QMainWindow):
         laserOff.setStatusTip('Power down laser (Not Implemented)')
         laserOff.triggered.connect(lambda: print('Action not implemented'))
         laserMenu = self.menubar.addMenu('Laser')
+        laserMenu.setStyleSheet(defaults.STYLE_MENU)
         laserMenu.addAction(laserSettings)
         laserMenu.addAction(laserOff)
         ### "Multiple" menu
         multipleMenu = self.menubar.addMenu('Multiple')
+        multipleMenu.setStyleSheet(defaults.STYLE_MENU)
         multipleAcqMenu = QAction(QIcon(None), 'Timed multiple acquisitions', self)
         multipleAcqMenu.setShortcut('Ctrl+M')
         multipleAcqMenu.setStatusTip('Open timed multiple acquisitions menu')
@@ -574,6 +578,7 @@ class mainWindow(QMainWindow):
         multipleAcqMenu.triggered.connect(lambda: self.multiple_acq_menu())
         ### "Options" menu
         optionsMenu = self.menubar.addMenu('Options')
+        optionsMenu.setStyleSheet(defaults.STYLE_MENU)
         self.repeatShow = QAction(QIcon(None),
                           'Plot data when using "Repeat"', self, checkable=True)
         self.repeatShow.setChecked(True) # Checked by default
@@ -589,6 +594,7 @@ class mainWindow(QMainWindow):
         aboutAction.setStatusTip('About')
         aboutAction.triggered.connect(self.about)
         helpMenu = self.menubar.addMenu('Help')
+        helpMenu.setStyleSheet(defaults.STYLE_MENU)
         helpMenu.addAction(aboutAction)
         ### Set title, icon and center window
         self.setWindowTitle('MIRcat Control Panel (Multi-thread)')
@@ -684,7 +690,7 @@ class mainWindow(QMainWindow):
             if x in ['QCL1', 'QCL2', 'QCL3', 'QCL4']:
                 k[0].setStyleSheet(defaults.STYLE_BUTTON)
             elif x in ['WlUnits']:
-                k[0].setStyleSheet(defaults.STYLE_UNITBUTTON)
+                k[0].setStyleSheet(defaults.STYLE_BUTTON_UNIT)
             else:
                 k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
@@ -1319,8 +1325,9 @@ class multipleAcquisitionsWindow(QMainWindow):
         exitAction.triggered.connect(lambda: self.close())
         ### Menus
         self.menubar = self.menuBar()
-        self.menubar.setStyleSheet(defaults.STYLE_BAR)
+        self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)
         fileMenu = self.menubar.addMenu('Actions')
+        fileMenu.setStyleSheet(defaults.STYLE_MENU)
         fileMenu.addAction(exitAction)
         ### Configure grid layout
         self.container = QWidget()
