@@ -576,6 +576,7 @@ class mainWindow(QMainWindow):
         optionsMenu = self.menubar.addMenu('Options')
         self.repeatShow = QAction(QIcon(None),
                           'Plot data when using "Repeat"', self, checkable=True)
+        self.repeatShow.setChecked(True) # Checked by default
         self.repeatShow.setStatusTip('Update plots when using "Repeat"')
         optionsMenu.addAction(self.repeatShow)
         self.darkMode = QAction(QIcon(None), 'Dark mode', self, checkable=True)
@@ -1059,7 +1060,7 @@ class mainWindow(QMainWindow):
             print('Could not repeat experiment:\n{}'.format(exc))
             return
         ### Plot data
-        if self.repeatShowAction.isChecked():
+        if self.repeatShow.isChecked():
             self.worker.outData.connect(self.plot)
         ### Save current QCLs, ranges and limits for use with "repeat" function
         self.worker.outParams.connect(self.update_parameters)
