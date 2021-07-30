@@ -75,7 +75,8 @@ class experiment(QObject):
             if self.parameters.acquisitions == 0:
                 self.run() # For the first acquisition, use "run"
             else:
-                self.repeat() # For subsequent acquisitions, use "repeat
+                # self.repeat() # For subsequent acquisitions, use "repeat"
+                self.run() # For the first acquisition, use "run"
             self.parameters.acquisitions += 1
             self.finishedOne.emit(self.parameters.acquisitions)
             ### Troubleshooting
