@@ -36,25 +36,26 @@ class stage():
         self.realHw = False
         ret = self.SDK.PriorScientificSDK_Initialise()
         if ret:
-            print(f"Error initialising {ret}")
+            print('Could not initialize: {}'.format(ret))
             sys.exit()
         else:
-            print(f"Ok initialising {ret}")
-        ret = self.SDK.PriorScientificSDK_Version(self.rx)
-        print(f"dll version api ret={ret}, version={self.rx.value.decode()}")
+            print('Initialized ({})'.format(ret))
+        self.SDK.PriorScientificSDK_Version(self.rx)
+        ver = self.rx.value.decode()
+        print('SDK version {}'.format(ver))
         '''Open session'''
         self.session = self.SDK.PriorScientificSDK_OpenNewSession()
         if self.session < 0:
-            print(f"Error getting sessionID {ret}")
+            print('Could not get session ID: {}'.format(ret))
         else:
-            print(f"SessionID = {self.session}")
+            print('Session ID: {}'.format(self.session))
         '''API response tests'''
-        ret = self.SDK.PriorScientificSDK_cmd(
-            self.session, create_string_buffer(b"dll.apitest 33 goodresponse"), self.rx)
-        print(f"api response {ret}, rx = {self.rx.value.decode()}")
-        ret = self.SDK.PriorScientificSDK_cmd(
-            self.session, create_string_buffer(b"dll.apitest -300 stillgoodresponse"), self.rx)
-        print(f"api response {ret}, rx = {self.rx.value.decode()}")
+        # ret = self.SDK.PriorScientificSDK_cmd(
+        #     self.session, create_string_buffer(b"dll.apitest 33 goodresponse"), self.rx)
+        # print(f"api response {ret}, rx = {self.rx.value.decode()}")
+        # ret = self.SDK.PriorScientificSDK_cmd(
+        #     self.session, create_string_buffer(b"dll.apitest -300 stillgoodresponse"), self.rx)
+        # print(f"api response {ret}, rx = {self.rx.value.decode()}")
 
     def connect(self):
         '''Connect controller'''
@@ -64,14 +65,77 @@ class stage():
         '''Disconnect controller'''
         self.message('controller.disconnect')
 
-    def identify(self):
-        '''Identify stage'''
-        sn = self.message('controller.serialnumber.get')
-        print('{}'.format(sn))
+    def encoder(self, axes='both', enable=True):
+        '''Enable axis encoders (enables closed-loop operation)'''
+        if enable:
+            en = 1
+        else:
+            en = 0
+        if axes in ['both', 'x']:
+            _, fitted = self.message('controller.stage.encoder.x.fitted.get')
+            fitted = int(fitted)
+            if fitted:
+                print('Axis x encoder fitted')
+            else:
+                print('Axis x encoder not fitted')
+                return
+            self.message('controller.stage.encoder.x.enabled.set {}'.format(en))
+            enabled = self.message('controller.stage.encoder.x.enabled.get')
+            if enabled:
+                print('Axis x encoder enabled')
+            else:
+                print('Axis x encoder disabled')
+        if axes in ['both', 'y']:
+            _, fitted = self.message('controller.stage.encoder.y.fitted.get')
+            fitted = int(fitted)
+            if fitted:
+                print('Axis y encoder fitted')
+            else:
+                print('Axis y encoder not fitted')
+                return
+            self.message('controller.stage.encoder.y.enabled.set {}'.format(en))
+            _, enabled = self.message('controller.stage.encoder.y.enabled.get')
+            enabled = int(enabled)
+            if enabled:
+                print('Axis y encoder enabled')
+            else:
+                print('Axis y encoder disabled')
 
-    def message(self, message):
-        '''Send message to API, not to stage'''
-        print('Sending: {}'.format(message))
+    def goto(self, x=0, y=0):
+        '''Go to specified position.'''
+        self.message('controller.stage.goto-position {} {}'.format(x, y))
+
+    def identify(self):
+        '''Identify controller'''
+        _, model = self.message('controller.model.get')
+        _, sn = self.message('controller.serialnumber.get')
+        print('Controller: {} S/N {}'.format(model, sn))
+        # _, name = self.message('controller.stage.name.get')
+        # print('Stage: {} S/N {}'.format(name, sn))
+
+    # def limits(self):
+    #     '''Get stage limit switches status'''
+    #     limits = self.message('controller.stage.limits.get')
+    #     print(limits)
+
+    def joystick(self, enable=True):
+        '''Enable/disable joystick'''
+        if enable:
+            self.message('controller.stage.joyxyz.on')
+        else:
+            self.message('controller.stage.joyxyz.off')
+
+    # def flag(self, flag):
+    #     '''Controller shutdown check'''
+    #     flag = self.message('controller.flag.get')
+    #     if not flag:
+    #         print('Controller was shut down since last use.')
+    #     self.message('controller.flag.set 1')
+
+    def message(self, message, verbose=False):
+        '''Send message to API'''
+        if verbose:
+            print('Sending: {}'.format(message))
         ret = self.SDK.PriorScientificSDK_cmd(
             self.session, create_string_buffer(message.encode()), self.rx)
         if ret:
@@ -79,6 +143,42 @@ class stage():
         # else:
         #     print('Success: {}'.format(self.rx.value.decode()))
         return ret, self.rx.value.decode()
+
+    def servo(self, axes='both', enable=False):
+        '''Enables servo function, which opposes forces applied to stage'''
+        if enable:
+            en = 1
+        else:
+            en = 0
+        if axes in ['both', 'x']:
+            encoder = self.message('controller.stage.encoder.x.enabled.get')
+            if not encoder:
+                print('Can\'t enable servo: axis x encoder not enabled')
+                return
+            self.message('controller.stage.servo.x.enabled.set {}'.format(en))
+            _, enabled = self.message('controller.stage.servo.x.enabled.get')
+            enabled = int(enabled)
+            if enabled:
+                print('Axis x servo enabled')
+            else:
+                print('Axis x servo disabled')
+        if axes in ['both', 'y']:
+            encoder = self.message('controller.stage.encoder.y.enabled.get')
+            if not encoder:
+                print('Can\'t enable servo: axis y encoder not enabled')
+                return
+            self.message('controller.stage.servo.y.enabled.set {}'.format(en))
+            _, enabled = self.message('controller.stage.servo.y.enabled.get')
+            enabled = int(enabled)
+            if enabled:
+                print(enabled)
+                print('Axis y servo enabled')
+            else:
+                print('Axis y servo disabled')
+
+    def reference(self):
+        '''Move stage to reference position'''
+        self.message('controller.stage.reference.set')
 
     # def center(self):
     #     '''Center stage'''
