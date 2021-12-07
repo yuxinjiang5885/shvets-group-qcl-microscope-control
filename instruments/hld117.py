@@ -65,41 +65,41 @@ class stage():
         '''Disconnect controller'''
         self.message('controller.disconnect')
 
-    def encoder(self, axes='both', enable=True):
-        '''Enable axis encoders (enables closed-loop operation)'''
-        if enable:
-            en = 1
-        else:
-            en = 0
-        if axes in ['both', 'x']:
-            _, fitted = self.message('controller.stage.encoder.x.fitted.get')
-            fitted = int(fitted)
-            if fitted:
-                print('Axis x encoder fitted')
-            else:
-                print('Axis x encoder not fitted')
-                return
-            self.message('controller.stage.encoder.x.enabled.set {}'.format(en))
-            enabled = self.message('controller.stage.encoder.x.enabled.get')
-            if enabled:
-                print('Axis x encoder enabled')
-            else:
-                print('Axis x encoder disabled')
-        if axes in ['both', 'y']:
-            _, fitted = self.message('controller.stage.encoder.y.fitted.get')
-            fitted = int(fitted)
-            if fitted:
-                print('Axis y encoder fitted')
-            else:
-                print('Axis y encoder not fitted')
-                return
-            self.message('controller.stage.encoder.y.enabled.set {}'.format(en))
-            _, enabled = self.message('controller.stage.encoder.y.enabled.get')
-            enabled = int(enabled)
-            if enabled:
-                print('Axis y encoder enabled')
-            else:
-                print('Axis y encoder disabled')
+    # def encoder(self, axes='both', enable=True):
+    #     '''Enable axis encoders (enables closed-loop operation)'''
+    #     if enable:
+    #         en = 1
+    #     else:
+    #         en = 0
+    #     if axes in ['both', 'x']:
+    #         _, fitted = self.message('controller.stage.encoder.x.fitted.get')
+    #         fitted = int(fitted)
+    #         if fitted:
+    #             print('Axis x encoder fitted')
+    #         else:
+    #             print('Axis x encoder not fitted')
+    #             return
+    #         self.message('controller.stage.encoder.x.enabled.set {}'.format(en))
+    #         enabled = self.message('controller.stage.encoder.x.enabled.get')
+    #         if enabled:
+    #             print('Axis x encoder enabled')
+    #         else:
+    #             print('Axis x encoder disabled')
+    #     if axes in ['both', 'y']:
+    #         _, fitted = self.message('controller.stage.encoder.y.fitted.get')
+    #         fitted = int(fitted)
+    #         if fitted:
+    #             print('Axis y encoder fitted')
+    #         else:
+    #             print('Axis y encoder not fitted')
+    #             return
+    #         self.message('controller.stage.encoder.y.enabled.set {}'.format(en))
+    #         _, enabled = self.message('controller.stage.encoder.y.enabled.get')
+    #         enabled = int(enabled)
+    #         if enabled:
+    #             print('Axis y encoder enabled')
+    #         else:
+    #             print('Axis y encoder disabled')
 
     def goto(self, x=0, y=0):
         '''Go to specified position.'''
@@ -144,37 +144,37 @@ class stage():
         #     print('Success: {}'.format(self.rx.value.decode()))
         return ret, self.rx.value.decode()
 
-    def servo(self, axes='both', enable=False):
-        '''Enables servo function, which opposes forces applied to stage'''
-        if enable:
-            en = 1
-        else:
-            en = 0
-        if axes in ['both', 'x']:
-            encoder = self.message('controller.stage.encoder.x.enabled.get')
-            if not encoder:
-                print('Can\'t enable servo: axis x encoder not enabled')
-                return
-            self.message('controller.stage.servo.x.enabled.set {}'.format(en))
-            _, enabled = self.message('controller.stage.servo.x.enabled.get')
-            enabled = int(enabled)
-            if enabled:
-                print('Axis x servo enabled')
-            else:
-                print('Axis x servo disabled')
-        if axes in ['both', 'y']:
-            encoder = self.message('controller.stage.encoder.y.enabled.get')
-            if not encoder:
-                print('Can\'t enable servo: axis y encoder not enabled')
-                return
-            self.message('controller.stage.servo.y.enabled.set {}'.format(en))
-            _, enabled = self.message('controller.stage.servo.y.enabled.get')
-            enabled = int(enabled)
-            if enabled:
-                print(enabled)
-                print('Axis y servo enabled')
-            else:
-                print('Axis y servo disabled')
+    # def servo(self, axes='both', enable=False):
+    #     '''Enables servo function, which opposes forces applied to stage'''
+    #     if enable:
+    #         en = 1
+    #     else:
+    #         en = 0
+    #     if axes in ['both', 'x']:
+    #         encoder = self.message('controller.stage.encoder.x.enabled.get')
+    #         if not encoder:
+    #             print('Can\'t enable servo: axis x encoder not enabled')
+    #             return
+    #         self.message('controller.stage.servo.x.enabled.set {}'.format(en))
+    #         _, enabled = self.message('controller.stage.servo.x.enabled.get')
+    #         enabled = int(enabled)
+    #         if enabled:
+    #             print('Axis x servo enabled')
+    #         else:
+    #             print('Axis x servo disabled')
+    #     if axes in ['both', 'y']:
+    #         encoder = self.message('controller.stage.encoder.y.enabled.get')
+    #         if not encoder:
+    #             print('Can\'t enable servo: axis y encoder not enabled')
+    #             return
+    #         self.message('controller.stage.servo.y.enabled.set {}'.format(en))
+    #         _, enabled = self.message('controller.stage.servo.y.enabled.get')
+    #         enabled = int(enabled)
+    #         if enabled:
+    #             print(enabled)
+    #             print('Axis y servo enabled')
+    #         else:
+    #             print('Axis y servo disabled')
 
     def reference(self):
         '''Move stage to reference position'''
