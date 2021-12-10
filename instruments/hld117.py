@@ -31,24 +31,24 @@ class stage():
         if os.path.exists(DLL_PATH):
             self.SDK = WinDLL(DLL_PATH)
         else:
-            raise RuntimeError('DLL not found.')
+            raise RuntimeError('Stage controller DLL not found.')
         self.rx = create_string_buffer(1000)
         self.realHw = False
         ret = self.SDK.PriorScientificSDK_Initialise()
         if ret:
-            print('Could not initialize: {}'.format(ret))
+            print('Could not initialize stage controller: {}'.format(ret))
             sys.exit()
         else:
-            print('Initialized ({})'.format(ret))
+            print('Stage controller initialized ({})'.format(ret))
         self.SDK.PriorScientificSDK_Version(self.rx)
         ver = self.rx.value.decode()
-        print('SDK version {}'.format(ver))
+        print('Stage controller SDK version {}'.format(ver))
         '''Open session'''
         self.session = self.SDK.PriorScientificSDK_OpenNewSession()
         if self.session < 0:
-            print('Could not get session ID: {}'.format(ret))
+            print('Could not get stage controller session ID: {}'.format(ret))
         else:
-            print('Session ID: {}'.format(self.session))
+            print('Stage controller session ID: {}'.format(self.session))
         '''API response tests'''
         # ret = self.SDK.PriorScientificSDK_cmd(
         #     self.session, create_string_buffer(b"dll.apitest 33 goodresponse"), self.rx)
@@ -109,7 +109,7 @@ class stage():
         '''Identify controller'''
         _, model = self.message('controller.model.get')
         _, sn = self.message('controller.serialnumber.get')
-        print('Controller: {} S/N {}'.format(model, sn))
+        print('Stage controller: {} S/N {}'.format(model, sn))
         # _, name = self.message('controller.stage.name.get')
         # print('Stage: {} S/N {}'.format(name, sn))
 

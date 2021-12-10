@@ -22,9 +22,9 @@ from experiment.routines_multithread import experiment
 from experiment.laser_windows import (laserInitializer,
                                       laserSettingWindow,
                                       laserStartupDialog)
-from experiment.stage_windows import stageMotionWindow
+from experiment.stage_windows import stageInitializer, stageMotionWindow
 from ui.plot_widgets import mplCanvas
-from instruments.mircat import laser
+# from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
@@ -78,19 +78,34 @@ class mainWindow(QMainWindow):
         super().__init__()
         ### Initialize laser
         self.laser = []
-        self.thread = QThread()
+        self.threadLas = QThread()
         self.laserWorker = laserInitializer()
-        self.laserWorker.moveToThread(self.thread)
-        self.thread.started.connect(self.laserWorker.laser_initialize)
-        self.laserWorker.laserInitialized.connect(self.thread.quit)
+        self.laserWorker.moveToThread(self.threadLas)
+        self.threadLas.started.connect(self.laserWorker.laser_initialize)
+        self.laserWorker.laserInitialized.connect(self.threadLas.quit)
         self.laserWorker.laserInitialized.connect(self.laserWorker.deleteLater)
         self.laserWorker.laserInstance.connect(self.laser_set)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.start()
-        ### Show startup dialog
+        self.threadLas.finished.connect(self.threadLas.deleteLater)
+        self.threadLas.start()
+        ### Show laser startup dialog
         startupDialog = laserStartupDialog() # Closes when startup finishes
         self.laserWorker.laserInitialized.connect(lambda: startupDialog.done(0))
         startupDialog.exec()
+        ### Initialize stage
+        self.stage = []
+        self.threadStg = QThread()
+        self.stageWorker = stageInitializer()
+        self.stageWorker.moveToThread(self.threadStg)
+        self.threadStg.started.connect(self.stageWorker.stage_initialize)
+        self.stageWorker.stageInitialized.connect(self.threadStg.quit)
+        self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)
+        self.stageWorker.stageInstance.connect(self.stage_set)
+        self.threadStg.finished.connect(self.threadStg.deleteLater)
+        self.threadStg.start()
+        ### Show stage startup dialog
+        startupDialog2 = laserStartupDialog() # Closes when startup finishes
+        self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
+        startupDialog2.exec()
         ### Prepare text for "about" dialog
         try:
             self.aboutText = ''
@@ -98,7 +113,7 @@ class mainWindow(QMainWindow):
             with open(aboutFile) as f:
                 self.aboutText = f.read()
         except Exception as exc:
-            print('Falied to load "about" text:\n{}'.format(exc))
+            print('Falied to load "about" contents:\n{}'.format(exc))
         ### Set class parameters
         self.parameters = experimentParameters() # Passed to "run" and "repeat"
         # self.useRef = False # By default, do not use reference
@@ -158,6 +173,7 @@ class mainWindow(QMainWindow):
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
+        self.stage.disconnect()
         event.accept()
         # reply = QMessageBox.question(self, 'Quit confirmation',
         #                              "Are you sure you want to quit?",
@@ -543,17 +559,17 @@ class mainWindow(QMainWindow):
         self.multiMenu.labelHead['counter'][0].setStyleSheet(defaults.STYLE_LABEL_ALT)
         # self.multiMenu.labelHead['timer'][0].setStyleSheet(STYLE_LABEL_ALT)
         ### Run acquisitions until "Stop" is clicked
-        self.thread = QThread()
+        self.threadMul = QThread()
         self.worker = experiment()
         self.multiMenu.btn['Stop'][0].clicked.connect(self.worker.stop)
         self.multiMenu.labelHead['counter'][0].setText('Running')
         self.worker.parameters = self.parameters
-        self.worker.moveToThread(self.thread)
-        self.thread.started.connect(self.worker.multiple)
-        self.worker.finishedMulti.connect(self.thread.quit)
+        self.worker.moveToThread(self.threadMul)
+        self.threadMul.started.connect(self.worker.multiple)
+        self.worker.finishedMulti.connect(self.threadMul.quit)
         self.worker.finishedMulti.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.start()
+        self.threadMul.finished.connect(self.threadMul.deleteLater)
+        self.threadMul.start()
         ### Acquisition timer
         self.worker.acquisitionTimer.connect(self.multiMenu.update_timer)
         self.worker.startedOne.connect(lambda: self.multiMenu.labelHead[
@@ -734,18 +750,18 @@ class mainWindow(QMainWindow):
         self.statusbar.showMessage('Busy')
         ###
         try:
-            self.thread = QThread()
+            self.threadRep = QThread()
             self.worker = experiment()
             ### Pass relevant parameters to worker instance
             self.worker.parameters = self.parameters
             self.worker.qcl = self.parameters.qcl
             self.worker.ranges = self.parameters.ranges
             self.worker.ranges = self.parameters.sweepLimits
-            self.worker.moveToThread(self.thread)
-            self.thread.started.connect(self.worker.repeat)
-            self.worker.finished.connect(self.thread.quit)
+            self.worker.moveToThread(self.threadRep)
+            self.threadRep.started.connect(self.worker.repeat)
+            self.worker.finished.connect(self.threadRep.quit)
             self.worker.finished.connect(self.worker.deleteLater)
-            self.thread.start()
+            self.threadRep.start()
         except Exception as exc:
             print('Could not repeat experiment:\n{}'.format(exc))
             return
@@ -795,15 +811,15 @@ class mainWindow(QMainWindow):
         self.lock_controls()
         self.statusbar.showMessage('Busy')
         ### Run acquisition in separate thread
-        self.thread = QThread()
+        self.threadRun = QThread()
         self.worker = experiment()
         self.worker.parameters = self.parameters
-        self.worker.moveToThread(self.thread)
-        self.thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.thread.quit)
+        self.worker.moveToThread(self.threadRun)
+        self.threadRun.started.connect(self.worker.run)
+        self.worker.finished.connect(self.threadRun.quit)
         self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.start()
+        self.threadRun.finished.connect(self.threadRun.deleteLater)
+        self.threadRun.start()
         ### Plot data
         self.worker.outData.connect(self.plot)
         ### Save current QCLs, ranges and limits for use with "repeat" function
@@ -820,6 +836,10 @@ class mainWindow(QMainWindow):
     def stage_motion_window(self):
         '''Multiple acquisitions menu'''
         self.stageMotionWindow.show()
+
+    def stage_set(self, stageInstance):
+        '''Set laser instance'''
+        self.stage = stageInstance
 
     def tune(self):
         '''Tune laser to input wavelength of currently selected QCL.'''

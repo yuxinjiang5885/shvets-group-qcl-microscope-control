@@ -6,6 +6,7 @@ Python 3.9.6 on Windows 10
 Created 2021-Dec-07
 '''
 
+import time
 import experiment.defaults as defaults
 from instruments.hld117 import stage
 from ui.plot_widgets import mplCanvas
@@ -25,12 +26,29 @@ from PyQt5.QtWidgets import (QAction,
                              QVBoxLayout)
 
 
+class stageInitializer(QObject):
+    '''Initialize stage'''
+    stageInitialized = pyqtSignal() # Emitted when stage is initialized
+    stageInstance = pyqtSignal(object) # Returns stage instance
+
+    def __init__(self):
+        super().__init__()
+
+    def stage_initialize(self):
+        stage0 = stage() # Initialize stage
+        stage0.connect()
+        stage0.identify()
+        self.stageInstance.emit(stage0)
+        self.stageInitialized.emit()
+
+
 class stageMotionWindow(QMainWindow):
     '''GUI for stage motion control'''
 
     def __init__(self, mainGUI):
-            super().__init__(None, Qt.WindowStaysOnTopHint)
-            self.make_gui()
+        super().__init__(None, Qt.WindowStaysOnTopHint)
+        self.stage = mainGUI.stage
+        self.make_gui()
 
     def center_window(self):
         '''Center main application window on screen'''
@@ -44,9 +62,11 @@ class stageMotionWindow(QMainWindow):
         event.accept()
 
     def goto(self):
-            '''Move to set x and y when Enter is pressed'''
-            targetx = float(self.inputField['xSet'][0].text())
-            targety = float(self.inputField['ySet'][0].text())
+        '''Move to set x and y when Enter is pressed'''
+        targetx = float(self.inputField['xSet'][0].text())
+        targety = float(self.inputField['ySet'][0].text())
+        print('Moving stage to ({:.0f} μm, {:.0f} μm)'.format(targetx, targety))
+        self.stage.goto(targetx, targety)
 
     def make_gui(self):
         '''Draw controls'''
@@ -143,5 +163,5 @@ class stageMotionWindow(QMainWindow):
             k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Connecting one-by-one as workaround
-        # self.inputField['xSet'][0].returnPressed.connect(lambda: self.goto())
-        # self.inputField['ySet'][0].returnPressed.connect(lambda: self.goto())
+        self.inputField['xSet'][0].returnPressed.connect(lambda: self.goto())
+        self.inputField['ySet'][0].returnPressed.connect(lambda: self.goto())
