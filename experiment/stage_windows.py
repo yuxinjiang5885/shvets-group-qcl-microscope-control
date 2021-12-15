@@ -49,6 +49,8 @@ class stageMotionWindow(QMainWindow):
         super().__init__(None, Qt.WindowStaysOnTopHint)
         self.paramNames = ['x_um', 'y_um', 'v_um_per_s', 'a_um_per_s2']
         self.stage = mainGUI.stage
+        self.stage.set_acc() # Return acceleration to default
+        self.stage.set_speed() # Return speed to default
         self.make_gui()
 
     def center_window(self):
@@ -201,6 +203,28 @@ class stageMotionWindow(QMainWindow):
         ### Connecting one-by-one as workaround
         self.inputField['xSet'][0].returnPressed.connect(lambda: self.goto())
         self.inputField['ySet'][0].returnPressed.connect(lambda: self.goto())
+        self.inputField['vSet'][0].returnPressed.connect(lambda: self.set_v())
+        self.inputField['aSet'][0].returnPressed.connect(lambda: self.set_a())
+
+    def set_a(self):
+        '''Set acceleration'''
+        targeta = float(self.inputField['aSet'][0].text())
+        try:
+            self.stage.set_acc(targeta)
+            self.update_readings()
+        except Exception as exc:
+            print('Could not set acceleration:\n{}'.format(exc))
+            return
+
+    def set_v(self):
+        '''Set speed'''
+        targetv = float(self.inputField['vSet'][0].text())
+        try:
+            self.stage.set_speed(targetv)
+            self.update_readings()
+        except Exception as exc:
+            print('Could not set speed:\n{}'.format(exc))
+            return
 
     def update_readings(self):
         '''Update stage parameter readings.'''

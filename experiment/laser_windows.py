@@ -80,8 +80,8 @@ class laserSettingWindow(QMainWindow):
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE)
         ### Set title, icon and center window
-        self.setWindowTitle('Laser Settings')
-        self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
+        self.setWindowTitle('MIRcat Settings Panel')
+        self.setWindowIcon(QIcon('icons/mircat.ico'))
         self.center_window()
         ### Actions
         updateAction = QAction(QIcon(None), 'Refresh Readings', self)
@@ -337,7 +337,7 @@ class laserStartupDialog(QDialog):
            Main UI window is disabled until laser is initialized.'''
         ### Window parameters
         self.setWindowTitle('Laser Initialization')
-        self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
+        self.setWindowIcon(QIcon('icons/mircat.ico'))
         self.setGeometry(0, 0, 200, 50)
         self.font = QFont()
         self.font.setFamily(defaults.FONT_FAMILY)

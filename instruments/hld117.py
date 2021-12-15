@@ -23,6 +23,9 @@ from os.path import abspath, join, split, realpath
 COM_PORT = 3 # Controller COM port
 DLL_PATH = 'instruments/prior/PriorScientificSDK.dll' # Prior SDK DLL path
 
+DEFAULT_SPEED = 30000 # Default stage speed, um/s
+DEFAULT_ACC = 142750 # Default stage acceleration, um/s^2
+
 class stage():
     '''HLD117 stage class'''
 
@@ -209,6 +212,15 @@ class stage():
     def reference(self):
         '''Move stage to reference position'''
         self.message('controller.stage.reference.set')
+
+    def set_acc(self, a = DEFAULT_ACC):
+        '''Set the maximum acceleration during a point to point move
+           or velocity move'''
+        self.message('controller.stage.acc.set {:.0f}'.format(a))
+
+    def set_speed(self, v = DEFAULT_SPEED):
+        '''Set the maximum speed during a point to point move'''
+        self.message('controller.stage.speed.set {:.0f}'.format(v))
 
     # def center(self):
     #     '''Center stage'''

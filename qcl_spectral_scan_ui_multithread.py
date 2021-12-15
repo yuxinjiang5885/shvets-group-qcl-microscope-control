@@ -115,7 +115,7 @@ class mainWindow(QMainWindow):
             with open(aboutFile) as f:
                 self.aboutText = f.read()
         except Exception as exc:
-            print('Falied to load "about" contents:\n{}'.format(exc))
+            print('Failed to load "about" contents:\n{}'.format(exc))
         ### Set class parameters
         self.parameters = experimentParameters() # Passed to "run" and "repeat"
         # self.useRef = False # By default, do not use reference
@@ -300,7 +300,7 @@ class mainWindow(QMainWindow):
         helpMenu.addAction(aboutAction)
         ### Set title, icon and center window
         self.setWindowTitle('MIRcat Control Panel (Multi-thread)')
-        self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
+        self.setWindowIcon(QIcon('icons/mircat.ico'))
         self.center_window()
         # Configure grid layout
         self.container = QWidget()
@@ -1026,7 +1026,7 @@ class multipleAcquisitionsWindow(QMainWindow):
         font.setPointSize(defaults.FONT_SIZE)
         ### Set title, icon and center window
         self.setWindowTitle('Multiple Acquisitions')
-        self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
+        self.setWindowIcon(QIcon('icons/mircat.ico'))
         self.center_window()
         ### Actions
         exitAction = QAction(QIcon(None), 'Close Window', self)
