@@ -22,7 +22,9 @@ from experiment.routines_multithread import experiment
 from experiment.laser_windows import (laserInitializer,
                                       laserSettingWindow,
                                       laserStartupDialog)
-from experiment.stage_windows import stageInitializer, stageMotionWindow
+from experiment.stage_windows import (stageInitializer,
+                                      stageMotionWindow,
+                                      stageStartupDialog)
 from ui.plot_widgets import mplCanvas
 # from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
@@ -103,7 +105,7 @@ class mainWindow(QMainWindow):
         self.threadStg.finished.connect(self.threadStg.deleteLater)
         self.threadStg.start()
         ### Show stage startup dialog
-        startupDialog2 = laserStartupDialog() # Closes when startup finishes
+        startupDialog2 = stageStartupDialog() # Closes when startup finishes
         self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
         startupDialog2.exec()
         ### Prepare text for "about" dialog

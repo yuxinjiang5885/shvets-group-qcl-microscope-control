@@ -6,7 +6,7 @@ Created 2021-Nov-26 for Python 3.9.6 64-bit
 '''
 
 from ctypes import WinDLL, create_string_buffer
-import os, sys
+import os, sys, time
 from inspect import currentframe, getfile
 from os.path import abspath, join, split, realpath
 
@@ -57,6 +57,11 @@ class stage():
         #     self.session, create_string_buffer(b"dll.apitest -300 stillgoodresponse"), self.rx)
         # print(f"api response {ret}, rx = {self.rx.value.decode()}")
 
+    def busy(self):
+        '''Check whether stage is busy'''
+        busy = self.message('controller.stage.busy.get')
+        return busy[1]
+
     def connect(self):
         '''Connect controller'''
         self.message('controller.connect {:0f}'.format(COM_PORT))
@@ -101,9 +106,34 @@ class stage():
     #         else:
     #             print('Axis y encoder disabled')
 
+    def get_acc(self):
+        '''Get current stage maximum set acceleration'''
+        acc = self.message('controller.stage.acc.get')
+        return(float(acc[1]))
+
+    def get_position(self):
+        '''Get current stage position'''
+        count = 0
+        while self.busy() not in ['0']:
+            time.sleep(0.1)
+            count += 1
+            if count > 50:
+                print('Failed to get position: stage is still busy.')
+                return(0, 0)
+        position = self.message('controller.stage.position.get')
+        (x,y) = position[1].split(',')
+        return(float(x), float(y))
+
+    def get_speed(self):
+        '''Get current stage maximum set point-to-point movement speed'''
+        speed = self.message('controller.stage.speed.get')
+        return(float(speed[1]))
+
     def goto(self, x=0, y=0):
         '''Go to specified position.'''
-        self.message('controller.stage.goto-position {} {}'.format(x, y))
+        # while self.busy() not in ['0']:
+        #     time.sleep(0.1)
+        self.message('controller.stage.goto-position {:.0f} {:.0f}'.format(x, y))
 
     def identify(self):
         '''Identify controller'''

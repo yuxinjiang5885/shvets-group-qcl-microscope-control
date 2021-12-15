@@ -336,7 +336,7 @@ class laserStartupDialog(QDialog):
         '''Setup dialog window.
            Main UI window is disabled until laser is initialized.'''
         ### Window parameters
-        self.setWindowTitle('MIRcat Control Panel (Multi-thread)')
+        self.setWindowTitle('Laser Initialization')
         self.setWindowIcon(QIcon('icons/mircat_ui.ico'))
         self.setGeometry(0, 0, 200, 50)
         self.font = QFont()
