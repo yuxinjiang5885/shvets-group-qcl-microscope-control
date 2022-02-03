@@ -83,7 +83,7 @@ class stageMotionWindow(QMainWindow):
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE)
         ### Set title, icon and center window
-        self.setWindowTitle('Stage Motion Control Panel')
+        self.setWindowTitle('Stage Motion')
         self.setWindowIcon(QIcon('icons/stage.ico'))
         self.center_window()
         ### Actions
