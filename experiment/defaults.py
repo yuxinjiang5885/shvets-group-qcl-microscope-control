@@ -162,6 +162,13 @@ DEF_WL_START_UM = 5.2 # Default scan/sweep start wavelength, um
 DEF_WL_END_UM = 5.8 # Default scan/sweep end wavelength, um
 DEF_WL_STEP_UM = 0.1 # Default scan/sweep wavelength step, um
 
+### Multiwell holder parameters
+DEF_WELLS_X = 5 # Default number of wells along x
+DEF_WELLS_Y = 2 # Default number of wells along y
+DEF_WELL_SEP_X_UM = 10000 # Default well separation along x, um
+DEF_WELL_SEP_Y_UM = 10000 # Default well separation along y, um
+DEF_DWELL_TIME_S = 0.1 # Default dwell time, s
+
 ### UI look and feel
 COL_WIDTH = 100
 FONT_FAMILY = 'Open Sans Semibold'
@@ -311,6 +318,38 @@ STYLE_STATUSBAR = ''' QStatusBar {{
         color: {};
     }}'''.format(GS_COLORS['menu'],
                  GS_COLORS['text'])
+STYLE_TABS = '''QTabWidget::pane {{
+        background: {};
+        border: 2px solid {};
+    }}
+    QTabBar::tab {{
+        background: {};
+        border: 2px solid {};
+        border-bottom: 0px solid #FFFFFF;
+        border-top-left-radius: 4px;
+        border-top-right-radius: 4px;
+        color: {};
+        min-width: 24ex;
+        padding: 4px;
+    }}
+    QTabBar::tab:selected {{
+        background: {};
+        border-color: {};
+        color: {};
+    }}
+    QTabBar::tab:hover {{
+        background: {};
+        border-color: {};
+    }}'''.format(GS_COLORS['bg-alt'],
+                 GS_COLORS['border'],
+                 GS_COLORS['background'],
+                 GS_COLORS['border-alt'],
+                 GS_COLORS['text-lo-alt'],
+                 GS_COLORS['border'],
+                 GS_COLORS['border'],
+                 GS_COLORS['text-lo'],
+                 GS_COLORS['hover'],
+                 GS_COLORS['border-alt'])
 STYLE_TEXT = '''QTextEdit {{
         color: {};
         border: 2px solid {};

@@ -6,11 +6,12 @@ Python 3.9.6 on Windows 10
 Created 2021-Dec-07
 '''
 
-import time
+import numpy as np
 import experiment.defaults as defaults
 from instruments.hld117 import stage
+import time
 from ui.plot_widgets import mplCanvas
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QIntValidator, QIcon, QFont
 from PyQt5.QtWidgets import (QAction,
@@ -21,9 +22,10 @@ from PyQt5.QtWidgets import (QAction,
                              QLineEdit,
                              QMainWindow,
                              QPushButton,
-                             QWidget,
+                             QTabWidget,
                              QSizePolicy,
-                             QVBoxLayout)
+                             QVBoxLayout,
+                             QWidget)
 
 
 class stageInitializer(QObject):
@@ -64,10 +66,12 @@ class stageMotionWindow(QMainWindow):
         '''Show warning dialog on close.'''
         event.accept()
 
-    def goto(self):
+    def goto(self, targetx=-1, targety=-1):
         '''Move to set x and y'''
-        targetx = float(self.inputField['xSet'][0].text())
-        targety = float(self.inputField['ySet'][0].text())
+        if targetx == -1:
+            targetx = float(self.inputField['xSet'][0].text())
+        if targety == -1:
+            targety = float(self.inputField['ySet'][0].text())
         print('Moving stage to ({:.0f} μm, {:.0f} μm)'.format(targetx, targety))
         try:
             self.stage.goto(targetx, targety)
@@ -97,7 +101,7 @@ class stageMotionWindow(QMainWindow):
         fileMenu = self.menubar.addMenu('Actions')
         fileMenu.setStyleSheet(defaults.STYLE_MENU)
         fileMenu.addAction(exitAction)
-        ### Configure grid layout
+        ### Configure main grid layout
         self.container = QWidget()
         self.container.setStyleSheet(defaults.STYLE_CONTAINER)
         self.setCentralWidget(self.container)
@@ -115,9 +119,21 @@ class stageMotionWindow(QMainWindow):
         darkColor = defaults.PLOT_COLOR_DARK
         self.plotCanvas.recolor(darkAxes, darkBackground, darkColor)
         self.grid.addWidget(self.plotCanvas, 0, 0, 5, 6)
-        ### Labels: header
+        ### Tabs widget
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet(defaults.STYLE_TABS)
+        self.tabs.setFont(font)
+        self.grid.addWidget(self.tabs, 5, 0, 5, 6)
+        ### Raster tab - Base layout
+        self.tabRaster = QWidget()
+        self.tabRaster.setStyleSheet(defaults.STYLE_CONTAINER)
+        self.tabs.addTab(self.tabRaster, 'Position/Raster')
+        ### Raster tab - Grid layout
+        self.tabRasterGrid = QGridLayout()
+        self.tabRaster.setLayout(self.tabRasterGrid)
+        self.tabRasterGrid.setSpacing(10)
+        ### Raster tab - Labels: header
         self.labels = dict() # [label, row, col, rowSpan, colSpan]
-        # self.labels['Stage'] = [QLabel('Stage'), 0, 1, 1, 5]
         self.labels['Read'] = [QLabel('Read'), 5, 1, 1, 1]
         self.labels['Set'] = [QLabel('Set'), 5, 2, 1, 1]
         self.labels['Start'] = [QLabel('Start'), 5, 3, 1, 1]
@@ -126,25 +142,8 @@ class stageMotionWindow(QMainWindow):
         for _, k in self.labels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
-            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        # Labels: units
-        # unitLabelStrings = ['μm', 'μm', 'μm/s', 'μm/s²']
-        # for x, labelText in enumerate(unitLabelStrings):
-        #     row = x + 1 # Every row starting from 1
-        #     labelObject = QLabel(labelText)
-        #     labelObject.setFont(font)
-        #     labelObject.setStyleSheet(defaults.STYLE_LABEL_UNIT)
-        #     self.grid.addWidget(labelObject, row, 12, 1, 1)
-        # Labels: axes
-        # xLabel = QLabel('x')
-        # xLabel.setFont(font)
-        # xLabel.setStyleSheet(defaults.STYLE_LABEL_UNIT)
-        # self.grid.addWidget(xLabel, 6, 3, 1, 1)
-        # yLabel = QLabel('y')
-        # yLabel.setFont(font)
-        # yLabel.setStyleSheet(defaults.STYLE_LABEL_UNIT)
-        # self.grid.addWidget(yLabel, 3, 0, 1, 1)
-        # Labels: parameters
+            self.tabRasterGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Raster tab - Labels: parameters
         self.paramLabels = dict() # [label, row, col, rowSpan, colSpan]
         self.paramLabels['x'] = [QLabel('x (μm)'), 6, 0, 1, 1]
         self.paramLabels['y'] = [QLabel('y (μm)'), 7, 0, 1, 1]
@@ -153,8 +152,8 @@ class stageMotionWindow(QMainWindow):
         for _, k in self.paramLabels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
-            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        ### Labels for QCL parameter readings
+            self.tabRasterGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Raster tab - Labels: readings
         blankLine = ''
         self.readingLabels = dict()
         for x, param in enumerate(self.paramNames):
@@ -164,8 +163,8 @@ class stageMotionWindow(QMainWindow):
         for _, k in self.readingLabels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
-            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        ### Input fields: x/y set/start/stop/step and v/a
+            self.tabRasterGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Raster tab - Input fields: x/y set/start/stop/step and v/a
         blankLine = ''
         self.inputField = dict() # to collect all input fields
         self.inputField['xSet'] = [QLineEdit(blankLine), 6, 2, 1, 1]
@@ -181,12 +180,56 @@ class stageMotionWindow(QMainWindow):
         for _, k in self.inputField.items(): # Arrange in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
-            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        # buttons
+            self.tabRasterGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Multiwell tab - Base layout
+        self.tabMultiwell = QWidget()
+        self.tabMultiwell.setStyleSheet(defaults.STYLE_CONTAINER)
+        self.tabs.addTab(self.tabMultiwell, 'Multiwell')
+        ### Multiwell tab - Grid layout
+        self.tabMultiwellGrid = QGridLayout()
+        self.tabMultiwell.setLayout(self.tabMultiwellGrid)
+        self.tabMultiwellGrid.setSpacing(10)
+        ### Multiwell tab - Labels: headers and parameters
+        self.multiwellLabels = dict() # [label, row, col, rowSpan, colSpan]
+        self.multiwellLabels['x'] = [QLabel('x'), 1, 0, 1, 1]
+        self.multiwellLabels['y'] = [QLabel('y'), 2, 0, 1, 1]
+        self.multiwellLabels['wells'] = [QLabel('Wells'), 0, 1, 1, 1]
+        self.multiwellLabels['wellSeparation'] = [QLabel('Well Sep. (μm)'),
+                                                                     0, 2, 1, 1]
+        self.multiwellLabels['firstWell'] = [QLabel('First Well Pos. (μm)'),
+                                                                     0, 3, 1, 1]
+        self.multiwellLabels['lastWell'] = [QLabel('Last Well Pos. (μm)'),
+                                                                     0, 4, 1, 1]
+        self.multiwellLabels['dwell'] = [QLabel('Dwell time (s)'), 4, 0, 1, 2]
+        for _, k in self.multiwellLabels.items(): # Arrange labels in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
+            self.tabMultiwellGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Multiwell tab - Input fields
+        mwDef = ['{:.0f}'.format(defaults.DEF_WELLS_X),
+                 '{:.0f}'.format(defaults.DEF_WELLS_Y),
+                 '{:.0f}'.format(defaults.DEF_WELL_SEP_X_UM),
+                 '{:.0f}'.format(defaults.DEF_WELL_SEP_Y_UM),
+                 '{:.3f}'.format(defaults.DEF_DWELL_TIME_S)]
+        self.multiwellInputField = dict() # to collect all input fields
+        self.multiwellInputField['xWells'] = [QLineEdit(mwDef[0]), 1, 1, 1, 1]
+        self.multiwellInputField['yWells'] = [QLineEdit(mwDef[1]), 2, 1, 1, 1]
+        self.multiwellInputField['xWellSep'] = [QLineEdit(mwDef[2]), 1, 2, 1, 1]
+        self.multiwellInputField['yWellSep'] = [QLineEdit(mwDef[3]), 2, 2, 1, 1]
+        self.multiwellInputField['wellx1'] = [QLineEdit(blankLine), 1, 3, 1, 1]
+        self.multiwellInputField['welly1'] = [QLineEdit(blankLine), 2, 3, 1, 1]
+        self.multiwellInputField['wellx2'] = [QLineEdit(blankLine), 1, 4, 1, 1]
+        self.multiwellInputField['welly2'] = [QLineEdit(blankLine), 2, 4, 1, 1]
+        self.multiwellInputField['dwell'] = [QLineEdit(mwDef[4]), 4, 3, 1, 1]
+        for _, k in self.multiwellInputField.items(): # Arrange in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_INPUT)
+            self.tabMultiwellGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Buttons
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
-        self.btn['Start'] = [QPushButton('Start'), 10, 0, 2, 2]
+        self.btn['Start'] = [QPushButton('Start'), 10, 0, 2, 3]
         self.btn['Start'][0].setToolTip('Start raster scan')
-        self.btn['Stop'] = [QPushButton('Stop'), 12, 0, 2, 2]
+        self.btn['Stop'] = [QPushButton('Stop'), 10, 3, 2, 3]
         self.btn['Stop'][0].setToolTip('Stop raster scan')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
@@ -196,15 +239,55 @@ class stageMotionWindow(QMainWindow):
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Set row stretch
-        for row in range(0, 14): # Set row spacing
+        for row in range(0, 12): # Set row spacing
             self.grid.setRowStretch(row, 1)
         ### Fill in readings, and use as start values for inputs
         self.update_readings()
-        ### Connecting one-by-one as workaround
+        ### Connecting inputs one-by-one as workaround
         self.inputField['xSet'][0].returnPressed.connect(lambda: self.goto())
         self.inputField['ySet'][0].returnPressed.connect(lambda: self.goto())
         self.inputField['vSet'][0].returnPressed.connect(lambda: self.set_v())
         self.inputField['aSet'][0].returnPressed.connect(lambda: self.set_a())
+        ### Connecting buttons
+        self.btn['Start'][0].clicked.connect(lambda: self.run())
+
+    def run(self):
+        '''Run stage scan'''
+        if self.tabs.currentIndex() not in [1]:
+            print('Not implemented.')
+            return
+        if self.tabs.currentIndex() == 1:
+            print('Running multiwell scan.')
+            self.run_multiwell()
+
+    def run_multiwell(self):
+        '''Run multiwell holder scan'''
+        xWells = int(self.multiwellInputField['xWells'][0].text())
+        yWells = int(self.multiwellInputField['yWells'][0].text())
+        xWellSep = int(self.multiwellInputField['xWellSep'][0].text())
+        yWellSep = int(self.multiwellInputField['yWellSep'][0].text())
+        x1 = int(self.multiwellInputField['wellx1'][0].text())
+        x2 = int(self.multiwellInputField['wellx2'][0].text())
+        y1 = int(self.multiwellInputField['welly1'][0].text())
+        y2 = int(self.multiwellInputField['welly2'][0].text())
+        dwellTime = float(self.multiwellInputField['dwell'][0].text())
+        x0 = x2 - x1
+        y0 = y2 - y1
+        xMW = (xWells - 1) * xWellSep
+        yMW = (yWells - 1) * yWellSep
+        sine = (y0 - (yMW/xMW)*x0) / (xMW + yMW**2/xMW)
+        angle = np.arcsin(sine)
+        print(angle)
+        positions = []
+        for x in range(0, xWells):
+            for y in range(0, yWells):
+                xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.sin(angle)
+                yPos = y1 + x*xWellSep*np.sin(angle) + y*yWellSep*np.cos(angle)
+                positions.append([xPos, yPos])
+        for p in positions:
+            time.sleep(dwellTime)
+            self.goto(p[0], p[1])
+        self.btn['Start'][0].setChecked(False)
 
     def set_a(self):
         '''Set acceleration'''
