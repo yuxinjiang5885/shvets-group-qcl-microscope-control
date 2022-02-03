@@ -674,6 +674,7 @@ class mainWindow(QMainWindow):
             self.plotCanvas.recolor(plotColor = defaults.PLOT_COLOR)
             self.plotCanvasRef.recolor(plotColor = defaults.PLOT_COLOR_REF)
             self.plotCanvasT.recolor(plotColor = defaults.PLOT_COLOR_T)
+
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
         self.lock_controls(lock=True)
