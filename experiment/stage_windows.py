@@ -95,12 +95,17 @@ class stageMotionWindow(QMainWindow):
         exitAction.setShortcut('Ctrl+W')
         exitAction.setStatusTip('Close stage motion window')
         exitAction.triggered.connect(lambda: self.close())
+        updateAction = QAction(QIcon(None), 'Update readings', self)
+        updateAction.setShortcut('Ctrl+U')
+        updateAction.setStatusTip('Update x/y stage position readings')
+        updateAction.triggered.connect(lambda: self.update_readings())
         ### Menus
         self.menubar = self.menuBar()
         self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)
         fileMenu = self.menubar.addMenu('Actions')
         fileMenu.setStyleSheet(defaults.STYLE_MENU)
         fileMenu.addAction(exitAction)
+        fileMenu.addAction(updateAction)
         ### Configure main grid layout
         self.container = QWidget()
         self.container.setStyleSheet(defaults.STYLE_CONTAINER)
