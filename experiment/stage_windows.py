@@ -6,6 +6,8 @@ Python 3.9.6 on Windows 10
 Created 2021-Dec-07
 '''
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import experiment.defaults as defaults
 from instruments.hld117 import stage
@@ -116,14 +118,38 @@ class stageMotionWindow(QMainWindow):
         ### Plot: stage position
         self.plotCanvas = mplCanvas(width=5, height=4)
         self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.plotCanvas.axes.set_aspect('equal')
         self.plotCanvas.axes.set_xlabel('x (μm)')
+        xTravel = defaults.STAGE_X_TRAVEL_UM
+        xMax = 1.1 * xTravel / 2
+        xMin = -1 * xMax
+        self.plotCanvas.axes.set_xlim(xMin, xMax)
         self.plotCanvas.axes.set_ylabel('y (μm)')
+        yTravel = defaults.STAGE_Y_TRAVEL_UM
+        yMax = 1.1 * yTravel / 2
+        yMin = -1 * yMax
+        self.plotCanvas.axes.set_ylim(yMin, yMax)
+        self.plotCanvas.axes.invert_yaxis() # Positive y is towards user
         self.plotCanvas.axes.set_title('Stage Position')
+        xMax = 1. * xTravel / 2
+        xMin = -1 * xMax
+        yMax = 1. * yTravel / 2
+        yMin = -1 * yMax
+        self.plotCanvas.axes.set_axisbelow(True)
+        self.plotCanvas.axes.grid(color='gray', linestyle='dashed')
+        patch = mpl.patches.Rectangle((xMin, yMin), xTravel, yTravel,
+                                    alpha = 0.5,
+                                    edgecolor = defaults.STG_COLORS['edge'],
+                                    facecolor = defaults.STG_COLORS['fill'],
+                                    fill = True,
+                                    lw = 2,
+                                    zorder = 1)
+        self.plotCanvas.axes.add_patch(patch)
         darkAxes = defaults.DARK_PLOT_AXES
         darkBackground = defaults.DARK_PLOT_BACKGROUND
         darkColor = defaults.PLOT_COLOR_DARK
         self.plotCanvas.recolor(darkAxes, darkBackground, darkColor)
-        self.grid.addWidget(self.plotCanvas, 0, 0, 5, 6)
+        self.grid.addWidget(self.plotCanvas, 0, 1, 4, 4)
         ### Tabs widget
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(defaults.STYLE_TABS)
@@ -233,9 +259,9 @@ class stageMotionWindow(QMainWindow):
         ### Buttons
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['Start'] = [QPushButton('Start'), 10, 0, 2, 3]
-        self.btn['Start'][0].setToolTip('Start raster scan')
+        self.btn['Start'][0].setToolTip('Start stage scan')
         self.btn['Stop'] = [QPushButton('Stop'), 10, 3, 2, 3]
-        self.btn['Stop'][0].setToolTip('Stop raster scan')
+        self.btn['Stop'][0].setToolTip('Stop stage scan')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
             k[0].setFocusPolicy(Qt.NoFocus)
@@ -290,6 +316,10 @@ class stageMotionWindow(QMainWindow):
                 yPos = y1 + x*xWellSep*np.sin(angle) + y*yWellSep*np.cos(angle)
                 positions.append([xPos, yPos])
         for p in positions:
+            # if self.btn['Stop'][0].isChecked():
+            #     print('Stage scan interrupted by user')
+            #     self.btn['Stop'][0].setChecked('False')
+            #     break
             time.sleep(dwellTime)
             self.goto(p[0], p[1])
         self.btn['Start'][0].setChecked(False)
@@ -314,6 +344,26 @@ class stageMotionWindow(QMainWindow):
             print('Could not set speed:\n{}'.format(exc))
             return
 
+    def update_plot(self, x=0, y=0, pattern=[]):
+        '''Update stage position plot'''
+        self.plotCanvas.clear_plots()
+        plot = self.plotCanvas.axes.scatter(x, y,
+                                            c = defaults.STG_COLORS['marker'],
+                                            marker = '+',
+                                            zorder = 10)
+        self.plotCanvas.plots.append(plot)
+        if (np.abs(x) < 1000) or (np.abs(y) < 1000):
+            textStr = '{:.0f}, {:.0f}'.format(x, y)
+        else:
+            textStr = '{:.0f},\n{:.0f}'.format(x, y)
+        text = plt.text(x + 2000, y + 0, textStr,
+                        color = defaults.STG_COLORS['text'],
+                        fontsize = 10)
+        self.plotCanvas.plots.append(text)
+        titleString = 'Stage Position: {:.0f}, {:.0f}'.format(x, y)
+        self.plotCanvas.axes.set_title(titleString)
+        self.plotCanvas.figure.canvas.draw()
+
     def update_readings(self):
         '''Update stage parameter readings.'''
         (x_um, y_um) = self.stage.get_position()
@@ -330,6 +380,8 @@ class stageMotionWindow(QMainWindow):
             ### Update input fields
             fieldName = '{}Set'.format(inputNames[x])
             self.inputField[fieldName][0].setText('{:.0f}'.format(paramReadings[x]))
+        ### Update position plot
+        self.update_plot(x_um, y_um)
 
 
 class stageStartupDialog(QDialog):

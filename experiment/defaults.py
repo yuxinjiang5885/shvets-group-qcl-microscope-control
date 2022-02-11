@@ -57,6 +57,10 @@ SOLARIZED = {'base03' : '#002b36',
              'blue': '#268bd2',
              'cyan': '#2aa198',
              'green': '#859900'}
+STG_COLORS = {'edge': '#99CCCC',
+              'fill' : '#336666',
+              'marker' : '#FF0000',
+              'text' : '#FF0000'}
 
 ### Individual colors
 DARK_PLOT_AXES = GS_COLORS['text']
@@ -161,6 +165,10 @@ DEF_SAMPLES = 32
 DEF_WL_START_UM = 5.2 # Default scan/sweep start wavelength, um
 DEF_WL_END_UM = 5.8 # Default scan/sweep end wavelength, um
 DEF_WL_STEP_UM = 0.1 # Default scan/sweep wavelength step, um
+
+### Stage travel parameters
+STAGE_X_TRAVEL_UM = 120000 # um
+STAGE_Y_TRAVEL_UM = 80000 # um
 
 ### Multiwell holder parameters
 DEF_WELLS_X = 5 # Default number of wells along x
