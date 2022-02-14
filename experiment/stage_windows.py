@@ -45,6 +45,80 @@ class stageInitializer(QObject):
         self.stageInstance.emit(stage0)
         self.stageInitialized.emit()
 
+class stageMotion(QObject):
+    '''Complex stage motion and scan patterns. Run in a separate thread.'''
+    finished = pyqtSignal()
+    stopped = False
+
+    def __init__(self):
+        '''Parameters must be set by caller for any method to work.'''
+        super().__init__()
+        self.parameters = [] # Parameters from caller, placeholder value
+
+    def goto_and_wait(self, targetx, targety):
+        '''Move to set x and y. Wait for stage to finish moving.'''
+        try:
+            self.parameters.stage.goto(targetx, targety)
+            while int(self.parameters.stage.busy()) > 0:
+                time.sleep(0.1)
+        except Exception as exc:
+            print('Could not move stage:\n{}'.format(exc))
+            return
+
+    def multiwell(self):
+        '''Multiwell scan: move to a number of positions in a sequence, stop and
+           dwell at each'''
+        ### Read parameters
+        xWells = self.parameters.xWells
+        yWells = self.parameters.yWells
+        xWellSep = self.parameters.xWellSep
+        yWellSep = self.parameters.yWellSep
+        angle = self.parameters.angle
+        x1 = self.parameters.x1
+        y1 = self.parameters.y1
+        dwellTime = self.parameters.dwellTime
+        ### Calculate positions vector
+        positions = []
+        for x in range(0, xWells):
+            for y in range(0, yWells):
+                xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.sin(angle)
+                yPos = y1 + x*xWellSep*np.sin(angle) + y*yWellSep*np.cos(angle)
+                positions.append([xPos, yPos])
+        ### Scan positions
+        for p in positions:
+            if self.stopped:
+                print('Stage scan interrupted by user')
+                break
+            self.goto_and_wait(p[0], p[1])
+            time.sleep(dwellTime)
+        self.stopped = False
+        self.finished.emit()
+
+    def stop(self):
+        '''Set stop flag. Connect to UI stop button.'''
+        self.stopped = True
+
+
+class stageMotionParameters():
+    '''Holds stage motion parameters, used by threaded run processes'''
+
+    def __init__(self):
+        self.stage = [] # Stage instance
+        self.xWells = defaults.DEF_WELLS_X # Wells along x
+        self.yWells = defaults.DEF_WELLS_Y # Wells along y
+        self.xWellSep = defaults.DEF_WELL_SEP_X_UM # Well separation x, um
+        self.yWellSep = defaults.DEF_WELL_SEP_Y_UM # Well separation y, um
+        self.x1 = defaults.DEF_WELL_ORIGIN_X_UM # Origin/start well x, um
+        self.y1 = defaults.DEF_WELL_ORIGIN_Y_UM # Origin/start well y, um
+        self.x2 = defaults.DEF_WELL_CORNER_X_UM # Corner/end well x, um
+        self.y2 = defaults.DEF_WELL_CORNER_Y_UM # Corner/end well y, um
+        self.dwellTime = defaults.DEF_DWELL_TIME_S # Dwell time, s
+        self.xCornerRel = self.x2 - self.x1 # Corner/end well relative x, um
+        self.yCornerRel = self.y2 - self.y1 # Corner/end well relative y, um
+        ### Inside size of well plate, as defined by scan path
+        self.xLength = (defaults.DEF_WELLS_X - 1) * defaults.DEF_WELL_SEP_X_UM
+        self.yLength = (defaults.DEF_WELLS_Y - 1) * defaults.DEF_WELL_SEP_Y_UM
+        self.angle = 0 # Well plate angle
 
 class stageMotionWindow(QMainWindow):
     '''GUI for stage motion control'''
@@ -55,6 +129,9 @@ class stageMotionWindow(QMainWindow):
         self.stage = mainGUI.stage
         self.stage.set_acc() # Return acceleration to default
         self.stage.set_speed() # Return speed to default
+        self.parameters = stageMotionParameters() # Passed to "run"
+        self.threadMW = [] # Multiwell thread
+        self.workerMW = [] # Multiwell worker
         self.make_gui()
 
     def center_window(self):
@@ -69,7 +146,8 @@ class stageMotionWindow(QMainWindow):
         event.accept()
 
     def goto(self, targetx=-1, targety=-1):
-        '''Move to set x and y'''
+        '''Move to set x and y.
+           Note: there is no wait at the end for the stage to finish moving.'''
         if targetx == -1:
             targetx = float(self.inputField['xSet'][0].text())
         if targety == -1:
@@ -81,6 +159,17 @@ class stageMotionWindow(QMainWindow):
         except Exception as exc:
             print('Could not move stage:\n{}'.format(exc))
             return
+
+    def lock_controls(self, lock=True):
+        '''Disable all buttons while operations are performed.'''
+        enabled = not lock # For the sake of clarity
+        lockableControls = [self.btn['Start'],
+                            self.inputField['xSet'],
+                            self.inputField['ySet'],
+                            self.inputField['vSet'],
+                            self.inputField['aSet']]
+        for k in lockableControls:
+            k[0].setEnabled(enabled)
 
     def make_gui(self):
         '''Draw controls'''
@@ -241,18 +330,22 @@ class stageMotionWindow(QMainWindow):
                  '{:.0f}'.format(defaults.DEF_WELLS_Y),
                  '{:.0f}'.format(defaults.DEF_WELL_SEP_X_UM),
                  '{:.0f}'.format(defaults.DEF_WELL_SEP_Y_UM),
+                 '{:.0f}'.format(defaults.DEF_WELL_ORIGIN_X_UM),
+                 '{:.0f}'.format(defaults.DEF_WELL_ORIGIN_Y_UM),
+                 '{:.0f}'.format(defaults.DEF_WELL_CORNER_X_UM),
+                 '{:.0f}'.format(defaults.DEF_WELL_CORNER_Y_UM),
                  '{:.3f}'.format(defaults.DEF_DWELL_TIME_S)]
-        self.multiwellInputField = dict() # to collect all input fields
-        self.multiwellInputField['xWells'] = [QLineEdit(mwDef[0]), 1, 1, 1, 1]
-        self.multiwellInputField['yWells'] = [QLineEdit(mwDef[1]), 2, 1, 1, 1]
-        self.multiwellInputField['xWellSep'] = [QLineEdit(mwDef[2]), 1, 2, 1, 1]
-        self.multiwellInputField['yWellSep'] = [QLineEdit(mwDef[3]), 2, 2, 1, 1]
-        self.multiwellInputField['wellx1'] = [QLineEdit(blankLine), 1, 3, 1, 1]
-        self.multiwellInputField['welly1'] = [QLineEdit(blankLine), 2, 3, 1, 1]
-        self.multiwellInputField['wellx2'] = [QLineEdit(blankLine), 1, 4, 1, 1]
-        self.multiwellInputField['welly2'] = [QLineEdit(blankLine), 2, 4, 1, 1]
-        self.multiwellInputField['dwell'] = [QLineEdit(mwDef[4]), 4, 3, 1, 1]
-        for _, k in self.multiwellInputField.items(): # Arrange in grid
+        self.mwInputField = dict() # to collect all input fields
+        self.mwInputField['xWells'] = [QLineEdit(mwDef[0]), 1, 1, 1, 1]
+        self.mwInputField['yWells'] = [QLineEdit(mwDef[1]), 2, 1, 1, 1]
+        self.mwInputField['xWellSep'] = [QLineEdit(mwDef[2]), 1, 2, 1, 1]
+        self.mwInputField['yWellSep'] = [QLineEdit(mwDef[3]), 2, 2, 1, 1]
+        self.mwInputField['wellx1'] = [QLineEdit(mwDef[4]), 1, 3, 1, 1]
+        self.mwInputField['welly1'] = [QLineEdit(mwDef[5]), 2, 3, 1, 1]
+        self.mwInputField['wellx2'] = [QLineEdit(mwDef[6]), 1, 4, 1, 1]
+        self.mwInputField['welly2'] = [QLineEdit(mwDef[7]), 2, 4, 1, 1]
+        self.mwInputField['dwell'] = [QLineEdit(mwDef[8]), 4, 3, 1, 1]
+        for _, k in self.mwInputField.items(): # Arrange in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.tabMultiwellGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
@@ -269,9 +362,11 @@ class stageMotionWindow(QMainWindow):
             k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        ### Set row stretch
-        for row in range(0, 12): # Set row spacing
+        ### Set stretch
+        for row in range(0, 12):
             self.grid.setRowStretch(row, 1)
+        for col in range(0, 6):
+            self.grid.setColumnStretch(col, 1)
         ### Fill in readings, and use as start values for inputs
         self.update_readings()
         ### Connecting inputs one-by-one as workaround
@@ -286,43 +381,65 @@ class stageMotionWindow(QMainWindow):
         '''Run stage scan'''
         if self.tabs.currentIndex() not in [1]:
             print('Not implemented.')
-            return
-        if self.tabs.currentIndex() == 1:
+        elif self.tabs.currentIndex() == 1:
             print('Running multiwell scan.')
             self.run_multiwell()
 
     def run_multiwell(self):
         '''Run multiwell holder scan'''
-        xWells = int(self.multiwellInputField['xWells'][0].text())
-        yWells = int(self.multiwellInputField['yWells'][0].text())
-        xWellSep = int(self.multiwellInputField['xWellSep'][0].text())
-        yWellSep = int(self.multiwellInputField['yWellSep'][0].text())
-        x1 = int(self.multiwellInputField['wellx1'][0].text())
-        x2 = int(self.multiwellInputField['wellx2'][0].text())
-        y1 = int(self.multiwellInputField['welly1'][0].text())
-        y2 = int(self.multiwellInputField['welly2'][0].text())
-        dwellTime = float(self.multiwellInputField['dwell'][0].text())
-        x0 = x2 - x1
-        y0 = y2 - y1
-        xMW = (xWells - 1) * xWellSep
-        yMW = (yWells - 1) * yWellSep
+        ### Lock GUI controls
+        self.lock_controls()
+        # self.statusbar.showMessage('Busy')
+        ### Read, calculate and compile experiment parameters
+        self.parameters.stage = self.stage
+        self.parameters.xWells = int(self.mwInputField['xWells'][0].text())
+        self.parameters.yWells = int(self.mwInputField['yWells'][0].text())
+        self.parameters.xWellSep = int(self.mwInputField['xWellSep'][0].text())
+        self.parameters.yWellSep = int(self.mwInputField['yWellSep'][0].text())
+        self.parameters.x1 = int(self.mwInputField['wellx1'][0].text())
+        self.parameters.x2 = int(self.mwInputField['wellx2'][0].text())
+        self.parameters.y1 = int(self.mwInputField['welly1'][0].text())
+        self.parameters.y2 = int(self.mwInputField['welly2'][0].text())
+        self.parameters.dwellTime = float(self.mwInputField['dwell'][0].text())
+        x0 = self.parameters.x2 - self.parameters.x1
+        y0 = self.parameters.y2 - self.parameters.y1
+        xMW = (self.parameters.xWells - 1) * self.parameters.xWellSep
+        yMW = (self.parameters.yWells - 1) * self.parameters.yWellSep
         sine = (y0 - (yMW/xMW)*x0) / (xMW + yMW**2/xMW)
-        angle = np.arcsin(sine)
-        print(angle)
+        self.parameters.xCornerRel = x0
+        self.parameters.yCornerRel = y0
+        self.parameters.xLength = xMW
+        self.parameters.yLength = yMW
+        self.parameters.angle = np.arcsin(sine)
         positions = []
-        for x in range(0, xWells):
-            for y in range(0, yWells):
-                xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.sin(angle)
-                yPos = y1 + x*xWellSep*np.sin(angle) + y*yWellSep*np.cos(angle)
-                positions.append([xPos, yPos])
-        for p in positions:
-            # if self.btn['Stop'][0].isChecked():
-            #     print('Stage scan interrupted by user')
-            #     self.btn['Stop'][0].setChecked('False')
-            #     break
-            time.sleep(dwellTime)
-            self.goto(p[0], p[1])
-        self.btn['Start'][0].setChecked(False)
+        ### Parameter checks
+        # if self.parameters.start == self.parameters.end: # Requested limits are equal
+        #     print('Limits cannot be equal.')
+        #     self.btn['Start'][0].setChecked(False)
+        #     # GUIInstance.btn['Stop'][0].setChecked(False)
+        #     self.btn['Sweep'][0].setChecked(False)
+        #     return
+        ### Run stage scan in separate thread
+        self.threadMW = QThread()
+        self.workerMW = stageMotion()
+        self.btn['Stop'][0].clicked.connect(self.workerMW.stop)
+        self.workerMW.parameters = self.parameters
+        self.workerMW.moveToThread(self.threadMW)
+        self.threadMW.started.connect(self.workerMW.multiwell)
+        self.workerMW.finished.connect(self.threadMW.quit)
+        self.workerMW.finished.connect(self.workerMW.deleteLater)
+        self.threadMW.finished.connect(self.threadMW.deleteLater)
+        self.threadMW.start()
+        ### Plot data
+        # self.workerMW.outData.connect(self.plot)
+        ### Save current QCLs, ranges and limits for use with "repeat" function
+        # self.workerMW.outParams.connect(self.update_parameters)
+        ### Unlock GUI controls
+        self.workerMW.finished.connect(lambda: self.lock_controls(lock=False))
+        # self.workerMW.finished.connect(lambda: self.statusbar.showMessage('Ready'))
+        ### Uncheck UI buttons
+        self.workerMW.finished.connect(lambda: self.btn['Start'][0].setChecked(False))
+        self.workerMW.finished.connect(lambda: self.btn['Stop'][0].setChecked(False))
 
     def set_a(self):
         '''Set acceleration'''
@@ -360,7 +477,7 @@ class stageMotionWindow(QMainWindow):
                         color = defaults.STG_COLORS['text'],
                         fontsize = 10)
         self.plotCanvas.plots.append(text)
-        titleString = 'Stage Position: {:.0f}, {:.0f}'.format(x, y)
+        titleString = 'Stage Position: x {:.0f} μm, y  {:.0f} μm'.format(x, y)
         self.plotCanvas.axes.set_title(titleString)
         self.plotCanvas.figure.canvas.draw()
 

@@ -61,7 +61,8 @@ class stage():
         # print(f"api response {ret}, rx = {self.rx.value.decode()}")
 
     def busy(self):
-        '''Check whether stage is busy'''
+        '''Check whether stage is busy:
+           “0” idle, “1” X moving, “2” Y moving, “3” both X&Y moving'''
         busy = self.message('controller.stage.busy.get')
         return busy[1]
 
