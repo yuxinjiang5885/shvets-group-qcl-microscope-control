@@ -472,6 +472,8 @@ class stageMotionWindow(QMainWindow):
                 yLine = [p1[1], p2[1]]
                 line = self.plotCanvas.axes.plot(xLine, yLine, 'k')
                 self.plotCanvas.plots.append(line[0])
+                # self.plotCanvas.axes.arrow(0, 0, 0.01, np.sin(0.01), shape='full', lw=10,
+                #         length_includes_head=True, head_width=.05, color='r')
         plot = self.plotCanvas.axes.scatter(x, y,
                                             c = defaults.STG_COLORS['marker'],
                                             marker = '+',
