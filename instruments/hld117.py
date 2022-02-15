@@ -20,7 +20,8 @@ from os.path import abspath, join, split, realpath
 # if mSubdir not in sys.path:
 #     sys.path.append(mSubdir)
 
-COM_PORT = 3 # Controller COM port
+# COM_PORT = 3 # Controller COM port
+COM_PORT = 5 # Controller COM port
 DLL_PATH = 'instruments/prior/PriorScientificSDK.dll' # Prior SDK DLL path
 
 DEFAULT_SPEED = 30000 # Default stage speed, um/s

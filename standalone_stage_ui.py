@@ -40,11 +40,11 @@ class mainWindow(QMainWindow):
         self.stage_motion_window()
 
     def stage_motion_window(self):
-        '''Multiple acquisitions menu'''
+        '''Show actual stage motion control window'''
         self.stageMotionWindow.show()
 
     def stage_set(self, stageInstance):
-        '''Set laser instance'''
+        '''Set stage instance'''
         self.stage = stageInstance
 
 if __name__ == '__main__':

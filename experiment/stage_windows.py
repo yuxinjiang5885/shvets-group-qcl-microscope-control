@@ -48,7 +48,7 @@ class stageInitializer(QObject):
 class stageMotion(QObject):
     '''Complex stage motion and scan patterns. Run in a separate thread.'''
     finished = pyqtSignal()
-    currentPosition = pyqtSignal(int, int, list)
+    currentPosition = pyqtSignal(float, float, list)
     stopped = False
 
     def __init__(self):
@@ -463,6 +463,8 @@ class stageMotionWindow(QMainWindow):
 
     def update_plot(self, x=0, y=0, pattern=[]):
         '''Update stage position plot'''
+        print(x)
+        print(y)
         self.plotCanvas.clear_plots()
         if not pattern == []:
             for p in range (0, len(pattern) - 1):
@@ -470,7 +472,7 @@ class stageMotionWindow(QMainWindow):
                 p2 = pattern[p + 1]
                 xLine = [p1[0], p2[0]]
                 yLine = [p1[1], p2[1]]
-                line = self.plotCanvas.axes.plot(xLine, yLine, 'k')
+                line = self.plotCanvas.axes.plot(xLine, yLine, 'k', zorder = 2)
                 self.plotCanvas.plots.append(line[0])
                 # self.plotCanvas.axes.arrow(0, 0, 0.01, np.sin(0.01), shape='full', lw=10,
                 #         length_includes_head=True, head_width=.05, color='r')
