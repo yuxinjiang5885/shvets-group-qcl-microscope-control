@@ -34,6 +34,11 @@ class mainWindow(QMainWindow):
         startupDialog2 = stageStartupDialog() # Closes when startup finishes
         self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
         startupDialog2.exec()
+        ### Connection check: WIP
+        # if not connected:
+        #     print('Could not connect to stage.')
+        #     print('Is the COM port in "hld117.py" correct?')
+        #     print('Available ports are listed in Device Manager.')
         ### Create window with stage motion controls
         self.stageMotionWindow = stageMotionWindow(self)
         ### Show stage motions control window

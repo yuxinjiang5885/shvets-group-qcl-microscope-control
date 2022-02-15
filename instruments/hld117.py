@@ -69,6 +69,7 @@ class stage():
 
     def connect(self):
         '''Connect controller'''
+        print('Connecting to stage on COM port {}'.format(COM_PORT))
         self.message('controller.connect {:0f}'.format(COM_PORT))
 
     def disconnect(self):
