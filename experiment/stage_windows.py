@@ -463,8 +463,6 @@ class stageMotionWindow(QMainWindow):
 
     def update_plot(self, x=0, y=0, pattern=[]):
         '''Update stage position plot'''
-        print(x)
-        print(y)
         self.plotCanvas.clear_plots()
         if not pattern == []:
             for p in range (0, len(pattern) - 1):
@@ -473,9 +471,25 @@ class stageMotionWindow(QMainWindow):
                 xLine = [p1[0], p2[0]]
                 yLine = [p1[1], p2[1]]
                 line = self.plotCanvas.axes.plot(xLine, yLine, 'k', zorder = 2)
-                self.plotCanvas.plots.append(line[0])
-                # self.plotCanvas.axes.arrow(0, 0, 0.01, np.sin(0.01), shape='full', lw=10,
-                #         length_includes_head=True, head_width=.05, color='r')
+                self.plotCanvas.plots.append(line[0]) # Index to get actual object
+                xArrow = (p1[0] + p2[0]) / 2
+                yArrow = (p1[1] + p2[1]) / 2
+                if p2[0] == p1[0]:
+                    dxArrow = 0
+                else:
+                    dxArrow = 1800 * (p2[0] - p1[0]) / np.abs(p2[0] - p1[0])
+                if p2[1] == p1[1]:
+                    dyArrow = 0
+                else:
+                    dyArrow = 1700 * (p2[1] - p1[1]) / np.abs(p2[1] - p1[1])
+                arrow = self.plotCanvas.axes.arrow(xArrow, yArrow,
+                                                   dxArrow, dyArrow,
+                                                   lw = 1,
+                                                   length_includes_head = True,
+                                                   head_length = 1800,
+                                                   head_width = 1800,
+                                                   color = 'k')
+                self.plotCanvas.plots.append(arrow)
         plot = self.plotCanvas.axes.scatter(x, y,
                                             c = defaults.STG_COLORS['marker'],
                                             marker = '+',

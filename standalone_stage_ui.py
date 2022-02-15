@@ -37,8 +37,9 @@ class mainWindow(QMainWindow):
         ### Connection check: WIP
         # if not connected:
         #     print('Could not connect to stage.')
-        #     print('Is the COM port in "hld117.py" correct?')
+        #     print('Is the COM port in "hld117.py" correct?', end = '')
         #     print('Available ports are listed in Device Manager.')
+        #     return
         ### Create window with stage motion controls
         self.stageMotionWindow = stageMotionWindow(self)
         ### Show stage motions control window
