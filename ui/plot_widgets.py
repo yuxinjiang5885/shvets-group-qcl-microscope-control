@@ -26,7 +26,7 @@ class mplCanvas(FigCanvas):
     def clear_plots(self):
         for pl in self.plots:
             pl.remove()
-            self.plots = [] # Re-initialize list
+        self.plots = [] # Re-initialize list
 
     def plot_line(self, X, Y, color=[0, 0, 0]):
         '''Call plot_surface to plot data'''

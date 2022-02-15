@@ -48,6 +48,7 @@ class stageInitializer(QObject):
 class stageMotion(QObject):
     '''Complex stage motion and scan patterns. Run in a separate thread.'''
     finished = pyqtSignal()
+    currentPosition = pyqtSignal(int, int, list)
     stopped = False
 
     def __init__(self):
@@ -90,6 +91,7 @@ class stageMotion(QObject):
                 print('Stage scan interrupted by user')
                 break
             self.goto_and_wait(p[0], p[1])
+            self.currentPosition.emit(p[0], p[1], positions) # Send to plot
             time.sleep(dwellTime)
         self.stopped = False
         self.finished.emit()
@@ -430,10 +432,8 @@ class stageMotionWindow(QMainWindow):
         self.workerMW.finished.connect(self.workerMW.deleteLater)
         self.threadMW.finished.connect(self.threadMW.deleteLater)
         self.threadMW.start()
-        ### Plot data
-        # self.workerMW.outData.connect(self.plot)
-        ### Save current QCLs, ranges and limits for use with "repeat" function
-        # self.workerMW.outParams.connect(self.update_parameters)
+        ### Plot current position and pattern
+        self.workerMW.currentPosition.connect(self.update_plot)
         ### Unlock GUI controls
         self.workerMW.finished.connect(lambda: self.lock_controls(lock=False))
         # self.workerMW.finished.connect(lambda: self.statusbar.showMessage('Ready'))
@@ -464,6 +464,14 @@ class stageMotionWindow(QMainWindow):
     def update_plot(self, x=0, y=0, pattern=[]):
         '''Update stage position plot'''
         self.plotCanvas.clear_plots()
+        if not pattern == []:
+            for p in range (0, len(pattern) - 1):
+                p1 = pattern[p]
+                p2 = pattern[p + 1]
+                xLine = [p1[0], p2[0]]
+                yLine = [p1[1], p2[1]]
+                line = self.plotCanvas.axes.plot(xLine, yLine, 'k')
+                self.plotCanvas.plots.append(line[0])
         plot = self.plotCanvas.axes.scatter(x, y,
                                             c = defaults.STG_COLORS['marker'],
                                             marker = '+',
