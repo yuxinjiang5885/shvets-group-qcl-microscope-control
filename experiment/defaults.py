@@ -171,7 +171,7 @@ STAGE_X_TRAVEL_UM = 120000 # um
 STAGE_Y_TRAVEL_UM = 80000 # um
 
 ### Multiwell holder parameters
-DEF_WELLS_X = 5 # Default number of wells along x
+DEF_WELLS_X = 8 # Default number of wells along x
 DEF_WELLS_Y = 2 # Default number of wells along y
 DEF_WELL_SEP_X_UM = 10000 # Default well separation along x, um
 DEF_WELL_SEP_Y_UM = 10000 # Default well separation along y, um
