@@ -177,7 +177,7 @@ DEF_WELL_SEP_X_UM = 10000 # Default well separation along x, um
 DEF_WELL_SEP_Y_UM = 10000 # Default well separation along y, um
 DEF_WELL_ORIGIN_X_UM = 0 # Default position of origin well, x, um
 DEF_WELL_ORIGIN_Y_UM = 0 # Default position of origin well, y, um
-DEF_WELL_CORNER_X_UM = 40000 # Default position of top corner well, x, um
+DEF_WELL_CORNER_X_UM = 70000 # Default position of top corner well, x, um
 DEF_WELL_CORNER_Y_UM = 10000 # Default position of top corner well, y, um
 DEF_DWELL_TIME_S = 0.1 # Default dwell time, s
 

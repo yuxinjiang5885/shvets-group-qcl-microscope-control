@@ -85,6 +85,8 @@ class stageMotion(QObject):
                 xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.sin(angle)
                 yPos = y1 + x*xWellSep*np.sin(angle) + y*yWellSep*np.cos(angle)
                 positions.append([xPos, yPos])
+        if self.parameters.reverse:
+            positions.reverse()
         ### Scan positions
         for p in positions:
             if self.stopped:
@@ -121,6 +123,7 @@ class stageMotionParameters():
         self.xLength = (defaults.DEF_WELLS_X - 1) * defaults.DEF_WELL_SEP_X_UM
         self.yLength = (defaults.DEF_WELLS_Y - 1) * defaults.DEF_WELL_SEP_Y_UM
         self.angle = 0 # Well plate angle
+        self.reverse = False # Reverse pattern direction
 
 class stageMotionWindow(QMainWindow):
     '''GUI for stage motion control'''
@@ -192,6 +195,10 @@ class stageMotionWindow(QMainWindow):
         updateAction.setShortcut('Ctrl+U')
         updateAction.setStatusTip('Update x/y stage position readings')
         updateAction.triggered.connect(lambda: self.update_readings())
+        ### Pattern options
+        self.reverse = QAction(QIcon(None), 'Reverse pattern', self, checkable=True)
+        self.reverse.setShortcut('Ctrl+R')
+        self.reverse.setStatusTip('Reverse pattern direction')
         ### Menus
         self.menubar = self.menuBar()
         self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)
@@ -199,6 +206,9 @@ class stageMotionWindow(QMainWindow):
         fileMenu.setStyleSheet(defaults.STYLE_MENU)
         fileMenu.addAction(exitAction)
         fileMenu.addAction(updateAction)
+        patternMenu = self.menubar.addMenu('Patterns')
+        patternMenu.setStyleSheet(defaults.STYLE_MENU)
+        patternMenu.addAction(self.reverse)
         ### Configure main grid layout
         self.container = QWidget()
         self.container.setStyleSheet(defaults.STYLE_CONTAINER)
@@ -318,9 +328,9 @@ class stageMotionWindow(QMainWindow):
         self.multiwellLabels['wells'] = [QLabel('Wells'), 0, 1, 1, 1]
         self.multiwellLabels['wellSeparation'] = [QLabel('Well Sep. (μm)'),
                                                                      0, 2, 1, 1]
-        self.multiwellLabels['firstWell'] = [QLabel('First Well Pos. (μm)'),
+        self.multiwellLabels['firstWell'] = [QLabel('Bottom Left (μm)'),
                                                                      0, 3, 1, 1]
-        self.multiwellLabels['lastWell'] = [QLabel('Last Well Pos. (μm)'),
+        self.multiwellLabels['lastWell'] = [QLabel('Top Right (μm)'),
                                                                      0, 4, 1, 1]
         self.multiwellLabels['dwell'] = [QLabel('Dwell time (s)'), 4, 0, 1, 2]
         for _, k in self.multiwellLabels.items(): # Arrange labels in grid
@@ -339,14 +349,23 @@ class stageMotionWindow(QMainWindow):
                  '{:.3f}'.format(defaults.DEF_DWELL_TIME_S)]
         self.mwInputField = dict() # to collect all input fields
         self.mwInputField['xWells'] = [QLineEdit(mwDef[0]), 1, 1, 1, 1]
+        self.mwInputField['xWells'][0].setToolTip('Number of wells along x')
         self.mwInputField['yWells'] = [QLineEdit(mwDef[1]), 2, 1, 1, 1]
+        self.mwInputField['yWells'][0].setToolTip('Number of wells along y')
         self.mwInputField['xWellSep'] = [QLineEdit(mwDef[2]), 1, 2, 1, 1]
+        self.mwInputField['xWellSep'][0].setToolTip('Wells separation along x')
         self.mwInputField['yWellSep'] = [QLineEdit(mwDef[3]), 2, 2, 1, 1]
+        self.mwInputField['yWellSep'][0].setToolTip('Wells separation along y')
         self.mwInputField['wellx1'] = [QLineEdit(mwDef[4]), 1, 3, 1, 1]
+        self.mwInputField['wellx1'][0].setToolTip('x coordinate of bottom left well in scan')
         self.mwInputField['welly1'] = [QLineEdit(mwDef[5]), 2, 3, 1, 1]
+        self.mwInputField['welly1'][0].setToolTip('y coordinate of bottom left well in scan')
         self.mwInputField['wellx2'] = [QLineEdit(mwDef[6]), 1, 4, 1, 1]
+        self.mwInputField['wellx2'][0].setToolTip('x coordinate of top right well in scan')
         self.mwInputField['welly2'] = [QLineEdit(mwDef[7]), 2, 4, 1, 1]
+        self.mwInputField['welly2'][0].setToolTip('y coordinate of top right well in scan')
         self.mwInputField['dwell'] = [QLineEdit(mwDef[8]), 4, 3, 1, 1]
+        self.mwInputField['dwell'][0].setToolTip('Time to wait at each well')
         for _, k in self.mwInputField.items(): # Arrange in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
@@ -407,13 +426,20 @@ class stageMotionWindow(QMainWindow):
         y0 = self.parameters.y2 - self.parameters.y1
         xMW = (self.parameters.xWells - 1) * self.parameters.xWellSep
         yMW = (self.parameters.yWells - 1) * self.parameters.yWellSep
-        sine = (y0 - (yMW/xMW)*x0) / (xMW + yMW**2/xMW)
+        if (xMW == 0) or (yMW == 0): # Then angle is between first and last well
+            angle = np.arctan2(y0, x0)
+        else: # Angle is that of multiwell holder
+            sine = (y0 - (yMW/xMW)*x0) / (xMW + yMW**2/xMW)
+            angle = np.arcsin(sine)
         self.parameters.xCornerRel = x0
         self.parameters.yCornerRel = y0
         self.parameters.xLength = xMW
         self.parameters.yLength = yMW
-        self.parameters.angle = np.arcsin(sine)
-        positions = []
+        self.parameters.angle = angle
+        if self.reverse.isChecked():
+            self.parameters.reverse = True
+        else:
+            self.parameters.reverse = False
         ### Parameter checks
         # if self.parameters.start == self.parameters.end: # Requested limits are equal
         #     print('Limits cannot be equal.')
