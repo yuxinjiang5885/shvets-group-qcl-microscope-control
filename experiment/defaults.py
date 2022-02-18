@@ -57,7 +57,8 @@ SOLARIZED = {'base03' : '#002b36',
              'blue': '#268bd2',
              'cyan': '#2aa198',
              'green': '#859900'}
-STG_COLORS = {'edge': '#99CCCC',
+STG_COLORS = {'acqText': '#FFFFFF',
+              'edge': '#99CCCC',
               'fill' : '#336666',
               'marker' : '#FF0000',
               'text' : '#FF0000'}
@@ -180,6 +181,7 @@ DEF_WELL_ORIGIN_Y_UM = 5000 # Default position of origin well, y, um
 DEF_WELL_CORNER_X_UM = 35000 # Default position of top corner well, x, um
 DEF_WELL_CORNER_Y_UM = -5000 # Default position of top corner well, y, um
 DEF_DWELL_TIME_S = 0.1 # Default dwell time, s
+DEF_NUMBER_OF_ACQ = 1 # Default number of acquisitions
 
 ### UI look and feel
 COL_WIDTH = 100
@@ -267,6 +269,10 @@ STYLE_CONTAINER = '''QWidget {{
 STYLE_LABEL_EMPH = '''QLabel {{
         color:{};
         qproperty-alignment: AlignLeft;
+    }}'''.format(GS_COLORS['text'])
+STYLE_LABEL_EMPH_CENTER = '''QLabel {{
+        color:{};
+        qproperty-alignment: AlignCenter;
     }}'''.format(GS_COLORS['text'])
 STYLE_INPUT = '''QLineEdit {{
         color: {};

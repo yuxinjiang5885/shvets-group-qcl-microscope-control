@@ -48,7 +48,7 @@ class stageInitializer(QObject):
 class stageMotion(QObject):
     '''Complex stage motion and scan patterns. Run in a separate thread.'''
     finished = pyqtSignal()
-    currentPosition = pyqtSignal(float, float, list)
+    currentPosition = pyqtSignal(float, float, list, list)
     stopped = False
 
     def __init__(self):
@@ -70,6 +70,7 @@ class stageMotion(QObject):
         '''Multiwell scan: move to a number of positions in a sequence, stop and
            dwell at each'''
         ### Read parameters
+        acquisitions = self.parameters.acquisitions
         xWells = self.parameters.xWells
         yWells = self.parameters.yWells
         xWellSep = self.parameters.xWellSep
@@ -98,13 +99,17 @@ class stageMotion(QObject):
         if self.parameters.reverse:
             positions.reverse()
         ### Scan positions
-        for p in positions:
+        for a in range(0, acquisitions):
             if self.stopped:
-                print('Stage scan interrupted by user')
                 break
-            self.goto_and_wait(p[0], p[1])
-            self.currentPosition.emit(p[0], p[1], positions) # Send to plot
-            time.sleep(dwellTime)
+            for p in positions:
+                if self.stopped:
+                    print('Stage scan interrupted by user')
+                    break
+                self.goto_and_wait(p[0], p[1])
+                acqStatus = [acquisitions, a + 1]
+                self.currentPosition.emit(p[0], p[1], positions, acqStatus) # Send to plot
+                time.sleep(dwellTime)
         self.stopped = False
         self.finished.emit()
 
@@ -118,6 +123,7 @@ class stageMotionParameters():
 
     def __init__(self):
         self.stage = [] # Stage instance
+        self.acquisitions = defaults.DEF_NUMBER_OF_ACQ # Number of acquisitions
         self.xWells = defaults.DEF_WELLS_X # Wells along x
         self.yWells = defaults.DEF_WELLS_Y # Wells along y
         self.xWellSep = defaults.DEF_WELL_SEP_X_UM # Well separation x, um
@@ -199,16 +205,18 @@ class stageMotionWindow(QMainWindow):
         ### Actions
         exitAction = QAction(QIcon(None), 'Close Window', self)
         exitAction.setShortcut('Ctrl+W')
-        exitAction.setStatusTip('Close stage motion window')
+        exitAction.setToolTip('Close stage motion window')
         exitAction.triggered.connect(lambda: self.close())
         updateAction = QAction(QIcon(None), 'Update readings', self)
         updateAction.setShortcut('Ctrl+U')
-        updateAction.setStatusTip('Update x/y stage position readings')
+        updateAction.setToolTip('Update x/y stage position readings')
         updateAction.triggered.connect(lambda: self.update_readings())
         ### Pattern options
         self.reverse = QAction(QIcon(None), 'Reverse pattern', self, checkable=True)
         self.reverse.setShortcut('Ctrl+R')
-        self.reverse.setStatusTip('Reverse pattern direction')
+        self.reverse.setToolTip('Reverse pattern direction')
+        self.timeBehavior = QAction(QIcon(None), 'Include move time in step', self, checkable=True)
+        self.timeBehavior.setToolTip('Stage move time is included in step total')
         ### Menus
         self.menubar = self.menuBar()
         self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)
@@ -219,6 +227,7 @@ class stageMotionWindow(QMainWindow):
         patternMenu = self.menubar.addMenu('Patterns')
         patternMenu.setStyleSheet(defaults.STYLE_MENU)
         patternMenu.addAction(self.reverse)
+        patternMenu.addAction(self.timeBehavior)
         ### Configure main grid layout
         self.container = QWidget()
         self.container.setStyleSheet(defaults.STYLE_CONTAINER)
@@ -342,11 +351,17 @@ class stageMotionWindow(QMainWindow):
                                                                      0, 3, 1, 1]
         self.multiwellLabels['lastWell'] = [QLabel('Top Right (μm)'),
                                                                      0, 4, 1, 1]
-        self.multiwellLabels['dwell'] = [QLabel('Dwell time (s)'), 4, 0, 1, 2]
+        self.multiwellLabels['header2'] = [QLabel(''), 3, 0, 1, 5]
+        self.multiwellLabels['dwell'] = [QLabel('Dwell time (s): '), 4, 1, 1, 1]
+        self.multiwellLabels['acquisitions'] = [QLabel('Acquisitions: '), 4, 3, 1, 1]
+        self.multiwellLabels['dwell'][0].setAlignment(Qt.AlignCenter)
         for _, k in self.multiwellLabels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
             self.tabMultiwellGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Adjust alignment of select labels
+        self.multiwellLabels['dwell'][0].setStyleSheet(defaults.STYLE_LABEL_EMPH_CENTER)
+        self.multiwellLabels['acquisitions'][0].setStyleSheet(defaults.STYLE_LABEL_EMPH_CENTER)
         ### Multiwell tab - Input fields
         mwDef = ['{:.0f}'.format(defaults.DEF_WELLS_X),
                  '{:.0f}'.format(defaults.DEF_WELLS_Y),
@@ -356,6 +371,7 @@ class stageMotionWindow(QMainWindow):
                  '{:.0f}'.format(defaults.DEF_WELL_ORIGIN_Y_UM),
                  '{:.0f}'.format(defaults.DEF_WELL_CORNER_X_UM),
                  '{:.0f}'.format(defaults.DEF_WELL_CORNER_Y_UM),
+                 '{:.0f}'.format(defaults.DEF_NUMBER_OF_ACQ),
                  '{:.3f}'.format(defaults.DEF_DWELL_TIME_S)]
         self.mwInputField = dict() # to collect all input fields
         self.mwInputField['xWells'] = [QLineEdit(mwDef[0]), 1, 1, 1, 1]
@@ -374,7 +390,9 @@ class stageMotionWindow(QMainWindow):
         self.mwInputField['wellx2'][0].setToolTip('x coordinate of top right well in scan')
         self.mwInputField['welly2'] = [QLineEdit(mwDef[7]), 2, 4, 1, 1]
         self.mwInputField['welly2'][0].setToolTip('y coordinate of top right well in scan')
-        self.mwInputField['dwell'] = [QLineEdit(mwDef[8]), 4, 3, 1, 1]
+        self.mwInputField['acquisitions'] = [QLineEdit(mwDef[8]), 4, 4, 1, 1]
+        self.mwInputField['acquisitions'][0].setToolTip('Number of acquisitions')
+        self.mwInputField['dwell'] = [QLineEdit(mwDef[9]), 4, 2, 1, 1]
         self.mwInputField['dwell'][0].setToolTip('Time to wait at each well')
         for _, k in self.mwInputField.items(): # Arrange in grid
             k[0].setFont(font)
@@ -429,6 +447,7 @@ class stageMotionWindow(QMainWindow):
             self.lock_controls(lock=False)
             self.btn['Start'][0].setChecked(False)
             return
+        self.parameters.acquisitions = int(self.mwInputField['acquisitions'][0].text())
         self.parameters.stage = self.stage
         self.parameters.xWellSep = int(self.mwInputField['xWellSep'][0].text())
         self.parameters.yWellSep = int(self.mwInputField['yWellSep'][0].text())
@@ -507,7 +526,7 @@ class stageMotionWindow(QMainWindow):
             print('Could not set speed:\n{}'.format(exc))
             return
 
-    def update_plot(self, x=0, y=0, pattern=[]):
+    def update_plot(self, x=0, y=0, pattern=[], acquisitions = [1, 1]):
         '''Update stage position plot'''
         self.plotCanvas.clear_plots()
         if not pattern == []:
@@ -554,6 +573,14 @@ class stageMotionWindow(QMainWindow):
                         color = defaults.STG_COLORS['text'],
                         fontsize = 10)
         self.plotCanvas.plots.append(text)
+        acqNum = acquisitions[0]
+        acqCur = acquisitions[1]
+        if acqNum > 1:
+            acqTextStr = 'Acquisition: {:.0f} / {:.0f}'.format(acqCur, acqNum)
+            acqText = plt.text(-58000, -35000, acqTextStr,
+                            color = defaults.STG_COLORS['acqText'],
+                            fontsize = 10)
+            self.plotCanvas.plots.append(acqText)
         titleString = 'Stage Position: x {:.0f} μm, y  {:.0f} μm'.format(x, y)
         self.plotCanvas.axes.set_title(titleString)
         self.plotCanvas.figure.canvas.draw()
