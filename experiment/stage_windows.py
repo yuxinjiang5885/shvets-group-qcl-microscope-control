@@ -87,8 +87,13 @@ class stageMotion(QObject):
         else:
             for x in range(0, xWells):
                 for y in range(0, yWells):
+                    ### Rectangle diagonal for this position
+                    # angle2 = np.arctan2(y, x)
+                    ### Angle of position relative to bottom left well
+                    # posAngle = angle + angle2
+                    ### Calculate positons. Note: stage y axis is inverted.
                     xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.sin(angle)
-                    yPos = y1 + x*xWellSep*np.sin(angle) + y*yWellSep*np.cos(angle)
+                    yPos = y1 + -1 * x*xWellSep*np.sin(angle) + -1 * y*yWellSep*np.cos(angle)
                     positions.append([xPos, yPos])
         if self.parameters.reverse:
             positions.reverse()
@@ -445,7 +450,7 @@ class stageMotionWindow(QMainWindow):
             # sine = (y0 - (yMW/xMW)*x0) / (xMW + yMW**2/xMW)
             # angle = np.arcsin(sine)
             angle = np.arctan2(y0, x0) - np.arctan2(yMW, xMW)
-        print('Multiwell holder angle : {:.4f}°.'.format(angle* 360 / (2 * np.pi)))
+        print('Multiwell holder angle : {:.2f}°.'.format(angle* 360 / (2 * np.pi)))
         self.parameters.xCornerRel = x0
         self.parameters.yCornerRel = y0
         self.parameters.xLength = xMW
@@ -515,20 +520,25 @@ class stageMotionWindow(QMainWindow):
                 self.plotCanvas.plots.append(line[0]) # Index to get actual object
                 xArrow = (p1[0] + p2[0]) / 2
                 yArrow = (p1[1] + p2[1]) / 2
+                arrowLength = 1800 # um, choose value for plot clarity
+                ### Angle between two positions, with inverted y axis
+                dirAngle = np.arctan2(-1 * (p2[1] - p1[1]), p2[0] - p1[0])
                 if p2[0] == p1[0]:
                     dxArrow = 0
                 else:
-                    dxArrow = 1800 * (p2[0] - p1[0]) / np.abs(p2[0] - p1[0])
+                    dxDir = (p2[0] - p1[0]) / np.abs(p2[0] - p1[0])
+                    dxArrow = arrowLength * np.abs(np.cos(dirAngle)) * dxDir
                 if p2[1] == p1[1]:
                     dyArrow = 0
-                else:
-                    dyArrow = 1700 * (p2[1] - p1[1]) / np.abs(p2[1] - p1[1])
+                else: ### Corrections required for inverted y axis
+                    dyDir = (p2[1] - p1[1]) / np.abs(p2[1] - p1[1])
+                    dyArrow = arrowLength * np.abs(np.sin(dirAngle)) * dyDir
                 arrow = self.plotCanvas.axes.arrow(xArrow, yArrow,
                                                    dxArrow, dyArrow,
                                                    lw = 1,
                                                    length_includes_head = True,
-                                                   head_length = 1800,
-                                                   head_width = 1800,
+                                                   head_length = arrowLength,
+                                                   head_width = arrowLength,
                                                    color = 'k')
                 self.plotCanvas.plots.append(arrow)
         plot = self.plotCanvas.axes.scatter(x, y,
