@@ -80,11 +80,16 @@ class stageMotion(QObject):
         dwellTime = self.parameters.dwellTime
         ### Calculate positions vector
         positions = []
-        for x in range(0, xWells):
-            for y in range(0, yWells):
-                xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.sin(angle)
-                yPos = y1 + x*xWellSep*np.sin(angle) + y*yWellSep*np.cos(angle)
-                positions.append([xPos, yPos])
+        if xWells == 1:
+            pass
+        elif yWells == 1:
+            pass
+        else:
+            for x in range(0, xWells):
+                for y in range(0, yWells):
+                    xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.sin(angle)
+                    yPos = y1 + x*xWellSep*np.sin(angle) + y*yWellSep*np.cos(angle)
+                    positions.append([xPos, yPos])
         if self.parameters.reverse:
             positions.reverse()
         ### Scan positions
@@ -412,25 +417,35 @@ class stageMotionWindow(QMainWindow):
         self.lock_controls()
         # self.statusbar.showMessage('Busy')
         ### Read, calculate and compile experiment parameters
-        self.parameters.stage = self.stage
         self.parameters.xWells = int(self.mwInputField['xWells'][0].text())
         self.parameters.yWells = int(self.mwInputField['yWells'][0].text())
+        if (self.parameters.xWells == 1) and (self.parameters.yWells == 1):
+            print('Cannot run pattern with only one well.')
+            self.lock_controls(lock=False)
+            self.btn['Start'][0].setChecked(False)
+            return
+        self.parameters.stage = self.stage
         self.parameters.xWellSep = int(self.mwInputField['xWellSep'][0].text())
         self.parameters.yWellSep = int(self.mwInputField['yWellSep'][0].text())
         self.parameters.x1 = int(self.mwInputField['wellx1'][0].text())
         self.parameters.x2 = int(self.mwInputField['wellx2'][0].text())
         self.parameters.y1 = int(self.mwInputField['welly1'][0].text())
+        ### Stage y axis is reversed. Angle formula must take that into account.
+        y1Inv = -1 * int(self.mwInputField['welly1'][0].text())
+        y2Inv = -1 * int(self.mwInputField['welly2'][0].text())
         self.parameters.y2 = int(self.mwInputField['welly2'][0].text())
         self.parameters.dwellTime = float(self.mwInputField['dwell'][0].text())
         x0 = self.parameters.x2 - self.parameters.x1
-        y0 = self.parameters.y2 - self.parameters.y1
+        y0 = y2Inv - y1Inv
         xMW = (self.parameters.xWells - 1) * self.parameters.xWellSep
         yMW = (self.parameters.yWells - 1) * self.parameters.yWellSep
         if (xMW == 0) or (yMW == 0): # Then angle is between first and last well
             angle = np.arctan2(y0, x0)
         else: # Angle is that of multiwell holder
-            sine = (y0 - (yMW/xMW)*x0) / (xMW + yMW**2/xMW)
-            angle = np.arcsin(sine)
+            # sine = (y0 - (yMW/xMW)*x0) / (xMW + yMW**2/xMW)
+            # angle = np.arcsin(sine)
+            angle = np.arctan2(y0, x0) - np.arctan2(yMW, xMW)
+        print('Multiwell holder angle : {:.4f}°.'.format(angle* 360 / (2 * np.pi)))
         self.parameters.xCornerRel = x0
         self.parameters.yCornerRel = y0
         self.parameters.xLength = xMW
