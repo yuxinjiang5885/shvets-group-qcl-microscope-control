@@ -12,6 +12,7 @@ import numpy as np
 import experiment.defaults as defaults
 from instruments.hld117 import stage
 import time
+from time import perf_counter as timer, sleep
 from ui.plot_widgets import mplCanvas
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -98,18 +99,27 @@ class stageMotion(QObject):
                     positions.append([xPos, yPos])
         if self.parameters.reverse:
             positions.reverse()
+        ### Start timer
+        start = timer()
         ### Scan positions
+        numPositions = len(positions)
         for a in range(0, acquisitions):
             if self.stopped:
                 break
-            for p in positions:
+            for i, p in enumerate(positions):
                 if self.stopped:
                     print('Stage scan interrupted by user')
                     break
                 self.goto_and_wait(p[0], p[1])
                 acqStatus = [acquisitions, a + 1]
                 self.currentPosition.emit(p[0], p[1], positions, acqStatus) # Send to plot
-                time.sleep(dwellTime)
+                # time.sleep(dwellTime)
+                print('Acquisition {:.0f}, position {:.0f}'.format(a + 1, i + 1))
+                targetTime = ((a * dwellTime * numPositions)) + ((i + 1) * dwellTime)
+                while timer()-start < targetTime:
+                    print('Time: {:.3f} s'.format(timer()-start), end='\r')
+                    sleep(defaults.DEF_SLEEP_INTERVAL)
+                print('') # End line
         self.stopped = False
         self.finished.emit()
 
@@ -217,6 +227,8 @@ class stageMotionWindow(QMainWindow):
         self.reverse.setToolTip('Reverse pattern direction')
         self.timeBehavior = QAction(QIcon(None), 'Include move time in step', self, checkable=True)
         self.timeBehavior.setToolTip('Stage move time is included in step total')
+        self.timeBehavior.setChecked(True)
+        self.timeBehavior.setEnabled(False)
         ### Menus
         self.menubar = self.menuBar()
         self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)

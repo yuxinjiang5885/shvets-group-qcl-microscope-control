@@ -171,7 +171,7 @@ DEF_WL_STEP_UM = 0.1 # Default scan/sweep wavelength step, um
 STAGE_X_TRAVEL_UM = 120000 # um
 STAGE_Y_TRAVEL_UM = 80000 # um
 
-### Multiwell holder parameters
+### Multiwell holder and scan parameters
 DEF_WELLS_X = 8 # Default number of wells along x
 DEF_WELLS_Y = 2 # Default number of wells along y
 DEF_WELL_SEP_X_UM = 10000 # Default well separation along x, um
@@ -180,8 +180,9 @@ DEF_WELL_ORIGIN_X_UM = -35000 # Default position of origin well, x, um
 DEF_WELL_ORIGIN_Y_UM = 5000 # Default position of origin well, y, um
 DEF_WELL_CORNER_X_UM = 35000 # Default position of top corner well, x, um
 DEF_WELL_CORNER_Y_UM = -5000 # Default position of top corner well, y, um
-DEF_DWELL_TIME_S = 0.1 # Default dwell time, s
+DEF_DWELL_TIME_S = 4 # Default dwell time, s
 DEF_NUMBER_OF_ACQ = 1 # Default number of acquisitions
+DEF_SLEEP_INTERVAL = 0.1 # Default sleep interval for move cycle, s
 
 ### UI look and feel
 COL_WIDTH = 100
