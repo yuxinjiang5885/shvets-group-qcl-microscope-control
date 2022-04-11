@@ -19,14 +19,13 @@ class mainWindow(QMainWindow):
         super().__init__()
         ### Initialize stage
         self.stage = []
-        self.threadJoy = QThread()
-        self.workerJoy = Joystick()
-        self.workerJoy.moveToThread(self.threadJoy)
-        self.threadJoy.started.connect(self.workerJoy.return_self)
-        self.workerJoy.joystickWidget.connect(self.make_ui)
-        self.workerJoy.joystickInput.connect(self.print_input)
-        self.threadJoy.finished.connect(self.threadJoy.deleteLater)
-        self.threadJoy.start()
+        joy0 = Joystick()
+        # self.workerJoy.moveToThread(self.threadJoy)
+        # self.threadJoy.started.connect(self.workerJoy.return_self)
+        self.make_ui(joy0)
+        joy0.joystickInput.connect(self.print_input)
+        # self.threadJoy.finished.connect(self.threadJoy.deleteLater)
+        # self.threadJoy.start()
 
     def make_ui(self, joystickWidget):
         cw = QWidget()
