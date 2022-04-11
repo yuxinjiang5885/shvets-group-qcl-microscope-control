@@ -20,11 +20,11 @@ from timeit import default_timer as timer, timeit
 import experiment.defaults as defaults
 from experiment.routines_multithread import experiment
 from ui.laser_windows import (laserInitializer,
-                                      laserSettingWindow,
-                                      laserStartupDialog)
+                              laserSettingWindow,
+                              laserStartupDialog)
 from ui.stage_windows import (stageInitializer,
-                                      stageMotionWindow,
-                                      stageStartupDialog)
+                              stageMotionWindow,
+                              stageStartupDialog)
 from ui.plot_widgets import mplCanvas
 # from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI

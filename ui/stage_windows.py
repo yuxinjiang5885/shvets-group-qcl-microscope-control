@@ -6,6 +6,7 @@ Python 3.9.6 on Windows 10
 Created 2021-Dec-07
 '''
 
+from multiprocessing.dummy import JoinableQueue
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -192,6 +193,12 @@ class stageMotionWindow(QMainWindow):
             print('Could not move stage:\n{}'.format(exc))
             return
 
+    def goto_joystick(self, joystickPosition):
+        '''Move stage according to software joystick position'''
+        angle = joystickPosition[0]
+        speed = joystickPosition[1]
+        # print('Joystick angle : {}, speed: {}'.format(angle, speed))
+
     def lock_controls(self, lock=True):
         '''Disable all buttons while operations are performed.'''
         enabled = not lock # For the sake of clarity
@@ -300,6 +307,7 @@ class stageMotionWindow(QMainWindow):
         self.labels = dict() # [label, row, col, rowSpan, colSpan]
         self.labels['Read'] = [QLabel('Read'), 5, 1, 1, 1]
         self.labels['Set'] = [QLabel('Set'), 5, 2, 1, 1]
+        self.labels['Start'] = [QLabel('Joystick'), 5, 3, 1, 3]
         # self.labels['Start'] = [QLabel('Start'), 5, 3, 1, 1]
         # self.labels['Stop'] = [QLabel('Stop'), 5, 4, 1, 1]
         # self.labels['Step'] = [QLabel('Step'), 5, 5, 1, 1]
@@ -347,6 +355,8 @@ class stageMotionWindow(QMainWindow):
             self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Position tab - Joystick
         self.joystick = Joystick()
+        self.joystick.joystickInput.connect(self.goto_joystick)
+        self.tabPosGrid.addWidget(self.joystick, 6, 3, 4, 3)
         ### Multiwell tab - Base layout
         self.tabMultiwell = QWidget()
         self.tabMultiwell.setStyleSheet(defaults.STYLE_CONTAINER)

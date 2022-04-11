@@ -45,12 +45,12 @@ class Joystick(QWidget):
 
     def joystickDirection(self):
         if not self.grabCenter:
-            return 0
+            return([0, 0])
         normVector = QLineF(self._center(), self.movingOffset)
         currentDistance = normVector.length()
         angle = normVector.angle()
         distance = min(currentDistance / self.__maxDistance, 1.0)
-        return(angle, distance)
+        return([angle, distance])
 
     def mousePressEvent(self, ev):
         self.grabCenter = self._centerEllipse().contains(ev.pos())
@@ -60,7 +60,7 @@ class Joystick(QWidget):
         self.grabCenter = False
         self.movingOffset = QPointF(0, 0)
         # print(self.joystickDirection())
-        self.joystickInput.emit([self.joystickDirection()])
+        self.joystickInput.emit(self.joystickDirection())
         self.update()
 
     def mouseMoveEvent(self, event):
@@ -69,4 +69,4 @@ class Joystick(QWidget):
             self.movingOffset = self._boundJoystick(event.pos())
             self.update()
         # print(self.joystickDirection())
-        self.joystickInput.emit([self.joystickDirection()])
+        self.joystickInput.emit(self.joystickDirection())
