@@ -7,7 +7,7 @@ Created 2022-Feb-03
 
 import sys
 import experiment.defaults as defaults
-from experiment.stage_windows import (stageInitializer,
+from ui.stage_windows import (stageInitializer,
                                       stageMotionWindow,
                                       stageStartupDialog)
 from PyQt5.QtCore import QThread

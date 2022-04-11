@@ -19,10 +19,10 @@ from timeit import default_timer as timer, timeit
 # from experiment.defaults import *
 import experiment.defaults as defaults
 from experiment.routines_multithread import experiment
-from experiment.laser_windows import (laserInitializer,
+from ui.laser_windows import (laserInitializer,
                                       laserSettingWindow,
                                       laserStartupDialog)
-from experiment.stage_windows import (stageInitializer,
+from ui.stage_windows import (stageInitializer,
                                       stageMotionWindow,
                                       stageStartupDialog)
 from ui.plot_widgets import mplCanvas

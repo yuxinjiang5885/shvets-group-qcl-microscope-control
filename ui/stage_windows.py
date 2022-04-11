@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import experiment.defaults as defaults
 from instruments.hld117 import stage
+from .software_joystick import Joystick
 import time
 from time import perf_counter as timer, sleep
 from ui.plot_widgets import mplCanvas
@@ -287,26 +288,26 @@ class stageMotionWindow(QMainWindow):
         self.tabs.setStyleSheet(defaults.STYLE_TABS)
         self.tabs.setFont(font)
         self.grid.addWidget(self.tabs, 5, 0, 5, 6)
-        ### Raster tab - Base layout
-        self.tabRaster = QWidget()
-        self.tabRaster.setStyleSheet(defaults.STYLE_CONTAINER)
-        self.tabs.addTab(self.tabRaster, 'Position/Raster')
-        ### Raster tab - Grid layout
-        self.tabRasterGrid = QGridLayout()
-        self.tabRaster.setLayout(self.tabRasterGrid)
-        self.tabRasterGrid.setSpacing(10)
-        ### Raster tab - Labels: header
+        ### Position tab - Base layout
+        self.tabPos = QWidget()
+        self.tabPos.setStyleSheet(defaults.STYLE_CONTAINER)
+        self.tabs.addTab(self.tabPos, 'Position')
+        ### Position tab - Grid layout
+        self.tabPosGrid = QGridLayout()
+        self.tabPos.setLayout(self.tabPosGrid)
+        self.tabPosGrid.setSpacing(10)
+        ### Position tab - Labels: header
         self.labels = dict() # [label, row, col, rowSpan, colSpan]
         self.labels['Read'] = [QLabel('Read'), 5, 1, 1, 1]
         self.labels['Set'] = [QLabel('Set'), 5, 2, 1, 1]
-        self.labels['Start'] = [QLabel('Start'), 5, 3, 1, 1]
-        self.labels['Stop'] = [QLabel('Stop'), 5, 4, 1, 1]
-        self.labels['Step'] = [QLabel('Step'), 5, 5, 1, 1]
+        # self.labels['Start'] = [QLabel('Start'), 5, 3, 1, 1]
+        # self.labels['Stop'] = [QLabel('Stop'), 5, 4, 1, 1]
+        # self.labels['Step'] = [QLabel('Step'), 5, 5, 1, 1]
         for _, k in self.labels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
-            self.tabRasterGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        ### Raster tab - Labels: parameters
+            self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Position tab - Labels: parameters
         self.paramLabels = dict() # [label, row, col, rowSpan, colSpan]
         self.paramLabels['x'] = [QLabel('x (μm)'), 6, 0, 1, 1]
         self.paramLabels['y'] = [QLabel('y (μm)'), 7, 0, 1, 1]
@@ -315,8 +316,8 @@ class stageMotionWindow(QMainWindow):
         for _, k in self.paramLabels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
-            self.tabRasterGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        ### Raster tab - Labels: readings
+            self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Position tab - Labels: readings
         blankLine = ''
         self.readingLabels = dict()
         for x, param in enumerate(self.paramNames):
@@ -326,24 +327,26 @@ class stageMotionWindow(QMainWindow):
         for _, k in self.readingLabels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
-            self.tabRasterGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
-        ### Raster tab - Input fields: x/y set/start/stop/step and v/a
+            self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Position tab - Input fields: x/y set/start/stop/step and v/a
         blankLine = ''
         self.inputField = dict() # to collect all input fields
         self.inputField['xSet'] = [QLineEdit(blankLine), 6, 2, 1, 1]
-        self.inputField['xStart'] = [QLineEdit(blankLine), 6, 3, 1, 1]
-        self.inputField['xStop'] = [QLineEdit(blankLine), 6, 4, 1, 1]
-        self.inputField['xStep'] = [QLineEdit(blankLine), 6, 5, 1, 1]
+        # self.inputField['xStart'] = [QLineEdit(blankLine), 6, 3, 1, 1]
+        # self.inputField['xStop'] = [QLineEdit(blankLine), 6, 4, 1, 1]
+        # self.inputField['xStep'] = [QLineEdit(blankLine), 6, 5, 1, 1]
         self.inputField['ySet'] = [QLineEdit(blankLine), 7, 2, 1, 1]
-        self.inputField['yStart'] = [QLineEdit(blankLine), 7, 3, 1, 1]
-        self.inputField['yStop'] = [QLineEdit(blankLine), 7, 4, 1, 1]
-        self.inputField['yStep'] = [QLineEdit(blankLine), 7, 5, 1, 1]
+        # self.inputField['yStart'] = [QLineEdit(blankLine), 7, 3, 1, 1]
+        # self.inputField['yStop'] = [QLineEdit(blankLine), 7, 4, 1, 1]
+        # self.inputField['yStep'] = [QLineEdit(blankLine), 7, 5, 1, 1]
         self.inputField['vSet'] = [QLineEdit(blankLine), 8, 2, 1, 1]
         self.inputField['aSet'] = [QLineEdit(blankLine), 9, 2, 1, 1]
         for _, k in self.inputField.items(): # Arrange in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
-            self.tabRasterGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+            self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Position tab - Joystick
+        self.joystick = Joystick()
         ### Multiwell tab - Base layout
         self.tabMultiwell = QWidget()
         self.tabMultiwell.setStyleSheet(defaults.STYLE_CONTAINER)

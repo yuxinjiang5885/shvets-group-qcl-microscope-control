@@ -14,7 +14,6 @@ from PyQt5.QtWidgets import QWidget
 
 class Joystick(QWidget):
     joystickInput = pyqtSignal(list)
-    joystickWidget = pyqtSignal(object)
 
     def __init__(self, parent=None):
         super(Joystick, self).__init__(parent)
@@ -22,10 +21,6 @@ class Joystick(QWidget):
         self.movingOffset = QPointF(0, 0)
         self.grabCenter = False
         self.__maxDistance = 50
-        self.joystickWidget.emit(self)
-
-    def return_self(self):
-        self.joystickWidget.emit(self)
 
     def paintEvent(self, event):
         painter = QPainter(self)
