@@ -158,8 +158,10 @@ class stage():
         '''Enable/disable joystick'''
         if enable:
             self.message('controller.stage.joyxyz.on')
+            print('Stage joystick enabled')
         else:
             self.message('controller.stage.joyxyz.off')
+            print('Stage joystick disabled')
 
     # def flag(self, flag):
     #     '''Controller shutdown check'''

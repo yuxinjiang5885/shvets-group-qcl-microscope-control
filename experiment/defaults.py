@@ -184,6 +184,10 @@ DEF_DWELL_TIME_S = 4 # Default dwell time, s
 DEF_NUMBER_OF_ACQ = 1 # Default number of acquisitions
 DEF_SLEEP_INTERVAL = 0.1 # Default sleep interval for move cycle, s
 
+### Gamepad
+
+GAMEPAD_UPDATE_INTERVAL_MS = 10 # ms
+
 ### UI look and feel
 COL_WIDTH = 100
 FONT_FAMILY = 'Open Sans Semibold'

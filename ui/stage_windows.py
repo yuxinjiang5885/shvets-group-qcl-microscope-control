@@ -6,6 +6,7 @@ Python 3.9.6 on Windows 10
 Created 2021-Dec-07
 '''
 
+from cgitb import enable
 from multiprocessing.dummy import JoinableQueue
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -13,6 +14,7 @@ import numpy as np
 import experiment.defaults as defaults
 from instruments.hld117 import stage
 from .software_joystick import Joystick
+from .xbox_controller import xboxController
 import time
 from time import perf_counter as timer, sleep
 from ui.plot_widgets import mplCanvas
@@ -33,6 +35,23 @@ from PyQt5.QtWidgets import (QAction,
                              QWidget)
 
 
+class gamepad(QObject):
+    '''Handle stage movement with gamepad'''
+
+    def __init__(self, stageInstance):
+        super().__init__()
+        self.updateInterval = defaults.GAMEPAD_UPDATE_INTERVAL_MS
+        self.stage = stageInstance
+        self.gamepad = xboxController()
+
+    def read(self):
+        inputs_limit = 100
+        i = 0
+        while i < inputs_limit:
+            print(self.gamepad.read())
+            i += 1
+
+
 class stageInitializer(QObject):
     '''Initialize stage'''
     stageInitialized = pyqtSignal() # Emitted when stage is initialized
@@ -47,6 +66,7 @@ class stageInitializer(QObject):
         stage0.identify()
         self.stageInstance.emit(stage0)
         self.stageInitialized.emit()
+
 
 class stageMotion(QObject):
     '''Complex stage motion and scan patterns. Run in a separate thread.'''
@@ -153,6 +173,7 @@ class stageMotionParameters():
         self.angle = 0 # Well plate angle
         self.reverse = False # Reverse pattern direction
 
+
 class stageMotionWindow(QMainWindow):
     '''GUI for stage motion control'''
 
@@ -165,6 +186,12 @@ class stageMotionWindow(QMainWindow):
         self.parameters = stageMotionParameters() # Passed to "run"
         self.threadMW = [] # Multiwell thread
         self.workerMW = [] # Multiwell worker
+        self.threadG = [] # Gamepad thread
+        self.workerG = [] # Gamepad worker
+        # try:
+        #     self.gamepad = xboxController()
+        # except Exception as exc:
+        #     print('Could not connect to gamepad:\n{}'.format(exc))
         self.make_gui()
 
     def center_window(self):
@@ -193,11 +220,49 @@ class stageMotionWindow(QMainWindow):
             print('Could not move stage:\n{}'.format(exc))
             return
 
+    def goto_gamepad(self):
+        '''Control stage with gamepad'''
+        # self.gamepad.read()
+        self.threadG = QThread()
+        self.workerG = gamepad(self.stage)
+        self.workerG.moveToThread(self.threadG)
+        self.threadG.started.connect(self.workerG.read)
+        # self.stageWorker.stageInitialized.connect(self.threadStg.quit)
+        # self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)
+        self.threadG.finished.connect(self.threadG.deleteLater)
+        self.threadG.start()
+
     def goto_joystick(self, joystickPosition):
         '''Move stage according to software joystick position'''
         angle = joystickPosition[0]
         speed = joystickPosition[1]
-        # print('Joystick angle : {}, speed: {}'.format(angle, speed))
+        print('Joystick angle : {}, speed: {}'.format(angle, speed))
+
+    def joystick(self, selected='hardware'):
+        '''Switches between hardware joystick, software joystick, and gamepad'''
+        # if not self.threadG == []: # Stop gamepad thread if it is running
+        #     self.workerG.stop()
+        if selected == 'hardware':
+            self.swJoystickEnable.setChecked(False)
+            self.gamepadEnable.setChecked(False)
+            self.stage.joystick(enable=True)
+            print('Hardware joystick enabled')
+        elif selected == 'software':
+            self.hwJoystickEnable.setChecked(False)
+            self.gamepadEnable.setChecked(False)
+            self.stage.joystick(enable=False)
+            print('Software joystick enabled')
+        elif selected == 'gamepad':
+            self.hwJoystickEnable.setChecked(False)
+            self.swJoystickEnable.setChecked(False)
+            self.stage.joystick(enable=False)
+            self.goto_gamepad()
+            print('Gamepad enabled')
+        else:
+            self.swJoystickEnable.setChecked(False)
+            self.gamepadEnable.setChecked(False)
+            self.stage.joystick(enable=True)
+            print('Hardware joystick enabled')
 
     def lock_controls(self, lock=True):
         '''Disable all buttons while operations are performed.'''
@@ -229,6 +294,17 @@ class stageMotionWindow(QMainWindow):
         updateAction.setShortcut('Ctrl+U')
         updateAction.setToolTip('Update x/y stage position readings')
         updateAction.triggered.connect(lambda: self.update_readings())
+        ### Control options
+        self.hwJoystickEnable = QAction(QIcon(None), 'Enable hardware joystick',
+                                        self, checkable=True, checked=True)
+        self.swJoystickEnable = QAction(QIcon(None), 'Enable software joystick',
+                                        self, checkable=True, checked=False)
+        self.gamepadEnable = QAction(QIcon(None), 'Enable gamepad',
+                                     self, checkable=True, checked=False)
+        ### Connect control options
+        self.hwJoystickEnable.triggered.connect(lambda: self.joystick(selected='hardware'))
+        self.swJoystickEnable.triggered.connect(lambda: self.joystick(selected='software'))
+        self.gamepadEnable.triggered.connect(lambda: self.joystick(selected='gamepad'))
         ### Pattern options
         self.reverse = QAction(QIcon(None), 'Reverse pattern', self, checkable=True)
         self.reverse.setShortcut('Ctrl+R')
@@ -244,6 +320,11 @@ class stageMotionWindow(QMainWindow):
         fileMenu.setStyleSheet(defaults.STYLE_MENU)
         fileMenu.addAction(exitAction)
         fileMenu.addAction(updateAction)
+        controlMenu = self.menubar.addMenu('Control')
+        controlMenu.setStyleSheet(defaults.STYLE_MENU)
+        controlMenu.addAction(self.hwJoystickEnable)
+        controlMenu.addAction(self.swJoystickEnable)
+        controlMenu.addAction(self.gamepadEnable)
         patternMenu = self.menubar.addMenu('Patterns')
         patternMenu.setStyleSheet(defaults.STYLE_MENU)
         patternMenu.addAction(self.reverse)
@@ -354,9 +435,9 @@ class stageMotionWindow(QMainWindow):
             k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Position tab - Joystick
-        self.joystick = Joystick()
-        self.joystick.joystickInput.connect(self.goto_joystick)
-        self.tabPosGrid.addWidget(self.joystick, 6, 3, 4, 3)
+        self.swJoystick = Joystick()
+        self.swJoystick.joystickInput.connect(self.goto_joystick)
+        self.tabPosGrid.addWidget(self.swJoystick, 6, 3, 4, 3)
         ### Multiwell tab - Base layout
         self.tabMultiwell = QWidget()
         self.tabMultiwell.setStyleSheet(defaults.STYLE_CONTAINER)
