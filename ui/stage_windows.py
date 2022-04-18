@@ -40,16 +40,47 @@ class gamepad(QObject):
 
     def __init__(self, stageInstance):
         super().__init__()
-        self.updateInterval = defaults.GAMEPAD_UPDATE_INTERVAL_MS
+        self.updateInterval = defaults.GAMEPAD_UPDATE_INTERVAL_S
         self.stage = stageInstance
         self.gamepad = xboxController()
+        self.stop = False
 
     def read(self):
-        inputs_limit = 100
-        i = 0
-        while i < inputs_limit:
-            print(self.gamepad.read())
-            i += 1
+        # inputs_limit = 100
+        # i = 0
+        deadzone = defaults.JOY_DEADZONE
+        stage_speed = self.stage.get_speed() # um/s
+        while self.stop == False:
+            start = timer()
+            ### Read gamepad inputs
+            gamepadInput = self.gamepad.read()
+            # print(gamepadInput)
+            xJoyL = gamepadInput[0]
+            yJoyL = gamepadInput[1]
+            pushJoyL = gamepadInput[2]
+            xJoyR = gamepadInput[3]
+            yJoyR = gamepadInput[4]
+            pushJoyR = gamepadInput[5]
+            hatX = gamepadInput[6]
+            hatY = gamepadInput[7]
+            startBtn = gamepadInput[16]
+            selectBtn = gamepadInput[17]
+            ### Send command to stage
+            if selectBtn == 1:
+                self.stop = True
+            elif pushJoyL == 1:
+                ### Left thumbstick pushed: return to origin
+                self.stage.goto(0, 0)
+            elif (xJoyL > deadzone) or (yJoyL > deadzone):
+                travel = stage_speed * self.updateInterval
+                xRel = xJoyL * travel
+                yRel = -1 * yJoyL * travel
+                self.stage.move_rel(xRel, yRel)
+            ### Wait for stage to finish moving
+            # while int(self.stage.busy()) > 0:
+            #     time.sleep(0.01)
+            while timer()-start < self.updateInterval:
+                time.sleep(0.01)
 
 
 class stageInitializer(QObject):
@@ -227,8 +258,6 @@ class stageMotionWindow(QMainWindow):
         self.workerG = gamepad(self.stage)
         self.workerG.moveToThread(self.threadG)
         self.threadG.started.connect(self.workerG.read)
-        # self.stageWorker.stageInitialized.connect(self.threadStg.quit)
-        # self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)
         self.threadG.finished.connect(self.threadG.deleteLater)
         self.threadG.start()
 
@@ -241,7 +270,8 @@ class stageMotionWindow(QMainWindow):
     def joystick(self, selected='hardware'):
         '''Switches between hardware joystick, software joystick, and gamepad'''
         # if not self.threadG == []: # Stop gamepad thread if it is running
-        #     self.workerG.stop()
+            # self.workerG.stop = True
+            # self.workerG.deleteLater()
         if selected == 'hardware':
             self.swJoystickEnable.setChecked(False)
             self.gamepadEnable.setChecked(False)

@@ -15,10 +15,14 @@ class xboxController(object):
     MAX_JOY_VAL = math.pow(2, 15)
 
     def __init__(self):
-
         self.LeftJoystickY = 0
         self.LeftJoystickX = 0
+        self.LeftThumb = 0
+        self.RightJoystickX = 0
         self.RightJoystickY = 0
+        self.RightThumb = 0
+        self.hatX = 0
+        self.hatY = 0
         self.LeftTrigger = 0
         self.RightTrigger = 0
         self.LeftBumper = 0
@@ -27,30 +31,38 @@ class xboxController(object):
         self.X = 0
         self.Y = 0
         self.B = 0
-        self.LeftThumb = 0
-        self.RightThumb = 0
         self.Back = 0
         self.Start = 0
-        self.LeftDPad = 0
-        self.RightDPad = 0
-        self.UpDPad = 0
-        self.DownDPad = 0
-
+        # self.LeftDPad = 0
+        # self.RightDPad = 0
+        # self.UpDPad = 0
+        # self.DownDPad = 0
         self._monitor_thread = threading.Thread(target=self._monitor_controller, args=())
         self._monitor_thread.daemon = True
         self._monitor_thread.start()
 
-
     def read(self): # return the buttons/triggers that you care about in this methode
-        x = self.LeftJoystickX
-        y = self.LeftJoystickY
-        a = self.A
-        b = self.X # b=1, x=2
-        rb = self.RightBumper
-        return [x, y, a, b, rb]
-
+        return[self.LeftJoystickX,
+               self.LeftJoystickY,
+               self.LeftThumb,
+               self.RightJoystickX,
+               self.RightJoystickY,
+               self.RightThumb,
+               self.hatX,
+               self.hatY,
+               self.A,
+               self.B,
+               self.X,
+               self.Y,
+               self.LeftBumper,
+               self.RightBumper,
+               self.LeftTrigger,
+               self.RightTrigger,
+               self.Back,
+               self.Start]
 
     def _monitor_controller(self):
+        '''These assignments are for the Xbox Core Controller'''
         while True:
             events = get_gamepad()
             for event in events:
@@ -86,11 +98,15 @@ class xboxController(object):
                     self.Back = event.state
                 elif event.code == 'BTN_START':
                     self.Start = event.state
-                elif event.code == 'BTN_TRIGGER_HAPPY1':
-                    self.LeftDPad = event.state
-                elif event.code == 'BTN_TRIGGER_HAPPY2':
-                    self.RightDPad = event.state
-                elif event.code == 'BTN_TRIGGER_HAPPY3':
-                    self.UpDPad = event.state
-                elif event.code == 'BTN_TRIGGER_HAPPY4':
-                    self.DownDPad = event.state
+                elif event.code == 'ABS_HAT0X':
+                    self.hatX = event.state
+                elif event.code == 'ABS_HAT0Y':
+                    self.hatY = event.state
+                # elif event.code == 'ABS_BTN_DPAD_LEFT':
+                #     self.LeftDPad = event.state
+                # elif event.code == 'BTN_DPAD_RIGHT':
+                #     self.RightDPad = event.state
+                # elif event.code == 'BTN_DPAD_UP':
+                #     self.UpDPad = event.state
+                # elif event.code == 'BTN_DPAD_DOWN':
+                #     self.DownDPad = event.state

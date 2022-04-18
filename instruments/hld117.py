@@ -137,10 +137,8 @@ class stage():
 
     def goto(self, x=0, y=0):
         '''Go to specified position.'''
-        # while self.busy() not in ['0']:
-        #     time.sleep(0.1)
         self.message('controller.stage.goto-position {:.0f} {:.0f}'.format(x, y))
-
+    
     def identify(self):
         '''Identify controller'''
         _, model = self.message('controller.model.get')
@@ -181,6 +179,11 @@ class stage():
         # else:
         #     print('Success: {}'.format(self.rx.value.decode()))
         return ret, self.rx.value.decode()
+
+    def move_rel(self, x=0, y=0):
+        '''Move relative to current position.'''
+        self.message('controller.stage.move-relative {:.0f} {:.0f}'.format(x, y))
+
 
     # def servo(self, axes='both', enable=False):
     #     '''Enables servo function, which opposes forces applied to stage'''
