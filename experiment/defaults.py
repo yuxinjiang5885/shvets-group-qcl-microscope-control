@@ -186,7 +186,7 @@ DEF_SLEEP_INTERVAL = 0.1 # Default sleep interval for move cycle, s
 
 ### Gamepad
 
-GAMEPAD_UPDATE_INTERVAL_S = 0.01 # update interval for the gamepad loop, s
+GAMEPAD_UPDATE_INTERVAL_S = 0.1 # update interval for the gamepad loop, s
 JOY_DEADZONE = 0.1 # Threshold for thumbstick deadzone
 
 ### UI look and feel

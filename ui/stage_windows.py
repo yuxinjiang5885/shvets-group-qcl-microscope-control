@@ -66,21 +66,30 @@ class gamepad(QObject):
             startBtn = gamepadInput[16]
             selectBtn = gamepadInput[17]
             ### Send command to stage
+            if (xJoyL <= deadzone) and (yJoyL <= deadzone):
+                ### Left thumbstick centered: stop moving stage
+                self.stage.move_at_velocity(0, 0)
             if selectBtn == 1:
+                ### Menu button: stop loop
                 self.stop = True
             elif pushJoyL == 1:
                 ### Left thumbstick pushed: return to origin
                 self.stage.goto(0, 0)
             elif (xJoyL > deadzone) or (yJoyL > deadzone):
-                travel = stage_speed * self.updateInterval
-                xRel = xJoyL * travel
-                yRel = -1 * yJoyL * travel
-                self.stage.move_rel(xRel, yRel)
-            ### Wait for stage to finish moving
-            # while int(self.stage.busy()) > 0:
-            #     time.sleep(0.01)
+                vx = xJoyL * stage_speed
+                vy = yJoyL * stage_speed
+                self.stage.move_at_velocity(vx, vy)
+                # travel = stage_speed * self.updateInterval
+                # xRel = xJoyL * travel
+                # yRel = -1 * yJoyL * travel
+                # self.stage.move_rel(xRel, yRel)
+            ### Wait out update interval
             while timer()-start < self.updateInterval:
                 time.sleep(0.01)
+            ### Stop stage and wait for it to finish moving
+            # self.stage.stop_smoothly()
+            # while int(self.stage.busy()) > 0:
+            #     time.sleep(0.01)
 
 
 class stageInitializer(QObject):
