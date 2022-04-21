@@ -37,11 +37,13 @@ from PyQt5.QtWidgets import (QAction,
 
 class gamepad(QObject):
     '''Handle stage movement with gamepad'''
+    disconnected = pyqtSignal()
 
-    def __init__(self, stageInstance):
+    def __init__(self, motionWindowInstance):
         super().__init__()
         self.updateInterval = defaults.GAMEPAD_UPDATE_INTERVAL_S
-        self.stage = stageInstance
+        self.motionWindow = motionWindowInstance
+        self.stage = motionWindowInstance.stage
         self.gamepad = xboxController()
         self.stop = False
 
@@ -83,13 +85,14 @@ class gamepad(QObject):
                 # xRel = xJoyL * travel
                 # yRel = -1 * yJoyL * travel
                 # self.stage.move_rel(xRel, yRel)
+            else:
+                ### No inputs and stage not busy: update position reading
+                if self.stage.busy() in ['0']:
+                    self.motionWindow.update_readings()
             ### Wait out update interval
             while timer()-start < self.updateInterval:
                 time.sleep(0.01)
-            ### Stop stage and wait for it to finish moving
-            # self.stage.stop_smoothly()
-            # while int(self.stage.busy()) > 0:
-            #     time.sleep(0.01)
+        self.disconnected.emit()
 
 
 class stageInitializer(QObject):
@@ -262,10 +265,10 @@ class stageMotionWindow(QMainWindow):
 
     def goto_gamepad(self):
         '''Control stage with gamepad'''
-        # self.gamepad.read()
         self.threadG = QThread()
-        self.workerG = gamepad(self.stage)
+        self.workerG = gamepad(self)
         self.workerG.moveToThread(self.threadG)
+        self.workerG.disconnected.connect(self.workerG.deleteLater)
         self.threadG.started.connect(self.workerG.read)
         self.threadG.finished.connect(self.threadG.deleteLater)
         self.threadG.start()
@@ -279,8 +282,8 @@ class stageMotionWindow(QMainWindow):
     def joystick(self, selected='hardware'):
         '''Switches between hardware joystick, software joystick, and gamepad'''
         # if not self.threadG == []: # Stop gamepad thread if it is running
-            # self.workerG.stop = True
-            # self.workerG.deleteLater()
+        #     self.workerG.stop = True
+        #     self.workerG.deleteLater()
         if selected == 'hardware':
             self.swJoystickEnable.setChecked(False)
             self.gamepadEnable.setChecked(False)
