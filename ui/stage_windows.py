@@ -48,10 +48,12 @@ class gamepad(QObject):
         self.stop = False
 
     def read(self):
-        # inputs_limit = 100
-        # i = 0
+        ### Initialize parameters
         deadzone = defaults.JOY_DEADZONE
         stage_speed = self.stage.get_speed() # um/s
+        ### Initialize triggering flags for buttons
+        ### A button should give a single input until released
+        hatTriggered = False
         while self.stop == False:
             start = timer()
             ### Read gamepad inputs
@@ -67,13 +69,16 @@ class gamepad(QObject):
             hatY = gamepadInput[7]
             startBtn = gamepadInput[16]
             selectBtn = gamepadInput[17]
-            ### Send command to stage
-            if (np.abs(xJoyL) <= deadzone) and (np.abs(yJoyL) <= deadzone):
-                ### Left thumbstick centered: stop moving stage
-                self.stage.move_at_velocity(0, 0)
+            ### Send commands: buttons pressed
             if selectBtn == 1:
                 ### Menu button: stop loop
                 self.stop = True
+            elif (hatX != 0) or (hatY != 0):
+                if not hatTriggered:
+                    xRel = hatX * 1000
+                    yRel = hatY * 1000
+                    self.stage.move_rel(xRel, yRel)
+                hatTriggered = True
             elif pushJoyL == 1:
                 ### Left thumbstick pushed: return to origin
                 self.stage.goto(0, 0)
@@ -81,17 +86,18 @@ class gamepad(QObject):
                 vx = xJoyL * stage_speed
                 vy = -1 * yJoyL * stage_speed
                 self.stage.move_at_velocity(vx, vy)
-                # travel = stage_speed * self.updateInterval
-                # xRel = xJoyL * travel
-                # yRel = -1 * yJoyL * travel
-                # self.stage.move_rel(xRel, yRel)
-            else:
-                ### No inputs and stage not busy: update position reading
-                if self.stage.busy() in ['0']:
-                    self.motionWindow.update_readings()
+            ### Send commands: buttons not pressed
+            if (hatX == 0) and (hatY == 0):
+                hatTriggered = False
+            if (np.abs(xJoyL) <= deadzone) and (np.abs(yJoyL) <= deadzone):
+                ### Left thumbstick centered: stop moving stage
+                self.stage.move_at_velocity(0, 0)
+            ### No inputs and stage not busy: update position reading
+            if self.stage.busy() in ['0']:
+                self.motionWindow.update_readings()
             ### Wait out update interval
             while timer()-start < self.updateInterval:
-                time.sleep(0.01)
+                time.sleep(0.1 * self.updateInterval)
         self.disconnected.emit()
 
 
