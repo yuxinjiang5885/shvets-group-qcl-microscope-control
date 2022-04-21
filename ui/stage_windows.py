@@ -66,7 +66,7 @@ class gamepad(QObject):
             startBtn = gamepadInput[16]
             selectBtn = gamepadInput[17]
             ### Send command to stage
-            if (xJoyL <= deadzone) and (yJoyL <= deadzone):
+            if (np.abs(xJoyL) <= deadzone) and (np.abs(yJoyL) <= deadzone):
                 ### Left thumbstick centered: stop moving stage
                 self.stage.move_at_velocity(0, 0)
             if selectBtn == 1:
@@ -75,9 +75,9 @@ class gamepad(QObject):
             elif pushJoyL == 1:
                 ### Left thumbstick pushed: return to origin
                 self.stage.goto(0, 0)
-            elif (xJoyL > deadzone) or (yJoyL > deadzone):
+            elif (np.abs(xJoyL) > deadzone) or (np.abs(yJoyL) > deadzone):
                 vx = xJoyL * stage_speed
-                vy = yJoyL * stage_speed
+                vy = -1 * yJoyL * stage_speed
                 self.stage.move_at_velocity(vx, vy)
                 # travel = stage_speed * self.updateInterval
                 # xRel = xJoyL * travel
