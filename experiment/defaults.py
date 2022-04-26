@@ -170,6 +170,8 @@ DEF_WL_STEP_UM = 0.1 # Default scan/sweep wavelength step, um
 ### Stage travel parameters
 STAGE_X_TRAVEL_UM = 120000 # um
 STAGE_Y_TRAVEL_UM = 80000 # um
+DEF_STAGE_X_STEP_UM = 1000 # um
+DEF_STAGE_Y_STEP_UM = 1000 # um
 
 ### Multiwell holder and scan parameters
 DEF_WELLS_X = 8 # Default number of wells along x
@@ -185,7 +187,6 @@ DEF_NUMBER_OF_ACQ = 1 # Default number of acquisitions
 DEF_SLEEP_INTERVAL = 0.1 # Default sleep interval for move cycle, s
 
 ### Gamepad
-
 GAMEPAD_UPDATE_INTERVAL_S = 0.1 # update interval for the gamepad loop, s
 JOY_DEADZONE = 0.1 # Threshold for thumbstick deadzone
 
@@ -193,6 +194,7 @@ JOY_DEADZONE = 0.1 # Threshold for thumbstick deadzone
 COL_WIDTH = 100
 FONT_FAMILY = 'Open Sans Semibold'
 FONT_SIZE = 12
+FONT_SIZE_SMALL = 10
 NUMBER_OF_ROWS = 14 # UI grid template rows
 NUMBER_OF_COLS = 11 # UI grid template columns
 MSG_TIMEOUT = 1000 # ms

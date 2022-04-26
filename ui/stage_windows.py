@@ -47,13 +47,23 @@ class gamepad(QObject):
         self.gamepad = xboxController()
         self.stop = False
 
+    def find_index_of_nearest(self, array, value):
+        '''https://stackoverflow.com/a/2566508'''
+        array = np.asarray(array)
+        i = (np.abs(array - value)).argmin()
+        return i
+
     def read(self):
         ### Initialize parameters
         deadzone = defaults.JOY_DEADZONE
-        stage_speed = self.stage.get_speed() # um/s
+        self.stage_speed = self.stage.get_speed() # um/s
+        self.step = float(self.motionWindow.inputField['stepSet'][0].text())
         ### Initialize triggering flags for buttons
         ### A button should give a single input until released
         hatTriggered = False
+        leftBumperTriggered = False
+        rightBumperTriggered = False
+        ### Start read loop
         while self.stop == False:
             start = timer()
             ### Read gamepad inputs
@@ -83,22 +93,40 @@ class gamepad(QObject):
                 self.stop = True
             elif (hatX != 0) or (hatY != 0):
                 if not hatTriggered:
-                    xRel = hatX * 1000
-                    yRel = hatY * 1000
+                    xRel = hatX * self.step
+                    yRel = hatY * self.step
                     self.stage.move_rel(xRel, yRel)
                 hatTriggered = True
             elif pushJoyL == 1:
                 ### Left thumbstick pushed: return to origin
                 self.stage.goto(0, 0)
             elif (np.abs(xJoyL) > deadzone) or (np.abs(yJoyL) > deadzone):
-                vx = xJoyL * stage_speed
-                vy = -1 * yJoyL * stage_speed
+                vx = xJoyL * self.stage_speed
+                vy = -1 * yJoyL * self.stage_speed
                 self.stage.move_at_velocity(vx, vy)
             elif btnB == 1:
                 self.stage.stop_smoothly()
+            elif leftBumper == 1:
+                if not leftBumperTriggered:
+                    i = self.find_index_of_nearest(self.stage.speeds, self.stage_speed)
+                    if i > 0:
+                        self.stage.set_speed(self.stage.speeds[i-1])
+                        self.stage_speed = self.stage.get_speed()
+                leftBumperTriggered = True
+            elif rightBumper == 1:
+                if not rightBumperTriggered:
+                    i = self.find_index_of_nearest(self.stage.speeds, self.stage_speed)
+                    if i < (len(self.stage.speeds) - 1):
+                        self.stage.set_speed(self.stage.speeds[i+1])
+                        self.stage_speed = self.stage.get_speed()
+                rightBumperTriggered = True
             ### Send commands: buttons not pressed
             if (hatX == 0) and (hatY == 0):
                 hatTriggered = False
+            if leftBumper == 0:
+                leftBumperTriggered = False
+            if rightBumper == 0:
+                rightBumperTriggered = False
             if (np.abs(xJoyL) <= deadzone) and (np.abs(yJoyL) <= deadzone):
                 ### Left thumbstick centered: stop moving stage
                 self.stage.move_at_velocity(0, 0)
@@ -335,10 +363,13 @@ class stageMotionWindow(QMainWindow):
 
     def make_gui(self):
         '''Draw controls'''
-        self.setGeometry(0, 0, 600, 600)
+        self.setGeometry(0, 0, 600, 800)
         font = QFont()
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE)
+        fontSmall = QFont()
+        font.setFamily(defaults.FONT_FAMILY)
+        fontSmall.setPointSize(defaults.FONT_SIZE_SMALL)
         ### Set title, icon and center window
         self.setWindowTitle('Stage Motion')
         self.setWindowIcon(QIcon('icons/stage.ico'))
@@ -394,6 +425,54 @@ class stageMotionWindow(QMainWindow):
         self.grid = QGridLayout()
         self.container.setLayout(self.grid)
         self.grid.setSpacing(10)
+        ### Stage controls - container
+        self.stgControls = QWidget()
+        self.stgControls.setStyleSheet(defaults.STYLE_CONTAINER)
+        self.stgControls.setFont(font)
+        self.grid.addWidget(self.stgControls, 0, 0, 2, 6)
+        ### Stage controls - Grid layout
+        self.stgControlsGrid = QGridLayout()
+        self.stgControls.setLayout(self.stgControlsGrid)
+        self.stgControlsGrid.setSpacing(10)
+        ### Stage controls - Input method indicators
+        self.inputMethods = dict() # [label, row, col, rowSpan, colSpan]
+        self.inputMethods['hw'] = [QPushButton(' HW  \n  JOY '), 0, 0, 2, 1]
+        self.inputMethods['hw'][0].setToolTip('Enable hardware joystick')
+        self.inputMethods['sw'] = [QPushButton(' SW  \n  JOY '), 0, 1, 2, 1]
+        self.inputMethods['sw'][0].setToolTip('Enable software joystick')
+        self.inputMethods['gp'] = [QPushButton(' GAME \n PAD  '), 0, 2, 2, 1]
+        self.inputMethods['gp'][0].setToolTip('Enable gamepad')
+        for _, k in self.inputMethods.items(): # Arrange labels in grid
+            k[0].setCheckable(True)
+            k[0].setFocusPolicy(Qt.NoFocus)
+            k[0].setFont(font)
+            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            k[0].setStyleSheet(defaults.STYLE_ARMED)
+            self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Stage controls - Labels
+        self.stgLabels = dict() # [label, row, col, rowSpan, colSpan]
+        self.stgLabels['x'] = [QLabel('x (μm)'), 0, 3, 1, 1]
+        self.stgLabels['y'] = [QLabel('y (μm)'), 0, 4, 1, 1]
+        self.stgLabels['v'] = [QLabel('v (μm/s)'), 0, 5, 1, 1]
+        self.stgLabels['a'] = [QLabel('a (μm/s²)'), 0, 6, 1, 1]
+        self.stgLabels['step'] = [QLabel('step (μm)'), 0, 7, 1, 1]
+        for _, k in self.stgLabels.items(): # Arrange labels in grid
+            k[0].setFont(fontSmall)
+            k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
+            self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Stage controls - input fields
+        blankLine = ''
+        initStep = '{:.0f}'.format(defaults.DEF_STAGE_X_STEP_UM)
+        self.inputField = dict() # to collect all input fields
+        self.inputField['xSet'] = [QLineEdit(blankLine), 1, 3, 1, 1]
+        self.inputField['ySet'] = [QLineEdit(blankLine), 1, 4, 1, 1]
+        self.inputField['vSet'] = [QLineEdit(blankLine), 1, 5, 1, 1]
+        self.inputField['aSet'] = [QLineEdit(blankLine), 1, 6, 1, 1]
+        self.inputField['stepSet'] = [QLineEdit(initStep), 1, 7, 1, 1]
+        for _, k in self.inputField.items(): # Arrange in grid
+            k[0].setFont(fontSmall)
+            k[0].setStyleSheet(defaults.STYLE_INPUT)
+            self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Plot: stage position
         self.plotCanvas = mplCanvas(width=5, height=4)
         self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -428,12 +507,12 @@ class stageMotionWindow(QMainWindow):
         darkBackground = defaults.DARK_PLOT_BACKGROUND
         darkColor = defaults.PLOT_COLOR_DARK
         self.plotCanvas.recolor(darkAxes, darkBackground, darkColor)
-        self.grid.addWidget(self.plotCanvas, 0, 1, 4, 4)
+        self.grid.addWidget(self.plotCanvas, 2, 1, 4, 4)
         ### Tabs widget
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(defaults.STYLE_TABS)
         self.tabs.setFont(font)
-        self.grid.addWidget(self.tabs, 5, 0, 5, 6)
+        self.grid.addWidget(self.tabs, 7, 0, 5, 6)
         ### Position tab - Base layout
         self.tabPos = QWidget()
         self.tabPos.setStyleSheet(defaults.STYLE_CONTAINER)
@@ -455,15 +534,15 @@ class stageMotionWindow(QMainWindow):
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
             self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Position tab - Labels: parameters
-        self.paramLabels = dict() # [label, row, col, rowSpan, colSpan]
-        self.paramLabels['x'] = [QLabel('x (μm)'), 6, 0, 1, 1]
-        self.paramLabels['y'] = [QLabel('y (μm)'), 7, 0, 1, 1]
-        self.paramLabels['v'] = [QLabel('v (μm/s)'), 8, 0, 1, 1]
-        self.paramLabels['a'] = [QLabel('a (μm/s²)'), 9, 0, 1, 1]
-        for _, k in self.paramLabels.items(): # Arrange labels in grid
-            k[0].setFont(font)
-            k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
-            self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        # self.paramLabels = dict() # [label, row, col, rowSpan, colSpan]
+        # self.paramLabels['x'] = [QLabel('x (μm)'), 6, 0, 1, 1]
+        # self.paramLabels['y'] = [QLabel('y (μm)'), 7, 0, 1, 1]
+        # self.paramLabels['v'] = [QLabel('v (μm/s)'), 8, 0, 1, 1]
+        # self.paramLabels['a'] = [QLabel('a (μm/s²)'), 9, 0, 1, 1]
+        # for _, k in self.paramLabels.items(): # Arrange labels in grid
+        #     k[0].setFont(font)
+        #     k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        #     self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Position tab - Labels: readings
         blankLine = ''
         self.readingLabels = dict()
@@ -476,22 +555,22 @@ class stageMotionWindow(QMainWindow):
             k[0].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
             self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Position tab - Input fields: x/y set/start/stop/step and v/a
-        blankLine = ''
-        self.inputField = dict() # to collect all input fields
-        self.inputField['xSet'] = [QLineEdit(blankLine), 6, 2, 1, 1]
+        # blankLine = ''
+        # self.inputField = dict() # to collect all input fields
+        # self.inputField['xSet'] = [QLineEdit(blankLine), 6, 2, 1, 1]
         # self.inputField['xStart'] = [QLineEdit(blankLine), 6, 3, 1, 1]
         # self.inputField['xStop'] = [QLineEdit(blankLine), 6, 4, 1, 1]
         # self.inputField['xStep'] = [QLineEdit(blankLine), 6, 5, 1, 1]
-        self.inputField['ySet'] = [QLineEdit(blankLine), 7, 2, 1, 1]
+        # self.inputField['ySet'] = [QLineEdit(blankLine), 7, 2, 1, 1]
         # self.inputField['yStart'] = [QLineEdit(blankLine), 7, 3, 1, 1]
         # self.inputField['yStop'] = [QLineEdit(blankLine), 7, 4, 1, 1]
         # self.inputField['yStep'] = [QLineEdit(blankLine), 7, 5, 1, 1]
-        self.inputField['vSet'] = [QLineEdit(blankLine), 8, 2, 1, 1]
-        self.inputField['aSet'] = [QLineEdit(blankLine), 9, 2, 1, 1]
-        for _, k in self.inputField.items(): # Arrange in grid
-            k[0].setFont(font)
-            k[0].setStyleSheet(defaults.STYLE_INPUT)
-            self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        # self.inputField['vSet'] = [QLineEdit(blankLine), 8, 2, 1, 1]
+        # self.inputField['aSet'] = [QLineEdit(blankLine), 9, 2, 1, 1]
+        # for _, k in self.inputField.items(): # Arrange in grid
+        #     k[0].setFont(font)
+        #     k[0].setStyleSheet(defaults.STYLE_INPUT)
+        #     self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Position tab - Joystick
         self.swJoystick = Joystick()
         self.swJoystick.joystickInput.connect(self.goto_joystick)
@@ -564,9 +643,9 @@ class stageMotionWindow(QMainWindow):
             self.tabMultiwellGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Buttons
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
-        self.btn['Start'] = [QPushButton('Start'), 10, 0, 2, 3]
+        self.btn['Start'] = [QPushButton('Start'), 12, 0, 2, 3]
         self.btn['Start'][0].setToolTip('Start stage scan')
-        self.btn['Stop'] = [QPushButton('Stop'), 10, 3, 2, 3]
+        self.btn['Stop'] = [QPushButton('Stop'), 12, 3, 2, 3]
         self.btn['Stop'][0].setToolTip('Stop stage scan')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
@@ -576,7 +655,7 @@ class stageMotionWindow(QMainWindow):
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Set stretch
-        for row in range(0, 12):
+        for row in range(0, 14):
             self.grid.setRowStretch(row, 1)
         for col in range(0, 6):
             self.grid.setColumnStretch(col, 1)
@@ -594,6 +673,7 @@ class stageMotionWindow(QMainWindow):
         '''Run stage scan'''
         if self.tabs.currentIndex() not in [1]:
             print('Not implemented.')
+            self.btn['Start'][0].setChecked(False)
         elif self.tabs.currentIndex() == 1:
             print('Running multiwell scan.')
             self.run_multiwell()

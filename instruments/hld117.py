@@ -24,8 +24,15 @@ from os.path import abspath, join, split, realpath
 COM_PORT = 5 # Controller COM port
 DLL_PATH = 'instruments/prior/PriorScientificSDK.dll' # Prior SDK DLL path
 
-DEFAULT_SPEED = 30000 # Default stage speed, um/s
-DEFAULT_ACC = 142750 # Default stage acceleration, um/s^2
+MAX_SPEED = 30000 # Maximum stage speed, um/s, found in Prior example app
+MAX_ACC = 142750 # Maximum stage acceleration, um/s^2, found in Prior example app
+
+DEFAULT_SPEED = MAX_SPEED # Default stage speed, um/s
+DEFAULT_ACC = MAX_ACC # Default stage acceleration, um/s^2
+
+SPEEDS = [10, 100, 1000, 10000, MAX_SPEED] # Select stage speeds, um/s
+STEPS = [10, 100, 1000, 10000] # Select stage steps, um
+ACCS = [MAX_ACC] # Select stage accelerations, um/s^2
 
 class stage():
     '''HLD117 stage class'''
@@ -60,6 +67,9 @@ class stage():
         # ret = self.SDK.PriorScientificSDK_cmd(
         #     self.session, create_string_buffer(b"dll.apitest -300 stillgoodresponse"), self.rx)
         # print(f"api response {ret}, rx = {self.rx.value.decode()}")
+        '''Stage parameters'''
+        self.speeds = SPEEDS
+        self.steps = STEPS
 
     def busy(self):
         '''Check whether stage is busy:
