@@ -67,6 +67,14 @@ class gamepad(QObject):
             pushJoyR = gamepadInput[5]
             hatX = gamepadInput[6]
             hatY = gamepadInput[7]
+            btnA = gamepadInput[8]
+            btnB = gamepadInput[9]
+            btnX = gamepadInput[10]
+            btnY = gamepadInput[11]
+            leftBumper = gamepadInput[12]
+            rightBumper = gamepadInput[13]
+            leftTrigger = gamepadInput[14]
+            rightTriger = gamepadInput[15]
             startBtn = gamepadInput[16]
             selectBtn = gamepadInput[17]
             ### Send commands: buttons pressed
@@ -86,6 +94,8 @@ class gamepad(QObject):
                 vx = xJoyL * stage_speed
                 vy = -1 * yJoyL * stage_speed
                 self.stage.move_at_velocity(vx, vy)
+            elif btnB == 1:
+                self.stage.stop_smoothly()
             ### Send commands: buttons not pressed
             if (hatX == 0) and (hatY == 0):
                 hatTriggered = False
@@ -98,6 +108,9 @@ class gamepad(QObject):
             ### Wait out update interval
             while timer()-start < self.updateInterval:
                 time.sleep(0.1 * self.updateInterval)
+        self.stage.stop_smoothly()
+        self.gamepad.stop()
+        print('Gamepad disconnected')
         self.disconnected.emit()
 
 
@@ -275,6 +288,7 @@ class stageMotionWindow(QMainWindow):
         self.workerG = gamepad(self)
         self.workerG.moveToThread(self.threadG)
         self.workerG.disconnected.connect(self.workerG.deleteLater)
+        self.workerG.disconnected.connect(self.threadG.quit)
         self.threadG.started.connect(self.workerG.read)
         self.threadG.finished.connect(self.threadG.deleteLater)
         self.threadG.start()
@@ -286,31 +300,27 @@ class stageMotionWindow(QMainWindow):
         print('Joystick angle : {}, speed: {}'.format(angle, speed))
 
     def joystick(self, selected='hardware'):
-        '''Switches between hardware joystick, software joystick, and gamepad'''
-        # if not self.threadG == []: # Stop gamepad thread if it is running
-        #     self.workerG.stop = True
-        #     self.workerG.deleteLater()
+        '''Enables or disables hardware joystick, software joystick, and gamepad'''
         if selected == 'hardware':
-            self.swJoystickEnable.setChecked(False)
-            self.gamepadEnable.setChecked(False)
-            self.stage.joystick(enable=True)
-            print('Hardware joystick enabled')
+            if self.hwJoystickEnable.isChecked():
+                self.stage.joystick(enable=True)
+                print('Hardware joystick enabled')
+            else:
+                self.stage.joystick(enable=False)
+                print('Hardware joystick disabled')
         elif selected == 'software':
-            self.hwJoystickEnable.setChecked(False)
-            self.gamepadEnable.setChecked(False)
-            self.stage.joystick(enable=False)
-            print('Software joystick enabled')
+            if self.swJoystickEnable.isChecked():
+                print('Software joystick enabled')
+            else:
+                print('Software joystick disabled')
         elif selected == 'gamepad':
-            self.hwJoystickEnable.setChecked(False)
-            self.swJoystickEnable.setChecked(False)
-            self.stage.joystick(enable=False)
-            self.goto_gamepad()
-            print('Gamepad enabled')
-        else:
-            self.swJoystickEnable.setChecked(False)
-            self.gamepadEnable.setChecked(False)
-            self.stage.joystick(enable=True)
-            print('Hardware joystick enabled')
+            if self.gamepadEnable.isChecked():
+                self.goto_gamepad()
+                print('Gamepad enabled')
+            else:
+                if self.threadG.isRunning:
+                    self.workerG.stop = True
+                print('Gamepad disabled')
 
     def lock_controls(self, lock=True):
         '''Disable all buttons while operations are performed.'''

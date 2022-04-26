@@ -13,6 +13,7 @@ import threading
 class xboxController(object):
     MAX_TRIG_VAL = math.pow(2, 8)
     MAX_JOY_VAL = math.pow(2, 15)
+    reading = True
 
     def __init__(self):
         self.LeftJoystickY = 0
@@ -61,9 +62,12 @@ class xboxController(object):
                self.Back,
                self.Start]
 
+    def stop(self):
+        self.reading = False
+
     def _monitor_controller(self):
         '''These assignments are for the Xbox Core Controller'''
-        while True:
+        while self.reading:
             events = get_gamepad()
             for event in events:
                 if event.code == 'ABS_Y':

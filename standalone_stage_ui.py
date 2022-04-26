@@ -25,7 +25,6 @@ class mainWindow(QMainWindow):
         self.stageWorker = stageInitializer()
         self.stageWorker.moveToThread(self.threadStg)
         self.threadStg.started.connect(self.stageWorker.stage_initialize)
-        self.stageWorker.stageInitialized.connect(self.threadStg.quit)
         self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)
         self.stageWorker.stageInstance.connect(self.stage_set)
         self.threadStg.finished.connect(self.threadStg.deleteLater)
