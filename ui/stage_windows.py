@@ -95,7 +95,10 @@ class gamepad(QObject):
                 if not hatTriggered:
                     xRel = hatX * self.step
                     yRel = hatY * self.step
+                    current_speed = self.stage.get_speed()
+                    self.stage.set_speed(self.stage.speeds[-1])
                     self.stage.move_rel(xRel, yRel)
+                    self.stage.set_speed(current_speed)
                 hatTriggered = True
             elif pushJoyL == 1:
                 ### Left thumbstick pushed: return to origin
