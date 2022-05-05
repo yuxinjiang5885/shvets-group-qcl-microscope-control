@@ -57,7 +57,6 @@ class gamepad(QObject):
         ### Initialize parameters
         deadzone = defaults.JOY_DEADZONE
         self.stage_speed = self.stage.get_speed() # um/s
-        self.step = float(self.motionWindow.inputField['stepSet'][0].text())
         ### Initialize triggering flags for buttons
         ### A button should give a single input until released
         hatTriggered = False
@@ -92,7 +91,9 @@ class gamepad(QObject):
                 ### Menu button: stop loop
                 self.stop = True
             elif (hatX != 0) or (hatY != 0):
+                ### Hat: move by step at maximum speed
                 if not hatTriggered:
+                    self.step = float(self.motionWindow.inputField['stepSet'][0].text())
                     xRel = hatX * self.step
                     yRel = hatY * self.step
                     current_speed = self.stage.get_speed()
@@ -276,6 +277,7 @@ class stageMotionWindow(QMainWindow):
         self.stage = mainGUI.stage
         self.stage.set_acc() # Return acceleration to default
         self.stage.set_speed() # Return speed to default
+        self.stage.joystick(enable=False) # Disable hardware joystick
         self.parameters = stageMotionParameters() # Passed to "run"
         self.threadMW = [] # Multiwell thread
         self.workerMW = [] # Multiwell worker
@@ -336,8 +338,14 @@ class stageMotionWindow(QMainWindow):
             if self.inputMethods['hw'][0].isChecked():
                 # self.hwJoystickEnable.setChecked(True)
                 # self.inputMethods['hw'][0].setChecked(True)
-                self.stage.joystick(enable=True)
-                print('Hardware joystick enabled')
+                try:
+                    self.stage.joystick(enable=True)
+                    print('Hardware joystick enabled')
+                except Exception as exc:
+                    print('Could not enable hardware joystick:\n{}'.format(exc))
+                    self.inputMethods['hw'][0].setStyleSheet(defaults.STYLE_BUTTON_JOY_FAULT)
+                    self.inputMethods['hw'][0].setChecked(False)
+                    self.inputMethods['hw'][0].setCheckable(False)
             else:
                 # self.hwJoystickEnable.setChecked(False)
                 # self.inputMethods['hw'][0].setChecked(False)
