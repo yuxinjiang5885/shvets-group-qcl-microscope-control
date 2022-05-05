@@ -27,9 +27,13 @@ NEW_TAB10 = {'blue' : '#4e79a7',
              'gray' : '#bab0ac'} # New Tableau 10 palette
 GS_COLORS = {'background': '#1f1f1f',
              'bg-alt': '#e6e6e6',
+             'bg-fault': '#1f1f1f',
+             'bg-operating': '#e6e6e6',
              'bg-warn': '#d75a3e',
              'border': '#404040',
              'border-alt': '#303030',
+             'border-fault': '#ff0000',
+             'border-operating': '#00ff00',
              'border-warn': '#d75a3e',
              'hover': '#353535',
              'hover-alt': '#d8d8d8',
@@ -247,6 +251,56 @@ STYLE_BUTTON = '''QPushButton {{
                  GS_COLORS['text-alt'],
                  GS_COLORS['hover'],
                  GS_COLORS['hover-alt'])
+STYLE_BUTTON_JOY = '''QPushButton {{
+        background-color: {};
+        border: 2px solid {};
+        border-radius: 4px;
+        width: 40px;
+        color: {};
+    }}
+    QPushButton:checked {{
+        background-color: {};
+        border: 2px solid {};
+        color: {};
+    }}
+    QPushButton:hover {{
+        background-color: {};
+    }}
+    QPushButton:checked:hover {{
+        background-color: {};
+    }}'''.format(GS_COLORS['background'],
+                 GS_COLORS['border'],
+                 GS_COLORS['text'],
+                 GS_COLORS['bg-operating'],
+                 GS_COLORS['border-operating'],
+                 GS_COLORS['text-alt'],
+                 GS_COLORS['hover'],
+                 GS_COLORS['hover-alt'])
+STYLE_BUTTON_JOY_FAULT = '''QPushButton {{
+        background-color: {};
+        border: 2px solid {};
+        border-radius: 4px;
+        width: 40px;
+        color: {};
+    }}
+    QPushButton:checked {{
+        background-color: {};
+        border: 2px solid {};
+        color: {};
+    }}
+    QPushButton:hover {{
+        background-color: {};
+    }}
+    QPushButton:checked:hover {{
+        background-color: {};
+    }}'''.format(GS_COLORS['background'],
+                 GS_COLORS['border'],
+                 GS_COLORS['text'],
+                 GS_COLORS['bg-fault'],
+                 GS_COLORS['border-fault'],
+                 GS_COLORS['text'],
+                 GS_COLORS['hover'],
+                 GS_COLORS['hover'])
 STYLE_BUTTON_UNIT = '''QPushButton {{
         background-color: {};
         border: 2px solid {};

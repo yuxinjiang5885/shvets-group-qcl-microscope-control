@@ -37,7 +37,7 @@ from PyQt5.QtWidgets import (QAction,
 
 class gamepad(QObject):
     '''Handle stage movement with gamepad'''
-    disconnected = pyqtSignal()
+    stopped = pyqtSignal()
 
     def __init__(self, motionWindowInstance):
         super().__init__()
@@ -141,8 +141,8 @@ class gamepad(QObject):
                 time.sleep(0.1 * self.updateInterval)
         self.stage.stop_smoothly()
         self.gamepad.stop()
-        print('Gamepad disconnected')
-        self.disconnected.emit()
+        print('Gamepad stopped')
+        self.stopped.emit()
 
 
 class stageInitializer(QObject):
@@ -318,8 +318,8 @@ class stageMotionWindow(QMainWindow):
         self.threadG = QThread()
         self.workerG = gamepad(self)
         self.workerG.moveToThread(self.threadG)
-        self.workerG.disconnected.connect(self.workerG.deleteLater)
-        self.workerG.disconnected.connect(self.threadG.quit)
+        self.workerG.stopped.connect(self.workerG.deleteLater)
+        self.workerG.stopped.connect(self.threadG.quit)
         self.threadG.started.connect(self.workerG.read)
         self.threadG.finished.connect(self.threadG.deleteLater)
         self.threadG.start()
@@ -333,22 +333,35 @@ class stageMotionWindow(QMainWindow):
     def joystick(self, selected='hardware'):
         '''Enables or disables hardware joystick, software joystick, and gamepad'''
         if selected == 'hardware':
-            if self.hwJoystickEnable.isChecked():
+            if self.inputMethods['hw'][0].isChecked():
+                # self.hwJoystickEnable.setChecked(True)
+                # self.inputMethods['hw'][0].setChecked(True)
                 self.stage.joystick(enable=True)
                 print('Hardware joystick enabled')
             else:
+                # self.hwJoystickEnable.setChecked(False)
+                # self.inputMethods['hw'][0].setChecked(False)
                 self.stage.joystick(enable=False)
                 print('Hardware joystick disabled')
         elif selected == 'software':
-            if self.swJoystickEnable.isChecked():
-                print('Software joystick enabled')
+            if self.inputMethods['sw'][0].isChecked():
+                # self.swJoystickEnable.setChecked(False)
+                self.inputMethods['sw'][0].setChecked(False)
+                # print('Software joystick enabled')
+                print('Software joystick not implemented')
+                self.inputMethods['sw'][0].setStyleSheet(defaults.STYLE_BUTTON_JOY_FAULT)
             else:
-                print('Software joystick disabled')
+                pass
+                # print('Software joystick disabled')
         elif selected == 'gamepad':
-            if self.gamepadEnable.isChecked():
+            if self.inputMethods['gp'][0].isChecked():
+                # self.gamepadEnable.setChecked(True)
+                # self.inputMethods['gp'][0].setChecked(True)
                 self.goto_gamepad()
                 print('Gamepad enabled')
             else:
+                # self.gamepadEnable.setChecked(False)
+                # self.inputMethods['gp'][0].setChecked(False)
                 if self.threadG.isRunning:
                     self.workerG.stop = True
                 print('Gamepad disabled')
@@ -387,16 +400,16 @@ class stageMotionWindow(QMainWindow):
         updateAction.setToolTip('Update x/y stage position readings')
         updateAction.triggered.connect(lambda: self.update_readings())
         ### Control options
-        self.hwJoystickEnable = QAction(QIcon(None), 'Enable hardware joystick',
-                                        self, checkable=True, checked=True)
-        self.swJoystickEnable = QAction(QIcon(None), 'Enable software joystick',
-                                        self, checkable=True, checked=False)
-        self.gamepadEnable = QAction(QIcon(None), 'Enable gamepad',
-                                     self, checkable=True, checked=False)
+        # self.hwJoystickEnable = QAction(QIcon(None), 'Enable hardware joystick',
+        #                                 self, checkable=True, checked=True)
+        # self.swJoystickEnable = QAction(QIcon(None), 'Enable software joystick',
+        #                                 self, checkable=True, checked=False)
+        # self.gamepadEnable = QAction(QIcon(None), 'Enable gamepad',
+        #                              self, checkable=True, checked=False)
         ### Connect control options
-        self.hwJoystickEnable.triggered.connect(lambda: self.joystick(selected='hardware'))
-        self.swJoystickEnable.triggered.connect(lambda: self.joystick(selected='software'))
-        self.gamepadEnable.triggered.connect(lambda: self.joystick(selected='gamepad'))
+        # self.hwJoystickEnable.triggered.connect(lambda: self.joystick(selected='hardware'))
+        # self.swJoystickEnable.triggered.connect(lambda: self.joystick(selected='software'))
+        # self.gamepadEnable.triggered.connect(lambda: self.joystick(selected='gamepad'))
         ### Pattern options
         self.reverse = QAction(QIcon(None), 'Reverse pattern', self, checkable=True)
         self.reverse.setShortcut('Ctrl+R')
@@ -412,11 +425,11 @@ class stageMotionWindow(QMainWindow):
         fileMenu.setStyleSheet(defaults.STYLE_MENU)
         fileMenu.addAction(exitAction)
         fileMenu.addAction(updateAction)
-        controlMenu = self.menubar.addMenu('Control')
-        controlMenu.setStyleSheet(defaults.STYLE_MENU)
-        controlMenu.addAction(self.hwJoystickEnable)
-        controlMenu.addAction(self.swJoystickEnable)
-        controlMenu.addAction(self.gamepadEnable)
+        # controlMenu = self.menubar.addMenu('Control')
+        # controlMenu.setStyleSheet(defaults.STYLE_MENU)
+        # controlMenu.addAction(self.hwJoystickEnable)
+        # controlMenu.addAction(self.swJoystickEnable)
+        # controlMenu.addAction(self.gamepadEnable)
         patternMenu = self.menubar.addMenu('Patterns')
         patternMenu.setStyleSheet(defaults.STYLE_MENU)
         patternMenu.addAction(self.reverse)
@@ -437,20 +450,20 @@ class stageMotionWindow(QMainWindow):
         self.stgControlsGrid = QGridLayout()
         self.stgControls.setLayout(self.stgControlsGrid)
         self.stgControlsGrid.setSpacing(10)
-        ### Stage controls - Input method indicators
+        ### Stage controls - Input method selectors
         self.inputMethods = dict() # [label, row, col, rowSpan, colSpan]
-        self.inputMethods['hw'] = [QPushButton(' HW  \n  JOY '), 0, 0, 2, 1]
+        self.inputMethods['hw'] = [QPushButton('HW\nJOY'), 0, 0, 2, 1]
         self.inputMethods['hw'][0].setToolTip('Enable hardware joystick')
-        self.inputMethods['sw'] = [QPushButton(' SW  \n  JOY '), 0, 1, 2, 1]
+        self.inputMethods['sw'] = [QPushButton('SW\nJOY'), 0, 1, 2, 1]
         self.inputMethods['sw'][0].setToolTip('Enable software joystick')
-        self.inputMethods['gp'] = [QPushButton(' GAME \n PAD  '), 0, 2, 2, 1]
+        self.inputMethods['gp'] = [QPushButton('GAME\nPAD'), 0, 2, 2, 1]
         self.inputMethods['gp'][0].setToolTip('Enable gamepad')
         for _, k in self.inputMethods.items(): # Arrange labels in grid
             k[0].setCheckable(True)
             k[0].setFocusPolicy(Qt.NoFocus)
-            k[0].setFont(font)
-            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            k[0].setStyleSheet(defaults.STYLE_ARMED)
+            k[0].setFont(fontSmall)
+            k[0].setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+            k[0].setStyleSheet(defaults.STYLE_BUTTON_JOY)
             self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Stage controls - Labels
         self.stgLabels = dict() # [label, row, col, rowSpan, colSpan]
@@ -671,6 +684,9 @@ class stageMotionWindow(QMainWindow):
         self.inputField['aSet'][0].returnPressed.connect(lambda: self.set_a())
         ### Connecting buttons
         self.btn['Start'][0].clicked.connect(lambda: self.run())
+        self.inputMethods['hw'][0].clicked.connect(lambda: self.joystick(selected='hardware'))
+        self.inputMethods['sw'][0].clicked.connect(lambda: self.joystick(selected='software'))
+        self.inputMethods['gp'][0].clicked.connect(lambda: self.joystick(selected='gamepad'))
 
     def run(self):
         '''Run stage scan'''
