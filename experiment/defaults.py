@@ -198,6 +198,7 @@ JOY_DEADZONE = 0.10 # Threshold for thumbstick deadzone
 COL_WIDTH = 100
 FONT_FAMILY = 'Open Sans Semibold'
 FONT_SIZE = 12
+FONT_SIZE_MEDIUM = 11
 FONT_SIZE_SMALL = 10
 NUMBER_OF_ROWS = 14 # UI grid template rows
 NUMBER_OF_COLS = 11 # UI grid template columns

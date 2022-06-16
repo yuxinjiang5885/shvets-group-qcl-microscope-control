@@ -10,8 +10,11 @@ import experiment.defaults as defaults
 from ui.stage_windows import (stageInitializer,
                                       stageMotionWindow,
                                       stageStartupDialog)
-from PyQt5.QtCore import QThread
-from PyQt5.QtWidgets import (QApplication,
+# from PyQt5.QtCore import QThread
+# from PyQt5.QtWidgets import (QApplication,
+#                              QMainWindow)
+from PyQt6.QtCore import QThread
+from PyQt6.QtWidgets import (QApplication,
                              QMainWindow)
 
 class mainWindow(QMainWindow):
@@ -55,4 +58,4 @@ class mainWindow(QMainWindow):
 if __name__ == '__main__':
     APP = QApplication(sys.argv)
     GUI0 = mainWindow()
-    sys.exit(APP.exec_())
+    sys.exit(APP.exec())

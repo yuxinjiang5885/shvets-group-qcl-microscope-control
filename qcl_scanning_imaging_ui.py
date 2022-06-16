@@ -28,14 +28,29 @@ from ui.stage_windows import (stageInitializer,
 from ui.plot_widgets import mplCanvas
 # from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QObject, QThread, pyqtSignal
-from PyQt5.QtGui import QIntValidator, QIcon, QFont, QWindow
-from PyQt5.QtWidgets import (QAction,
-                             QApplication,
-                             QDesktopWidget,
-                             QDialog,
-                             QFileDialog,
+# from PyQt5.QtCore import Qt
+# from PyQt5.QtCore import QObject, QThread, pyqtSignal
+# from PyQt5.QtGui import QIntValidator, QIcon, QFont, QWindow
+# from PyQt5.QtWidgets import (QAction,
+#                              QApplication,
+#                              QDesktopWidget,
+#                              QDialog,
+#                              QFileDialog,
+#                              QGridLayout,
+#                              QLabel,
+#                              QLineEdit,
+#                              QMainWindow,
+#                              QMessageBox,
+#                              QPushButton,
+#                              QWidget,
+#                              QSizePolicy,
+#                              QTabWidget,
+#                              QTextEdit,
+#                              QVBoxLayout)
+from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QThread
+from PyQt6.QtGui import QAction, QIcon, QFont, QScreen
+from PyQt6.QtWidgets import (QApplication,
                              QGridLayout,
                              QLabel,
                              QLineEdit,
@@ -45,8 +60,7 @@ from PyQt5.QtWidgets import (QAction,
                              QWidget,
                              QSizePolicy,
                              QTabWidget,
-                             QTextEdit,
-                             QVBoxLayout)
+                             QTextEdit)
 rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
 
 class experimentParameters():
@@ -170,7 +184,7 @@ class mainWindow(QMainWindow):
     def center_window(self):
         '''Center main application window on screen.'''
         qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
+        centerPoint = QScreen().availableGeometry().center()
         qtRectangle.moveCenter(centerPoint)
         self.move(qtRectangle.topLeft())
 
@@ -226,15 +240,15 @@ class mainWindow(QMainWindow):
 
     def make_gui(self):
         '''Create main GUI window.'''
-        self.setGeometry(0, 0, 1400, 960)
+        self.setGeometry(0, 0, 1200, 900)
+        # self.center_window()
         font = QFont()
         font.setFamily(defaults.FONT_FAMILY)
-        font.setPointSize(defaults.FONT_SIZE)
+        font.setPointSize(defaults.FONT_SIZE_MEDIUM)
         # self.setWindowModality(Qt.ApplicationModal)
-        ### Set title, icon and center window
+        ### Set title and icon
         self.setWindowTitle('QCL Scanning and Imaging UI')
         self.setWindowIcon(QIcon('icons/mircat.ico'))
-        self.center_window()
         ### Create bars
         self.menubar = self.menuBar()
         self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)
@@ -345,22 +359,22 @@ class mainWindow(QMainWindow):
                 self.gridSingle.setColumnStretch(col, 20)
         ### Plot: latest spectrum
         self.plotCanvas = mplCanvas(width=5, height=4)
-        self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        # self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.plotCanvas.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvas.axes.set_ylabel('Lock-in Mag. (V)')
         self.plotCanvas.axes.set_title('Latest Spectrum')
         self.gridSingle.addWidget(self.plotCanvas, 0, 0, 1, 5)
         ### Plot: current reference
         self.plotCanvasRef = mplCanvas(width=5, height=4)
-        self.plotCanvasRef.setSizePolicy(QSizePolicy.Fixed,
-                                                              QSizePolicy.Fixed)
+        # self.plotCanvasRef.setSizePolicy(QSizePolicy.Fixed,
+        #                                                       QSizePolicy.Fixed)
         self.plotCanvasRef.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
         self.plotCanvasRef.axes.set_title('Current Reference')
         self.gridSingle.addWidget(self.plotCanvasRef, 0, 5, 1, 3)
         ### Plot: transmittance
         self.plotCanvasT = mplCanvas(width=5, height=4)
-        self.plotCanvasT.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        # self.plotCanvasT.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.plotCanvasT.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvasT.axes.set_ylabel('Transmittance')
         self.plotCanvasT.axes.set_title('Transmittance (Latest/Reference)')
@@ -405,9 +419,9 @@ class mainWindow(QMainWindow):
         # self.btn['Stop'][0].setToolTip('Stop scan or sweep in progress')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
-            k[0].setFocusPolicy(Qt.NoFocus)
+            # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             if x in ['QCL1', 'QCL2', 'QCL3', 'QCL4']:
                 k[0].setStyleSheet(defaults.STYLE_BUTTON)
             elif x in ['WlUnits']:
@@ -536,6 +550,14 @@ class mainWindow(QMainWindow):
         self.btn['RefSet'][0].clicked.connect(lambda: self.reference_set(
                                                     self.parameters.latestDir))
         self.activeQcl = 0 # None selected on startup
+        ### Multiple acquisition tab - Base layout
+        self.tabMultiple = QWidget()
+        self.tabMultiple.setStyleSheet(defaults.STYLE_CONTAINER)
+        self.tabs.addTab(self.tabMultiple, 'Multiple')
+        ### Scanning imaging tab - Base layout
+        self.tabImag = QWidget()
+        self.tabImag.setStyleSheet(defaults.STYLE_CONTAINER)
+        self.tabs.addTab(self.tabImag, 'Scanning imaging')
         self.show()
 
     def multiple(self):
@@ -1022,17 +1044,18 @@ class multipleAcquisitionsWindow(QMainWindow):
     '''GUI for multiple acquisitions'''
 
     def __init__(self, mainGUI):
-        super().__init__(None, Qt.WindowStaysOnTopHint)
+        # super().__init__(None, Qt.WindowStaysOnTopHint)
+        super().__init__()
         # self.latestExperiment = [] # Placeholder for latest experiment instance
         self.make_gui()
         self.acquisitions = 0 # Controls acuisition counter only
 
-    def center_window(self):
-        '''Center main application window on screen'''
-        qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+    # def center_window(self):
+    #     '''Center main application window on screen'''
+    #     qtRectangle = self.frameGeometry()
+    #     centerPoint = QScreen().availableGeometry().center()
+    #     qtRectangle.moveCenter(centerPoint)
+    #     self.move(qtRectangle.topLeft())
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
@@ -1043,11 +1066,11 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.setGeometry(0, 0, 250, 350)
         font = QFont()
         font.setFamily(defaults.FONT_FAMILY)
-        font.setPointSize(defaults.FONT_SIZE)
+        font.setPointSize(defaults.FONT_SIZE_MEDIUM)
         ### Set title, icon and center window
         self.setWindowTitle('Multiple Acquisitions')
         self.setWindowIcon(QIcon('icons/mircat.ico'))
-        self.center_window()
+        # self.center_window()
         ### Actions
         exitAction = QAction(QIcon(None), 'Close Window', self)
         exitAction.setShortcut('Ctrl+W')
@@ -1076,9 +1099,9 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.btn['Stop'][0].setToolTip('Stop multiple acquisitions')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
-            k[0].setFocusPolicy(Qt.NoFocus)
+            # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Input fields
@@ -1138,4 +1161,4 @@ class multipleAcquisitionsWindow(QMainWindow):
 if __name__ == '__main__':
     APP = QApplication(sys.argv)
     GUI1 = mainWindow()
-    sys.exit(APP.exec_())
+    sys.exit(APP.exec())

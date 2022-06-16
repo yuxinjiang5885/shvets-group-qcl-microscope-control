@@ -8,12 +8,24 @@ Created 2021-Dec-07
 
 import experiment.defaults as defaults
 from instruments.mircat import laser
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtGui import QIntValidator, QIcon, QFont
-from PyQt5.QtWidgets import (QAction,
-                             QDesktopWidget,
-                             QDialog,
+# from PyQt5.QtCore import Qt
+# from PyQt5.QtCore import QObject, pyqtSignal
+# from PyQt5.QtGui import QIntValidator, QIcon, QFont
+# from PyQt5.QtWidgets import (QAction,
+#                              QDesktopWidget,
+#                              QDialog,
+#                              QGridLayout,
+#                              QLabel,
+#                              QLineEdit,
+#                              QMainWindow,
+#                              QPushButton,
+#                              QWidget,
+#                              QSizePolicy,
+#                              QVBoxLayout)
+from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtGui import QAction, QIntValidator, QIcon, QFont, QScreen
+from PyQt6.QtWidgets import (QDialog,
                              QGridLayout,
                              QLabel,
                              QLineEdit,
@@ -42,7 +54,8 @@ class laserSettingWindow(QMainWindow):
     '''GUI for laser settings'''
 
     def __init__(self, mainGUI):
-        super().__init__(None, Qt.WindowStaysOnTopHint)
+        # super().__init__(None, Qt.WindowStaysOnTopHint)
+        super().__init__()
         self.paramNames = ['PulseRate',
                            'PulseWidth',
                            'DutyCycle',
@@ -54,7 +67,7 @@ class laserSettingWindow(QMainWindow):
     def center_window(self):
         '''Center main application window on screen'''
         qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
+        centerPoint = QScreen().availableGeometry().center()
         qtRectangle.moveCenter(centerPoint)
         self.move(qtRectangle.topLeft())
 
@@ -82,7 +95,7 @@ class laserSettingWindow(QMainWindow):
         ### Set title, icon and center window
         self.setWindowTitle('MIRcat Settings Panel')
         self.setWindowIcon(QIcon('icons/mircat.ico'))
-        self.center_window()
+        # self.center_window()
         ### Actions
         updateAction = QAction(QIcon(None), 'Refresh Readings', self)
         updateAction.setShortcut('Ctrl+R')
@@ -141,9 +154,9 @@ class laserSettingWindow(QMainWindow):
             self.btn[btnName] = [QPushButton(btnText), row, 11, 2, 1]
         for x, (_, k) in enumerate(self.btn.items()): # Arrange buttons in grid
             k[0].setCheckable(True)
-            k[0].setFocusPolicy(Qt.NoFocus)
+            # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
             ### Connecting here will connect all to the last QCL.
@@ -328,7 +341,7 @@ class laserStartupDialog(QDialog):
     def center_window(self):
         '''Center window on screen.'''
         qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
+        centerPoint = QScreen().availableGeometry().center()
         qtRectangle.moveCenter(centerPoint)
         self.move(qtRectangle.topLeft())
 
@@ -343,7 +356,7 @@ class laserStartupDialog(QDialog):
         self.font.setFamily(defaults.FONT_FAMILY)
         self.font.setPointSize(defaults.FONT_SIZE)
         self.setStyleSheet(defaults.STYLE_CONTAINER)
-        self.setWindowModality(Qt.ApplicationModal) # Disable rest of UI
+        # self.setWindowModality(Qt.ApplicationModal) # Disable rest of UI
         ### Dialog text
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -351,4 +364,4 @@ class laserStartupDialog(QDialog):
         self.textBox.setFont(self.font)
         self.textBox.setStyleSheet(defaults.STYLE_LABEL_ALT)
         self.layout.addWidget(self.textBox)
-        self.center_window()
+        # self.center_window()

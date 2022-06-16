@@ -18,10 +18,9 @@ from instruments.mircat import SDK
 from . import defaults
 from timeit import default_timer as timer
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigCanvas
-from matplotlib.figure import Figure
 from instruments.daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_CM1, MIRcatSDK_UNITS_MICRONS
-from PyQt5.QtCore import QObject, QThread, pyqtSignal
+# from PyQt5.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 ### Define narrow QCL ranges with unused wavelengths/numbers before and after.
 ### This leaves space to sweep a little before and after the requested range.

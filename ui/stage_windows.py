@@ -13,17 +13,30 @@ import matplotlib.pyplot as plt
 import numpy as np
 import experiment.defaults as defaults
 from instruments.hld117 import stage
-from .software_joystick import Joystick
+# from .software_joystick import Joystick
 from .xbox_controller import xboxController
 import time
 from time import perf_counter as timer, sleep
 from ui.plot_widgets import mplCanvas
-from PyQt5.QtCore import Qt, QThread
-from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtGui import QIntValidator, QIcon, QFont
-from PyQt5.QtWidgets import (QAction,
-                             QDesktopWidget,
-                             QDialog,
+# from PyQt5.QtCore import Qt, QThread
+# from PyQt5.QtCore import QObject, pyqtSignal
+# from PyQt5.QtGui import QIntValidator, QIcon, QFont
+# from PyQt5.QtWidgets import (QAction,
+#                              QDesktopWidget,
+#                              QDialog,
+#                              QGridLayout,
+#                              QLabel,
+#                              QLineEdit,
+#                              QMainWindow,
+#                              QPushButton,
+#                              QTabWidget,
+#                              QSizePolicy,
+#                              QVBoxLayout,
+#                              QWidget)
+from PyQt6.QtCore import Qt, QThread
+from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtGui import QAction, QIcon, QFont
+from PyQt6.QtWidgets import (QDialog,
                              QGridLayout,
                              QLabel,
                              QLineEdit,
@@ -33,7 +46,6 @@ from PyQt5.QtWidgets import (QAction,
                              QSizePolicy,
                              QVBoxLayout,
                              QWidget)
-
 
 class gamepad(QObject):
     '''Handle stage movement with gamepad'''
@@ -272,7 +284,8 @@ class stageMotionWindow(QMainWindow):
     '''GUI for stage motion control'''
 
     def __init__(self, mainGUI):
-        super().__init__(None, Qt.WindowStaysOnTopHint)
+        # super().__init__(None, Qt.WindowStaysOnTopHint)
+        super().__init__()
         self.paramNames = ['x_um', 'y_um', 'v_um_per_s', 'a_um_per_s2']
         self.stage = mainGUI.stage
         self.stage.set_acc() # Return acceleration to default
@@ -289,12 +302,12 @@ class stageMotionWindow(QMainWindow):
         #     print('Could not connect to gamepad:\n{}'.format(exc))
         self.make_gui()
 
-    def center_window(self):
-        '''Center main application window on screen'''
-        qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+    # def center_window(self):
+    #     '''Center main application window on screen'''
+    #     qtRectangle = self.frameGeometry()
+    #     centerPoint = QDesktopWidget().availableGeometry().center()
+    #     qtRectangle.moveCenter(centerPoint)
+    #     self.move(qtRectangle.topLeft())
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
@@ -397,7 +410,7 @@ class stageMotionWindow(QMainWindow):
         ### Set title, icon and center window
         self.setWindowTitle('Stage Motion')
         self.setWindowIcon(QIcon('icons/stage.ico'))
-        self.center_window()
+        # self.center_window()
         ### Actions
         exitAction = QAction(QIcon(None), 'Close Window', self)
         exitAction.setShortcut('Ctrl+W')
@@ -468,9 +481,9 @@ class stageMotionWindow(QMainWindow):
         self.inputMethods['gp'][0].setToolTip('Enable gamepad')
         for _, k in self.inputMethods.items(): # Arrange labels in grid
             k[0].setCheckable(True)
-            k[0].setFocusPolicy(Qt.NoFocus)
+            # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(fontSmall)
-            k[0].setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+            # k[0].setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_BUTTON_JOY)
             self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Stage controls - Labels
@@ -499,7 +512,7 @@ class stageMotionWindow(QMainWindow):
             self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Plot: stage position
         self.plotCanvas = mplCanvas(width=5, height=4)
-        self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        # self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.plotCanvas.axes.set_aspect('equal')
         self.plotCanvas.axes.set_xlabel('x (μm)')
         xTravel = defaults.STAGE_X_TRAVEL_UM
@@ -596,9 +609,9 @@ class stageMotionWindow(QMainWindow):
         #     k[0].setStyleSheet(defaults.STYLE_INPUT)
         #     self.tabPosGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Position tab - Joystick
-        self.swJoystick = Joystick()
-        self.swJoystick.joystickInput.connect(self.goto_joystick)
-        self.tabPosGrid.addWidget(self.swJoystick, 6, 3, 4, 3)
+        # self.swJoystick = Joystick()
+        # self.swJoystick.joystickInput.connect(self.goto_joystick)
+        # self.tabPosGrid.addWidget(self.swJoystick, 6, 3, 4, 3)
         ### Multiwell tab - Base layout
         self.tabMultiwell = QWidget()
         self.tabMultiwell.setStyleSheet(defaults.STYLE_CONTAINER)
@@ -621,7 +634,7 @@ class stageMotionWindow(QMainWindow):
         self.multiwellLabels['header2'] = [QLabel(''), 3, 0, 1, 5]
         self.multiwellLabels['dwell'] = [QLabel('Dwell time (s): '), 4, 1, 1, 1]
         self.multiwellLabels['acquisitions'] = [QLabel('Acquisitions: '), 4, 3, 1, 1]
-        self.multiwellLabels['dwell'][0].setAlignment(Qt.AlignCenter)
+        # self.multiwellLabels['dwell'][0].setAlignment(Qt.AlignCenter)
         for _, k in self.multiwellLabels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
@@ -673,9 +686,9 @@ class stageMotionWindow(QMainWindow):
         self.btn['Stop'][0].setToolTip('Stop stage scan')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
-            k[0].setFocusPolicy(Qt.NoFocus)
+            # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Set stretch
@@ -901,7 +914,7 @@ class stageStartupDialog(QDialog):
         self.font.setFamily(defaults.FONT_FAMILY)
         self.font.setPointSize(defaults.FONT_SIZE)
         self.setStyleSheet(defaults.STYLE_CONTAINER)
-        self.setWindowModality(Qt.ApplicationModal) # Disable rest of UI
+        # self.setWindowModality(Qt.ApplicationModal) # Disable rest of UI
         ### Dialog text
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -909,4 +922,4 @@ class stageStartupDialog(QDialog):
         self.textBox.setFont(self.font)
         self.textBox.setStyleSheet(defaults.STYLE_LABEL_ALT)
         self.layout.addWidget(self.textBox)
-        self.center_window()
+        # self.center_window()

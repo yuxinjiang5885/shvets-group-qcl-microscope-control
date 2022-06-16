@@ -6,10 +6,13 @@ Adapted from https://stackoverflow.com/a/55899694
 Created 2022-Apr-06
 '''
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QObject, pyqtSignal, QPointF, QLineF, QRectF
-from PyQt5.QtGui import QIntValidator, QIcon, QFont, QPainter
-from PyQt5.QtWidgets import QWidget
+# from PyQt5.QtCore import Qt
+# from PyQt5.QtCore import QObject, pyqtSignal, QPointF, QLineF, QRectF
+# from PyQt5.QtGui import QIntValidator, QIcon, QFont, QPainter
+# from PyQt5.QtWidgets import QWidget
+from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QLineF, QRectF
+from PyQt6.QtGui import QColor, QPainter
+from PyQt6.QtWidgets import QWidget
 
 
 class Joystick(QWidget):
@@ -26,7 +29,7 @@ class Joystick(QWidget):
         painter = QPainter(self)
         bounds = QRectF(-self.__maxDistance, -self.__maxDistance, self.__maxDistance * 2, self.__maxDistance * 2).translated(self._center())
         painter.drawEllipse(bounds)
-        painter.setBrush(Qt.black)
+        # painter.setBrush(QColor.black)
         painter.drawEllipse(self._centerEllipse())
 
     def _centerEllipse(self):
