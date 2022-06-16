@@ -420,7 +420,7 @@ class mainWindow(QMainWindow):
             k[0].setCheckable(True)
             # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            # k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             if x in ['QCL1', 'QCL2', 'QCL3', 'QCL4']:
                 k[0].setStyleSheet(defaults.STYLE_BUTTON)
             elif x in ['WlUnits']:
@@ -557,6 +557,11 @@ class mainWindow(QMainWindow):
         self.tabImag = QWidget()
         self.tabImag.setStyleSheet(defaults.STYLE_CONTAINER)
         self.tabs.addTab(self.tabImag, 'Scanning imaging')
+        ### Scanning imaging tab - Grid layout
+        self.tabImagGrid = QGridLayout()
+        self.tabImag.setLayout(self.tabImagGrid)
+        self.tabImagGrid.setSpacing(10)
+        ### Show main application window
         self.show()
 
     def multiple(self):
@@ -1100,7 +1105,7 @@ class multipleAcquisitionsWindow(QMainWindow):
             k[0].setCheckable(True)
             # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            # k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Input fields
