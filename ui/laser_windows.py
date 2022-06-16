@@ -66,10 +66,10 @@ class laserSettingWindow(QMainWindow):
 
     def center_window(self):
         '''Center main application window on screen'''
-        qtRectangle = self.frameGeometry()
-        centerPoint = QScreen().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
@@ -95,7 +95,7 @@ class laserSettingWindow(QMainWindow):
         ### Set title, icon and center window
         self.setWindowTitle('MIRcat Settings Panel')
         self.setWindowIcon(QIcon('icons/mircat.ico'))
-        # self.center_window()
+        self.center_window()
         ### Actions
         updateAction = QAction(QIcon(None), 'Refresh Readings', self)
         updateAction.setShortcut('Ctrl+R')
@@ -339,11 +339,11 @@ class laserStartupDialog(QDialog):
         self.make_dialog()
 
     def center_window(self):
-        '''Center window on screen.'''
-        qtRectangle = self.frameGeometry()
-        centerPoint = QScreen().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+        '''Center main application window on screen'''
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def make_dialog(self):
         '''Setup dialog window.
@@ -364,4 +364,4 @@ class laserStartupDialog(QDialog):
         self.textBox.setFont(self.font)
         self.textBox.setStyleSheet(defaults.STYLE_LABEL_ALT)
         self.layout.addWidget(self.textBox)
-        # self.center_window()
+        self.center_window()

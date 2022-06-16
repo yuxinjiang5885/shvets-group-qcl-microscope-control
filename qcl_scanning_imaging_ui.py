@@ -182,11 +182,11 @@ class mainWindow(QMainWindow):
         self.statusbar.showMessage('Ready')
 
     def center_window(self):
-        '''Center main application window on screen.'''
-        qtRectangle = self.frameGeometry()
-        centerPoint = QScreen().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+        '''Center main application window on screen'''
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
@@ -241,7 +241,7 @@ class mainWindow(QMainWindow):
     def make_gui(self):
         '''Create main GUI window.'''
         self.setGeometry(0, 0, 1200, 900)
-        # self.center_window()
+        self.center_window()
         font = QFont()
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE_MEDIUM)
@@ -358,23 +358,22 @@ class mainWindow(QMainWindow):
             else:
                 self.gridSingle.setColumnStretch(col, 20)
         ### Plot: latest spectrum
-        self.plotCanvas = mplCanvas(width=5, height=4)
-        # self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.plotCanvas = mplCanvas(width=4, height=3)
+        self.plotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvas.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvas.axes.set_ylabel('Lock-in Mag. (V)')
         self.plotCanvas.axes.set_title('Latest Spectrum')
         self.gridSingle.addWidget(self.plotCanvas, 0, 0, 1, 5)
         ### Plot: current reference
-        self.plotCanvasRef = mplCanvas(width=5, height=4)
-        # self.plotCanvasRef.setSizePolicy(QSizePolicy.Fixed,
-        #                                                       QSizePolicy.Fixed)
+        self.plotCanvasRef = mplCanvas(width=4, height=3)
+        self.plotCanvasRef.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvasRef.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
         self.plotCanvasRef.axes.set_title('Current Reference')
         self.gridSingle.addWidget(self.plotCanvasRef, 0, 5, 1, 3)
         ### Plot: transmittance
-        self.plotCanvasT = mplCanvas(width=5, height=4)
-        # self.plotCanvasT.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.plotCanvasT = mplCanvas(width=4, height=3)
+        self.plotCanvasT.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvasT.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvasT.axes.set_ylabel('Transmittance')
         self.plotCanvasT.axes.set_title('Transmittance (Latest/Reference)')
@@ -421,7 +420,7 @@ class mainWindow(QMainWindow):
             k[0].setCheckable(True)
             # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            # k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             if x in ['QCL1', 'QCL2', 'QCL3', 'QCL4']:
                 k[0].setStyleSheet(defaults.STYLE_BUTTON)
             elif x in ['WlUnits']:
@@ -1050,12 +1049,12 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.make_gui()
         self.acquisitions = 0 # Controls acuisition counter only
 
-    # def center_window(self):
-    #     '''Center main application window on screen'''
-    #     qtRectangle = self.frameGeometry()
-    #     centerPoint = QScreen().availableGeometry().center()
-    #     qtRectangle.moveCenter(centerPoint)
-    #     self.move(qtRectangle.topLeft())
+    def center_window(self):
+        '''Center main application window on screen'''
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
@@ -1070,7 +1069,7 @@ class multipleAcquisitionsWindow(QMainWindow):
         ### Set title, icon and center window
         self.setWindowTitle('Multiple Acquisitions')
         self.setWindowIcon(QIcon('icons/mircat.ico'))
-        # self.center_window()
+        self.center_window()
         ### Actions
         exitAction = QAction(QIcon(None), 'Close Window', self)
         exitAction.setShortcut('Ctrl+W')
@@ -1101,7 +1100,7 @@ class multipleAcquisitionsWindow(QMainWindow):
             k[0].setCheckable(True)
             # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            # k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            # k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Input fields

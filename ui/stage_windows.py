@@ -302,12 +302,12 @@ class stageMotionWindow(QMainWindow):
         #     print('Could not connect to gamepad:\n{}'.format(exc))
         self.make_gui()
 
-    # def center_window(self):
-    #     '''Center main application window on screen'''
-    #     qtRectangle = self.frameGeometry()
-    #     centerPoint = QDesktopWidget().availableGeometry().center()
-    #     qtRectangle.moveCenter(centerPoint)
-    #     self.move(qtRectangle.topLeft())
+    def center_window(self):
+        '''Center main application window on screen'''
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
@@ -410,7 +410,7 @@ class stageMotionWindow(QMainWindow):
         ### Set title, icon and center window
         self.setWindowTitle('Stage Motion')
         self.setWindowIcon(QIcon('icons/stage.ico'))
-        # self.center_window()
+        self.center_window()
         ### Actions
         exitAction = QAction(QIcon(None), 'Close Window', self)
         exitAction.setShortcut('Ctrl+W')
@@ -483,7 +483,7 @@ class stageMotionWindow(QMainWindow):
             k[0].setCheckable(True)
             # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(fontSmall)
-            # k[0].setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+            k[0].setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_BUTTON_JOY)
             self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Stage controls - Labels
@@ -512,7 +512,7 @@ class stageMotionWindow(QMainWindow):
             self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Plot: stage position
         self.plotCanvas = mplCanvas(width=5, height=4)
-        # self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.plotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvas.axes.set_aspect('equal')
         self.plotCanvas.axes.set_xlabel('x (μm)')
         xTravel = defaults.STAGE_X_TRAVEL_UM
@@ -688,7 +688,7 @@ class stageMotionWindow(QMainWindow):
             k[0].setCheckable(True)
             # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            # k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Set stretch
@@ -897,11 +897,11 @@ class stageStartupDialog(QDialog):
         self.make_dialog()
 
     def center_window(self):
-        '''Center window on screen.'''
-        qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+        '''Center main application window on screen'''
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def make_dialog(self):
         '''Setup dialog window.
@@ -922,4 +922,4 @@ class stageStartupDialog(QDialog):
         self.textBox.setFont(self.font)
         self.textBox.setStyleSheet(defaults.STYLE_LABEL_ALT)
         self.layout.addWidget(self.textBox)
-        # self.center_window()
+        self.center_window()
