@@ -57,6 +57,7 @@ from PyQt6.QtWidgets import (QApplication,
                              QMainWindow,
                              QMessageBox,
                              QPushButton,
+                             QSlider,
                              QWidget,
                              QSizePolicy,
                              QTabWidget,
@@ -550,9 +551,9 @@ class mainWindow(QMainWindow):
                                                     self.parameters.latestDir))
         self.activeQcl = 0 # None selected on startup
         ### Multiple acquisition tab - Base layout
-        self.tabMultiple = QWidget()
-        self.tabMultiple.setStyleSheet(defaults.STYLE_CONTAINER)
-        self.tabs.addTab(self.tabMultiple, 'Multiple')
+        # self.tabMultiple = QWidget()
+        # self.tabMultiple.setStyleSheet(defaults.STYLE_CONTAINER)
+        # self.tabs.addTab(self.tabMultiple, 'Multiple')
         ### Scanning imaging tab - Base layout
         self.tabImag = QWidget()
         self.tabImag.setStyleSheet(defaults.STYLE_CONTAINER)
@@ -561,6 +562,86 @@ class mainWindow(QMainWindow):
         self.tabImagGrid = QGridLayout()
         self.tabImag.setLayout(self.tabImagGrid)
         self.tabImagGrid.setSpacing(10)
+        ### Scanning imaging tab - Plot: stage position
+        self.stagePlotCanvas = mplCanvas(width=5, height=4)
+        self.stagePlotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.stagePlotCanvas.axes.set_aspect('equal')
+        self.stagePlotCanvas.axes.set_xlabel('x (μm)')
+        xTravel = defaults.STAGE_X_TRAVEL_UM
+        xMax = 1.1 * xTravel / 2
+        xMin = -1 * xMax
+        self.stagePlotCanvas.axes.set_xlim(xMin, xMax)
+        self.stagePlotCanvas.axes.set_ylabel('y (μm)')
+        yTravel = defaults.STAGE_Y_TRAVEL_UM
+        yMax = 1.1 * yTravel / 2
+        yMin = -1 * yMax
+        self.stagePlotCanvas.axes.set_ylim(yMin, yMax)
+        self.stagePlotCanvas.axes.invert_yaxis() # Positive y is towards user
+        self.stagePlotCanvas.axes.set_title('Stage Position')
+        xMax = 1. * xTravel / 2
+        xMin = -1 * xMax
+        yMax = 1. * yTravel / 2
+        yMin = -1 * yMax
+        self.stagePlotCanvas.axes.set_axisbelow(True)
+        self.stagePlotCanvas.axes.grid(color='gray', linestyle='dashed')
+        patch = mpl.patches.Rectangle((xMin, yMin), xTravel, yTravel,
+                                    alpha = 0.5,
+                                    edgecolor = defaults.STG_COLORS['edge'],
+                                    facecolor = defaults.STG_COLORS['fill'],
+                                    fill = True,
+                                    lw = 2,
+                                    zorder = 1)
+        self.stagePlotCanvas.axes.add_patch(patch)
+        darkAxes = defaults.DARK_PLOT_AXES
+        darkBackground = defaults.DARK_PLOT_BACKGROUND
+        darkColor = defaults.PLOT_COLOR_DARK
+        self.stagePlotCanvas.recolor(darkAxes, darkBackground, darkColor)
+        self.tabImagGrid.addWidget(self.stagePlotCanvas, 0, 0, 4, 4)
+        ### Scanning imaging tab - Plot: image
+        self.imagePlotCanvas = mplCanvas(width=5, height=4)
+        self.imagePlotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.imagePlotCanvas.axes.set_aspect('equal')
+        self.imagePlotCanvas.axes.set_xlabel('x (μm)')
+        xTravel = defaults.STAGE_X_TRAVEL_UM
+        xMax = 1.1 * xTravel / 2
+        xMin = -1 * xMax
+        self.imagePlotCanvas.axes.set_xlim(xMin, xMax)
+        self.imagePlotCanvas.axes.set_ylabel('y (μm)')
+        yTravel = defaults.STAGE_Y_TRAVEL_UM
+        yMax = 1.1 * yTravel / 2
+        yMin = -1 * yMax
+        self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
+        self.imagePlotCanvas.axes.invert_yaxis() # Positive y is towards user
+        self.imagePlotCanvas.axes.set_title('Image')
+        xMax = 1. * xTravel / 2
+        xMin = -1 * xMax
+        yMax = 1. * yTravel / 2
+        yMin = -1 * yMax
+        self.imagePlotCanvas.axes.set_axisbelow(True)
+        self.imagePlotCanvas.axes.grid(color='gray', linestyle='dashed')
+        patch = mpl.patches.Rectangle((xMin, yMin), xTravel, yTravel,
+                                    alpha = 0.5,
+                                    edgecolor = defaults.STG_COLORS['edge'],
+                                    facecolor = defaults.STG_COLORS['fill'],
+                                    fill = True,
+                                    lw = 2,
+                                    zorder = 1)
+        self.imagePlotCanvas.axes.add_patch(patch)
+        darkAxes = defaults.DARK_PLOT_AXES
+        darkBackground = defaults.DARK_PLOT_BACKGROUND
+        darkColor = defaults.PLOT_COLOR_DARK
+        self.imagePlotCanvas.recolor(darkAxes, darkBackground, darkColor)
+        self.tabImagGrid.addWidget(self.imagePlotCanvas, 0, 6, 4, 4)
+        ### Scanning imaging tab - Image wavelength/wavenumber selector
+        self.imageWlSlider = QSlider(Qt.Orientation.Horizontal)
+        self.tabImagGrid.addWidget(self.imageWlSlider, 4, 6, 1, 6)
+        ### Scanning imaging tab - Scan browser
+        self.scanBrowser = QTabWidget()
+        self.scanBrowser.setDocumentMode(True)
+        self.scanBrowser.setTabsClosable(True)
+        self.scanUI = QWidget()
+        self.scanBrowser.addTab(self.scanUI, 'Scan 1')
+        self.tabImagGrid.addWidget(self.scanBrowser, 7, 0, 6, 6)
         ### Show main application window
         self.show()
 
