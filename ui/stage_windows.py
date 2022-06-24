@@ -33,7 +33,7 @@ from ui.plot_widgets import mplCanvas
 #                              QSizePolicy,
 #                              QVBoxLayout,
 #                              QWidget)
-from PyQt6.QtCore import Qt, QThread
+from PyQt6.QtCore import QThread
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QFont
 from PyQt6.QtWidgets import (QDialog,

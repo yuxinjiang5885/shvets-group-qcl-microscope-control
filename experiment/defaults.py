@@ -190,6 +190,14 @@ DEF_DWELL_TIME_S = 4 # Default dwell time, s
 DEF_NUMBER_OF_ACQ = 1 # Default number of acquisitions
 DEF_SLEEP_INTERVAL = 0.1 # Default sleep interval for move cycle, s
 
+### Default imaging scan parameters
+IMAG_SCAN_ORIGIN_X_UM = 0
+IMAG_SCAN_ORIGIN_Y_UM = 0
+IMAG_SCAN_STEP_X_UM = 10
+IMAG_SCAN_STEP_Y_UM = 10
+IMAG_SCAN_SIZE_X_UM = 100
+IMAG_SCAN_SIZE_Y_UM = 100
+
 ### Gamepad
 GAMEPAD_UPDATE_INTERVAL_S = 0.1 # update interval for the gamepad loop, s
 JOY_DEADZONE = 0.10 # Threshold for thumbstick deadzone

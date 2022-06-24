@@ -8,15 +8,10 @@ Created 2021-Mar-03
 '''
 
 import os
-import platform
 import sys
 import matplotlib as mpl
 import numpy as np
-import matplotlib.pyplot as plt
 from matplotlib import rcParams
-import time
-from timeit import default_timer as timer, timeit
-# from experiment.defaults import *
 import experiment.defaults as defaults
 from experiment.routines_multithread import experiment
 from ui.laser_windows import (laserInitializer,
@@ -25,31 +20,11 @@ from ui.laser_windows import (laserInitializer,
 from ui.stage_windows import (stageInitializer,
                               stageMotionWindow,
                               stageStartupDialog)
+from ui.scan_windows import scan_browser
 from ui.plot_widgets import mplCanvas
-# from instruments.mircat import laser
-from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
-# from PyQt5.QtCore import Qt
-# from PyQt5.QtCore import QObject, QThread, pyqtSignal
-# from PyQt5.QtGui import QIntValidator, QIcon, QFont, QWindow
-# from PyQt5.QtWidgets import (QAction,
-#                              QApplication,
-#                              QDesktopWidget,
-#                              QDialog,
-#                              QFileDialog,
-#                              QGridLayout,
-#                              QLabel,
-#                              QLineEdit,
-#                              QMainWindow,
-#                              QMessageBox,
-#                              QPushButton,
-#                              QWidget,
-#                              QSizePolicy,
-#                              QTabWidget,
-#                              QTextEdit,
-#                              QVBoxLayout)
 from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QThread
-from PyQt6.QtGui import QAction, QIcon, QFont, QScreen
+from PyQt6.QtGui import QAction, QIcon, QFont
 from PyQt6.QtWidgets import (QApplication,
                              QGridLayout,
                              QLabel,
@@ -306,7 +281,7 @@ class mainWindow(QMainWindow):
         self.repeatShow.setChecked(True) # Checked by default
         self.repeatShow.setStatusTip('Update plots when using "Repeat"')
         optionsMenu.addAction(self.repeatShow)
-        self.darkMode = QAction(QIcon(None), 'Dark mode', self, checkable=True)
+        self.darkMode = QAction(QIcon(None), 'Dark mode', self, checkable=True, checked=True)
         self.darkMode.setShortcut('Ctrl+D')
         self.darkMode.setStatusTip('Dark mode for plots')
         optionsMenu.addAction(self.darkMode)
@@ -379,6 +354,8 @@ class mainWindow(QMainWindow):
         self.plotCanvasT.axes.set_ylabel('Transmittance')
         self.plotCanvasT.axes.set_title('Transmittance (Latest/Reference)')
         self.gridSingle.addWidget(self.plotCanvasT, 0, 8, 1, 3)
+        ### Make dark mode for plots default
+        self.plot_dark_mode()
         ### Buttons: select QCL, laser arm, tune, enable emission
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['QCL1'] = [QPushButton('QCL 1 Off'), 2, 0, 2, 1]
@@ -636,11 +613,7 @@ class mainWindow(QMainWindow):
         self.imageWlSlider = QSlider(Qt.Orientation.Horizontal)
         self.tabImagGrid.addWidget(self.imageWlSlider, 4, 6, 1, 6)
         ### Scanning imaging tab - Scan browser
-        self.scanBrowser = QTabWidget()
-        self.scanBrowser.setDocumentMode(True)
-        self.scanBrowser.setTabsClosable(True)
-        self.scanUI = QWidget()
-        self.scanBrowser.addTab(self.scanUI, 'Scan 1')
+        self.scanBrowser = scan_browser()
         self.tabImagGrid.addWidget(self.scanBrowser, 7, 0, 6, 6)
         ### Show main application window
         self.show()
