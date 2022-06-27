@@ -24,16 +24,39 @@ class scan_browser(QTabWidget):
         super().__init__()
         self.setDocumentMode(True)
         self.setTabsClosable(True)
+        self.tabCloseRequested.connect(self.close_scan_tab)
+        self.tabBarDoubleClicked.connect(self.add_scan_tab_double_click)
         self.scans = []
         # self.addTab(self.scanUI, 'Scan 1')
-        self.new_scan()
+        self.add_scan_tab()
 
-    def new_scan(self, label = 'Scan'):
+    def add_scan_tab(self):
         '''Add a new tab with scan parameters'''
         scan = scan_ui()
+        scans = len(self.scans)
+        scan.scanID = scans + 1
+        scanLabel = '{:.0f}'.format(scan.scanID)
         self.scans.append(scan)
-        i = self.addTab(scan, label)
-        self.setCurrentIndex(i)
+        ti = self.addTab(scan, scanLabel)
+        self.setCurrentIndex(ti)
+
+    def add_scan_tab_double_click(self, ti):
+        '''Add tab by double-clicking the tabs bar'''
+        if ti == -1:
+            self.add_scan_tab()
+
+    def close_scan_tab(self, ti):
+        '''Close tab'''
+        if self.count() < 2:
+            print('Cannot close the last scan tab.')
+            return
+        for si, s in enumerate(self.scans):
+            if s == []:
+                continue
+            if int(self.tabText(ti)) == int(s.scanID):
+                self.scans[si] = []
+                print(self.scans)
+        self.removeTab(ti)
 
 class scan_ui(QWidget):
     '''Widget with scan controls'''
@@ -42,6 +65,7 @@ class scan_ui(QWidget):
         super().__init__()
         self.grid = QGridLayout()
         self.setLayout(self.grid)
+        self.scanID = -1
         self.make_ui()
 
     def make_ui(self):
