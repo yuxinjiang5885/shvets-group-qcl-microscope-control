@@ -7,13 +7,14 @@ Created 2022-Jun-24
 '''
 
 import experiment.defaults as defaults
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QAction, QFont
 from PyQt6.QtWidgets import (QGridLayout,
                              QLabel,
                              QLineEdit,
                              QPushButton,
                              QTabWidget,
                              QTextEdit,
+                             QToolBar,
                              QSizePolicy,
                              QWidget)
 
@@ -26,8 +27,14 @@ class scan_browser(QTabWidget):
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.close_scan_tab)
         self.tabBarDoubleClicked.connect(self.add_scan_tab_double_click)
+        self.tabTitleSeparator = ' '
         self.scans = []
-        # self.addTab(self.scanUI, 'Scan 1')
+        # self.toolbar = QToolBar('Scan tabs')
+        # self.addToolBar(self.toolbar)
+        # self.newTabAction = QAction('New Scan')
+        # self.newTabAction.setShortcut('Ctrl+T')
+        # self.newTabAction.triggered.connect(self.add_scan_tab())
+        # self.toolbar.addAction(self.newTabAction)
         self.add_scan_tab()
 
     def add_scan_tab(self):
@@ -35,7 +42,7 @@ class scan_browser(QTabWidget):
         scan = scan_ui()
         scans = len(self.scans)
         scan.scanID = scans + 1
-        scanLabel = '{:.0f}'.format(scan.scanID)
+        scanLabel = 'Scan{}{:.0f}'.format(self.tabTitleSeparator, scan.scanID)
         self.scans.append(scan)
         ti = self.addTab(scan, scanLabel)
         self.setCurrentIndex(ti)
@@ -53,7 +60,10 @@ class scan_browser(QTabWidget):
         for si, s in enumerate(self.scans):
             if s == []:
                 continue
-            if int(self.tabText(ti)) == int(s.scanID):
+            currentTabTitle = self.tabText(ti)
+            currentTabTitleParts = currentTabTitle.split(self.tabTitleSeparator)
+            currentScanID = currentTabTitleParts[-1]
+            if int(currentScanID) == int(s.scanID):
                 self.scans[si] = []
                 print(self.scans)
         self.removeTab(ti)

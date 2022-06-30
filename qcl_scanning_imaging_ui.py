@@ -26,6 +26,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QThread
 from PyQt6.QtGui import QAction, QIcon, QFont
 from PyQt6.QtWidgets import (QApplication,
+                             QComboBox,
                              QGridLayout,
                              QLabel,
                              QLineEdit,
@@ -314,46 +315,46 @@ class mainWindow(QMainWindow):
         # self.containerSingle.setStyleSheet(defaults.STYLE_CONTAINER)
         # self.grid.addWidget(self.stgControls, 0, 0, 1, 1)
         # self.setCentralWidget(self.containerSingle)
-        self.gridSingle = QGridLayout()
-        # self.containerSingle.setLayout(self.gridSingle)
-        self.tabSingle.setLayout(self.gridSingle)
-        self.gridSingle.setSpacing(10)
+        self.tabSingleGrid = QGridLayout()
+        # self.containerSingle.setLayout(self.tabSingleGrid)
+        self.tabSingle.setLayout(self.tabSingleGrid)
+        self.tabSingleGrid.setSpacing(10)
         for row in range(0, defaults.NUMBER_OF_ROWS): # Set row spacing
-            # self.gridSingle.setRowMinimumHeight(row, ROW_HEIGHT)
+            # self.tabSingleGrid.setRowMinimumHeight(row, ROW_HEIGHT)
             if row in [0]:
-                self.gridSingle.setRowStretch(row, 8)
+                self.tabSingleGrid.setRowStretch(row, 8)
             else:
-                self.gridSingle.setRowStretch(row, 1)
+                self.tabSingleGrid.setRowStretch(row, 1)
         for col in range(0, defaults.NUMBER_OF_COLS): # Set column spacing
             if col in [1, 3, 5]: # QCL settings
-                self.gridSingle.setColumnStretch(col, 2)
+                self.tabSingleGrid.setColumnStretch(col, 2)
             if col in [2, 4, 6]: # Scl setting labels
-                self.gridSingle.setColumnStretch(col, 1)
+                self.tabSingleGrid.setColumnStretch(col, 1)
             # elif col in [3]:
-            #     self.gridSingle.setColumnStretch(col, 4)
+            #     self.tabSingleGrid.setColumnStretch(col, 4)
             else:
-                self.gridSingle.setColumnStretch(col, 20)
+                self.tabSingleGrid.setColumnStretch(col, 20)
         ### Plot: latest spectrum
         self.plotCanvas = mplCanvas(width=4, height=3)
         self.plotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvas.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvas.axes.set_ylabel('Lock-in Mag. (V)')
         self.plotCanvas.axes.set_title('Latest Spectrum')
-        self.gridSingle.addWidget(self.plotCanvas, 0, 0, 1, 5)
+        self.tabSingleGrid.addWidget(self.plotCanvas, 0, 0, 1, 5)
         ### Plot: current reference
         self.plotCanvasRef = mplCanvas(width=4, height=3)
         self.plotCanvasRef.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvasRef.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
         self.plotCanvasRef.axes.set_title('Current Reference')
-        self.gridSingle.addWidget(self.plotCanvasRef, 0, 5, 1, 3)
+        self.tabSingleGrid.addWidget(self.plotCanvasRef, 0, 5, 1, 3)
         ### Plot: transmittance
         self.plotCanvasT = mplCanvas(width=4, height=3)
         self.plotCanvasT.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvasT.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvasT.axes.set_ylabel('Transmittance')
         self.plotCanvasT.axes.set_title('Transmittance (Latest/Reference)')
-        self.gridSingle.addWidget(self.plotCanvasT, 0, 8, 1, 3)
+        self.tabSingleGrid.addWidget(self.plotCanvasT, 0, 8, 1, 3)
         ### Make dark mode for plots default
         self.plot_dark_mode()
         ### Buttons: select QCL, laser arm, tune, enable emission
@@ -405,7 +406,7 @@ class mainWindow(QMainWindow):
                 k[0].setStyleSheet(defaults.STYLE_BUTTON_UNIT)
             else:
                 k[0].setStyleSheet(defaults.STYLE_ARMED)
-            self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
+            self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Input fields: wavelength
         self.inputField = dict() # to collect all input fields
         startupText = [defaults.MIN_WL_QCL1_UM,
@@ -445,7 +446,7 @@ class mainWindow(QMainWindow):
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
-            self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
+            self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Labels: headers, in a dict for ease of positioning
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
         self.labelHead['QCLMod'] = [QLabel('QCL Modules'), 1, 0, 1, 1]
@@ -457,7 +458,7 @@ class mainWindow(QMainWindow):
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
-            self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
+            self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: experiment controls sub-headers
         self.labelSubHead = dict() # [label, row, col, rowSpan, colSpan]
         self.labelSubHead['WlStart'] = [QLabel('Wl. Start (μm)'), 2, 8, 1, 1]
@@ -477,7 +478,7 @@ class mainWindow(QMainWindow):
         for _, k in self.labelSubHead.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
-            self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
+            self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: instrument readings, in a dict for reference by other methods
         self.labelInstr = dict() # [label, row, col, rowSpan, colSpan]
         # Labels: read currents
@@ -487,7 +488,7 @@ class mainWindow(QMainWindow):
             self.labelInstr[labelString].setFont(font)
             self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
             self.labelInstr[labelString].setToolTip('Reading from laser')
-            self.gridSingle.addWidget(self.labelInstr[labelString], 2*qcl+1, 1, 1, 4)
+            self.tabSingleGrid.addWidget(self.labelInstr[labelString], 2*qcl+1, 1, 1, 4)
         # Labels: read wavelengths (blank at startup)
         for qcl in range(1, self.laser.numQCL + 1):
             labelString = 'QCL{:d}Wavelength'.format(qcl)
@@ -495,14 +496,14 @@ class mainWindow(QMainWindow):
             self.labelInstr[labelString].setFont(font)
             self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
             self.labelInstr[labelString].setToolTip('Reading from laser')
-            self.gridSingle.addWidget(self.labelInstr[labelString], 2*qcl+1, 5, 1, 2)
+            self.tabSingleGrid.addWidget(self.labelInstr[labelString], 2*qcl+1, 5, 1, 2)
         # Labels: wavelength units
         for qcl in range(1, self.laser.numQCL + 1):
             labelString = 'QCL{:d}WlUnit'.format(qcl)
             self.labelInstr[labelString] = QLabel('μm    ')
             self.labelInstr[labelString].setFont(font)
             self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_UNIT)
-            self.gridSingle.addWidget(self.labelInstr[labelString], 2*qcl, 6, 1, 1)
+            self.tabSingleGrid.addWidget(self.labelInstr[labelString], 2*qcl, 6, 1, 1)
         # Compile relevant GUI elements to pass to other classes
         # GUIElem['expNo'] = outfld['ExpCur'][0]
         # GUIElem['expStepTot'] = outfld['ExpTotSteps'][0]
@@ -511,7 +512,7 @@ class mainWindow(QMainWindow):
         self.notes.setFont(font)
         self.notes.setStyleSheet(defaults.STYLE_TEXT)
         self.notes.setToolTip('Text written here will be saved to a "notes" file')
-        self.gridSingle.addWidget(self.notes, 12, 0, 2, 6)
+        self.tabSingleGrid.addWidget(self.notes, 12, 0, 2, 6)
         # Connect buttons to actions
         self.btn['QCL1'][0].clicked.connect(lambda: self.qcl(1))
         self.btn['QCL2'][0].clicked.connect(lambda: self.qcl(2))
@@ -615,6 +616,44 @@ class mainWindow(QMainWindow):
         ### Scanning imaging tab - Scan browser
         self.scanBrowser = scan_browser()
         self.tabImagGrid.addWidget(self.scanBrowser, 7, 0, 6, 6)
+        ### Scanning imaging tab - Scan options
+        scanFilePathLabel = QLabel('Scan file path')
+        scanFilePathLabel.setFont(font)
+        scanFilePathLabel.setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        self.tabImagGrid.addWidget(scanFilePathLabel, 7, 6, 1, 6)
+        self.scanFilePath = QLineEdit('C:\\')
+        self.scanFilePath.setFont(font)
+        self.scanFilePath.setStyleSheet(defaults.STYLE_INPUT)
+        self.tabImagGrid.addWidget(self.scanFilePath, 8, 6, 1, 6)
+        self.tabImagButtons = dict()
+        self.tabImagButtons['Save'] = [QPushButton('Save'), 9, 6, 1, 2]
+        self.tabImagButtons['Save'][0].setToolTip('Save scan file')
+        self.tabImagButtons['Load'] = [QPushButton('Load'), 9, 8, 1, 2]
+        self.tabImagButtons['Load'][0].setToolTip('Load scan file')
+        self.tabImagButtons['Start'] = [QPushButton('Start'), 12, 6, 2, 3]
+        self.tabImagButtons['Start'][0].setToolTip('Start scan')
+        self.tabImagButtons['Stop'] = [QPushButton('Stop'), 12, 9, 2, 3]
+        self.tabImagButtons['Stop'][0].setToolTip('Stop scan')
+        for x, k in self.tabImagButtons.items(): # Arrange buttons in grid
+            k[0].setCheckable(True)
+            # k[0].setFocusPolicy(Qt.NoFocus)
+            k[0].setFont(font)
+            # k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            if x in ['Start', 'Stop']:
+                k[0].setStyleSheet(defaults.STYLE_ARMED)
+            else:
+                k[0].setStyleSheet(defaults.STYLE_BUTTON)
+            self.tabImagGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        self.tabImageDropdowns = dict()
+        self.tabImageDropdowns['ScanPattern'] = [QComboBox(), 11, 6, 1, 3]
+        self.tabImageDropdowns['ScanPattern'][0].addItem('Raster')
+        self.tabImageDropdowns['ScanMode'] = [QComboBox(), 11, 9, 1, 3]
+        self.tabImageDropdowns['ScanMode'][0].addItem('Step')
+        self.tabImageDropdowns['ScanMode'][0].addItem('Continuous')
+        for x, k in self.tabImageDropdowns.items(): # Arrange buttons in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_INPUT)
+            self.tabImagGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Show main application window
         self.show()
 
@@ -1144,11 +1183,11 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.containerMultiple = QWidget()
         self.containerMultiple.setStyleSheet(defaults.STYLE_CONTAINER)
         self.setCentralWidget(self.containerMultiple)
-        self.gridSingle = QGridLayout()
-        self.containerMultiple.setLayout(self.gridSingle)
-        self.gridSingle.setSpacing(10)
+        self.tabSingleGrid = QGridLayout()
+        self.containerMultiple.setLayout(self.tabSingleGrid)
+        self.tabSingleGrid.setSpacing(10)
         for row in range(0, 9): # Set row spacing
-            self.gridSingle.setRowStretch(row, 1)
+            self.tabSingleGrid.setRowStretch(row, 1)
         ### Buttons
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['Start'] = [QPushButton('Start'), 5, 0, 2, 1]
@@ -1161,7 +1200,7 @@ class multipleAcquisitionsWindow(QMainWindow):
             k[0].setFont(font)
             k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
-            self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
+            self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Input fields
         self.inputField = dict() # to collect all input fields
         self.inputField['timeInterval'] = [QLineEdit('{}'.format(5)), 4, 0, 1, 1]
@@ -1170,7 +1209,7 @@ class multipleAcquisitionsWindow(QMainWindow):
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
-            self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
+            self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Labels
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
         self.labelHead['counter'] = [QLabel('Not running'), 0, 0, 1, 1]
@@ -1179,7 +1218,7 @@ class multipleAcquisitionsWindow(QMainWindow):
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_READ)
-            self.gridSingle.addWidget(k[0], k[1], k[2], k[3], k[4])
+            self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         self.labelHead['timeInterval'][0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
 
     def update_counter_running(self, acquisitions):
