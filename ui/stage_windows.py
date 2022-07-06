@@ -287,6 +287,7 @@ class stageMotionWindow(QMainWindow):
         # super().__init__(None, Qt.WindowStaysOnTopHint)
         super().__init__()
         self.paramNames = ['x_um', 'y_um', 'v_um_per_s', 'a_um_per_s2']
+        self.mainGUI = mainGUI
         self.stage = mainGUI.stage
         self.stage.set_acc() # Return acceleration to default
         self.stage.set_speed() # Return speed to default
@@ -783,6 +784,9 @@ class stageMotionWindow(QMainWindow):
         self.threadMW.start()
         ### Plot current position and pattern
         self.workerMW.currentPosition.connect(self.update_plot)
+        # if self.mainGUI.stagePlotCanvas != []:
+        #     ### If there is a full main UI with a stage plot, update that, too
+        #     self.workerMW.currentPosition.connect(self.update_plot_external)
         ### Unlock GUI controls
         self.workerMW.finished.connect(lambda: self.lock_controls(lock=False))
         # self.workerMW.finished.connect(lambda: self.statusbar.showMessage('Ready'))
@@ -853,7 +857,7 @@ class stageMotionWindow(QMainWindow):
             textStr = '{:.0f}, {:.0f}'.format(x, y)
         else:
             textStr = '{:.0f},\n{:.0f}'.format(x, y)
-        text = plt.text(x + 2000, y + 0, textStr,
+        text = self.plotCanvas.axes.text(x + 2000, y + 0, textStr,
                         color = defaults.STG_COLORS['text'],
                         fontsize = 10)
         self.plotCanvas.plots.append(text)
@@ -861,13 +865,34 @@ class stageMotionWindow(QMainWindow):
         acqCur = acquisitions[1]
         if acqNum > 1:
             acqTextStr = 'Acquisition: {:.0f} / {:.0f}'.format(acqCur, acqNum)
-            acqText = plt.text(-58000, -35000, acqTextStr,
+            acqText = self.plotCanvas.axes.text(-58000, -35000, acqTextStr,
                             color = defaults.STG_COLORS['acqText'],
                             fontsize = 10)
             self.plotCanvas.plots.append(acqText)
         titleString = 'Stage Position: x {:.0f} μm, y  {:.0f} μm'.format(x, y)
         self.plotCanvas.axes.set_title(titleString)
         self.plotCanvas.figure.canvas.draw()
+
+    def update_plot_external(self, x=0, y=0, pattern=[], acquisitions = [1, 1]):
+        '''Update plot in external UI'''
+        self.mainGUI.stagePlotCanvas.clear_plots()
+        plot = self.mainGUI.stagePlotCanvas.axes.scatter(x, y,
+                                            c = defaults.STG_COLORS['marker'],
+                                            marker = '+',
+                                            zorder = 10)
+        self.mainGUI.stagePlotCanvas.plots.append(plot)
+        if (np.abs(x) < 1000) or (np.abs(y) < 1000):
+            textStr = '{:.0f}, {:.0f}'.format(x, y)
+        else:
+            textStr = '{:.0f},\n{:.0f}'.format(x, y)
+        text = self.mainGUI.stagePlotCanvas.axes.text(x + 2000, y + 0, textStr,
+                        color = defaults.STG_COLORS['text'],
+                        fontsize = 10,
+                        zorder = 11)
+        self.mainGUI.stagePlotCanvas.plots.append(text)
+        titleString = 'Stage Position: x {:.0f} μm, y  {:.0f} μm'.format(x, y)
+        self.mainGUI.stagePlotCanvas.axes.set_title(titleString)
+        self.mainGUI.stagePlotCanvas.figure.canvas.draw()
 
     def update_readings(self):
         '''Update stage parameter readings.'''
@@ -887,6 +912,9 @@ class stageMotionWindow(QMainWindow):
             self.inputField[fieldName][0].setText('{:.0f}'.format(paramReadings[x]))
         ### Update position plot
         self.update_plot(x_um, y_um)
+        if self.mainGUI.stagePlotCanvas != []:
+            ### If there is a full main UI with a stage plot, update that, too
+            self.update_plot_external(x_um, y_um)
 
 
 class stageStartupDialog(QDialog):

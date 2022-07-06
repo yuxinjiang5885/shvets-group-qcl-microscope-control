@@ -65,7 +65,7 @@ class scan_browser(QTabWidget):
             currentScanID = currentTabTitleParts[-1]
             if int(currentScanID) == int(s.scanID):
                 self.scans[si] = []
-                print(self.scans)
+                # print(self.scans)
         self.removeTab(ti)
 
 class scan_ui(QWidget):

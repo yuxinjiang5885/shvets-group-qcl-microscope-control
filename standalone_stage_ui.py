@@ -22,6 +22,8 @@ class mainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        ### Dummy variable, expected by the stage UI from the full QCL/stage UI
+        self.stagePlotCanvas = []
         ### Initialize stage
         self.stage = []
         self.threadStg = QThread()
