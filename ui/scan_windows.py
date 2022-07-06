@@ -21,8 +21,9 @@ from PyQt6.QtWidgets import (QGridLayout,
 class scan_browser(QTabWidget):
     '''Multi-tab scan browser'''
 
-    def __init__(self):
+    def __init__(self, mainGUI):
         super().__init__()
+        self.mainGUI = mainGUI
         self.setDocumentMode(True)
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.close_scan_tab)
@@ -39,7 +40,7 @@ class scan_browser(QTabWidget):
 
     def add_scan_tab(self):
         '''Add a new tab with scan parameters'''
-        scan = scan_ui()
+        scan = scan_ui(self.mainGUI)
         scans = len(self.scans)
         scan.scanID = scans + 1
         scanLabel = 'Scan{}{:.0f}'.format(self.tabTitleSeparator, scan.scanID)
@@ -71,8 +72,9 @@ class scan_browser(QTabWidget):
 class scan_ui(QWidget):
     '''Widget with scan controls'''
 
-    def __init__(self):
+    def __init__(self, mainGUI):
         super().__init__()
+        self.mainGUI = mainGUI
         self.grid = QGridLayout()
         self.setLayout(self.grid)
         self.scanID = -1
@@ -126,6 +128,7 @@ class scan_ui(QWidget):
                                     defaults.IMAG_SCAN_SIZE_X_UM )), 2, 3, 1, 1]
         self.inputFields['ySizeN'][0].setToolTip('Scan x size')
         for _, k in self.inputFields.items(): # Arrange labels in grid
+            k[0].returnPressed.connect(lambda: self.mainGUI.update_imaging_scanning_plot())
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])

@@ -614,7 +614,7 @@ class mainWindow(QMainWindow):
         self.imageWlSlider = QSlider(Qt.Orientation.Horizontal)
         self.tabImagGrid.addWidget(self.imageWlSlider, 4, 6, 1, 6)
         ### Scanning imaging tab - Scan browser
-        self.scanBrowser = scan_browser()
+        self.scanBrowser = scan_browser(self)
         self.tabImagGrid.addWidget(self.scanBrowser, 7, 0, 6, 6)
         ### Scanning imaging tab - Scan options
         scanFilePathLabel = QLabel('Scan file path')
@@ -626,6 +626,10 @@ class mainWindow(QMainWindow):
         self.scanFilePath.setStyleSheet(defaults.STYLE_INPUT)
         self.tabImagGrid.addWidget(self.scanFilePath, 8, 6, 1, 6)
         self.tabImagButtons = dict()
+        self.tabImagButtons['Update'] = [QPushButton('Update'), 13, 0, 2, 3]
+        self.tabImagButtons['Update'][0].setToolTip('Update scan in plot')
+        self.tabImagButtons['Clear'] = [QPushButton('Clear'), 13, 3, 2, 3]
+        self.tabImagButtons['Clear'][0].setToolTip('Clear scans')
         self.tabImagButtons['Save'] = [QPushButton('Save'), 9, 6, 1, 2]
         self.tabImagButtons['Save'][0].setToolTip('Save scan file')
         self.tabImagButtons['Load'] = [QPushButton('Load'), 9, 8, 1, 2]
@@ -1005,6 +1009,14 @@ class mainWindow(QMainWindow):
     def tune_fast(self, targetWl):
         '''Version of "tune" with less overhead. Use with caution.'''
         self.laser.tune(self.activeQcl, targetWl, self.wlUnits)
+
+    def update_imaging_scanning_plot(self):
+        '''Update patterns on imaging scanning plot.'''
+        for s in self.scanBrowser.scans:
+            ### Get pattern parameters for this scan
+            print(s.inputFields['xOrig'][0].text())
+            ### Construct pattern
+            ### Display pattern on plot
 
     def update_parameters(self, parameters):
         '''Update class instance experiment parameters with last used set, which
