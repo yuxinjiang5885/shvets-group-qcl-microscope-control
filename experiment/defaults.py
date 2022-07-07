@@ -65,6 +65,7 @@ STG_COLORS = {'acqText': '#FFFFFF',
               'edge': '#99CCCC',
               'fill' : '#336666',
               'marker' : '#FF0000',
+              'pattern' : '#3333CC',
               'text' : '#FF0000'}
 
 ### Individual colors

@@ -13,14 +13,14 @@ import matplotlib as mpl
 import numpy as np
 from matplotlib import rcParams
 import experiment.defaults as defaults
-from experiment.routines_multithread import experiment
+from experiment.routines_multithread import experiment, imagingScan
 from ui.laser_windows import (laserInitializer,
                               laserSettingWindow,
                               laserStartupDialog)
 from ui.stage_windows import (stageInitializer,
                               stageMotionWindow,
                               stageStartupDialog)
-from ui.scan_windows import scan_browser
+from ui.scan_windows import scanBrowser
 from ui.plot_widgets import mplCanvas
 from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QThread
@@ -108,8 +108,9 @@ class mainWindow(QMainWindow):
                 self.aboutText = f.read()
         except Exception as exc:
             print('Failed to load "about" contents:\n{}'.format(exc))
-        ### Set class parameters
-        self.parameters = experimentParameters() # Passed to "run" and "repeat"
+        ### Set class parameters to be passed to run and repeat routines
+        self.parameters = experimentParameters()
+        self.scanImagParameters = scanningImagingParameters()
         # self.useRef = False # By default, do not use reference
         self.wlUnits = 'um' # Wavelength/number units
         ### Thread and worker placeholders
@@ -464,12 +465,12 @@ class mainWindow(QMainWindow):
         self.labelSubHead['WlStart'] = [QLabel('Wl. Start (μm)'), 2, 8, 1, 1]
         self.labelSubHead['WlEnd'] = [QLabel('Wl. End (μm)'), 2, 9, 1, 1]
         self.labelSubHead['WlStep'] = [QLabel('Wl. Step (μm)'), 2, 10, 1, 1]
-        self.labelSubHead['XStart'] = [QLabel('Stg. X Start (μm)'), 4, 8, 1, 1]
-        self.labelSubHead['XEnd'] = [QLabel('Stg. X End (μm)'), 4, 9, 1, 1]
-        self.labelSubHead['XStep'] = [QLabel('Stg. X Step (μm)'), 4, 10, 1, 1]
-        self.labelSubHead['YStart'] = [QLabel('Stg. Y Start (μm)'), 6, 8, 1, 1]
-        self.labelSubHead['YEnd'] = [QLabel('Stg. Y End (μm)'), 6, 9, 1, 1]
-        self.labelSubHead['YStep'] = [QLabel('Stg. Y Step (μm)'), 6, 10, 1, 1]
+        # self.labelSubHead['XStart'] = [QLabel('Stg. X Start (μm)'), 4, 8, 1, 1]
+        # self.labelSubHead['XEnd'] = [QLabel('Stg. X End (μm)'), 4, 9, 1, 1]
+        # self.labelSubHead['XStep'] = [QLabel('Stg. X Step (μm)'), 4, 10, 1, 1]
+        # self.labelSubHead['YStart'] = [QLabel('Stg. Y Start (μm)'), 6, 8, 1, 1]
+        # self.labelSubHead['YEnd'] = [QLabel('Stg. Y End (μm)'), 6, 9, 1, 1]
+        # self.labelSubHead['YStep'] = [QLabel('Stg. Y Step (μm)'), 6, 10, 1, 1]
         self.labelSubHead['SamplingRate'] = [QLabel('Sampl. Rate (Hz)'),
                                             8, 8, 1, 1]
         self.labelSubHead['SamplesPerWl'] = [QLabel('Sampl. per Wl.'),
@@ -542,6 +543,7 @@ class mainWindow(QMainWindow):
         self.tabImagGrid.setSpacing(10)
         ### Scanning imaging tab - Plot: stage position
         self.stagePlotCanvas = mplCanvas(width=5, height=4)
+        self.stagePlotCanvas.patterns = [] # To store scanning patterns
         self.stagePlotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.stagePlotCanvas.axes.set_aspect('equal')
         self.stagePlotCanvas.axes.set_xlabel('x (μm)')
@@ -614,7 +616,7 @@ class mainWindow(QMainWindow):
         self.imageWlSlider = QSlider(Qt.Orientation.Horizontal)
         self.tabImagGrid.addWidget(self.imageWlSlider, 4, 6, 1, 6)
         ### Scanning imaging tab - Scan browser
-        self.scanBrowser = scan_browser(self)
+        self.scanBrowser = scanBrowser(self)
         self.tabImagGrid.addWidget(self.scanBrowser, 7, 0, 6, 6)
         ### Scanning imaging tab - Scan options
         scanFilePathLabel = QLabel('Scan file path')
@@ -648,6 +650,9 @@ class mainWindow(QMainWindow):
             else:
                 k[0].setStyleSheet(defaults.STYLE_BUTTON)
             self.tabImagGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Connect buttons to actions
+        self.tabImagButtons['Start'][0].clicked.connect(lambda: self.run_scanning_imaging())
+        ### Scanning imaging tab - Drop-down scan pattern menu
         self.tabImageDropdowns = dict()
         self.tabImageDropdowns['ScanPattern'] = [QComboBox(), 11, 6, 1, 3]
         self.tabImageDropdowns['ScanPattern'][0].addItem('Raster')
@@ -978,6 +983,86 @@ class mainWindow(QMainWindow):
         ### Save UI screenshot
         self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
 
+    def run_scanning_imaging(self):
+        '''Run scanning imaging experiment.'''
+        ### Initial checks
+        if not self.btn['Arm'][0].isChecked():
+            print('Laser is not armed.')
+            self.btn['Start'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
+            self.btn['Sweep'][0].setChecked(False)
+            return
+        ### Show patterns on plot
+        self.update_imaging_scanning_plot()
+        ### Read and compile general experiment parameters
+        self.scanImagParameters.laser = self.laser
+        # self.scanImagParameters.notes = self.notes.toPlainText()
+        # self.scanImagParameters.useRef = self.btn['RefEnable'][0].isChecked()
+        self.scanImagParameters.sweeping = self.btn['Sweep'][0].isChecked()
+        ### Read and compile scanning patterns
+        self.scanImagParameters.patterns = []
+        for s in self.scanBrowser.scans:
+            ### Get pattern parameters for this scan
+            xOrig = int(s.inputFields['xOrig'][0].text())
+            yOrig = int(s.inputFields['yOrig'][0].text())
+            xStep = int(s.inputFields['xStep'][0].text())
+            yStep = int(s.inputFields['yStep'][0].text())
+            xSizeN = int(s.inputFields['xSizeN'][0].text())
+            ySizeN = int(s.inputFields['ySizeN'][0].text())
+            ### Construct pattern
+            patternx = []
+            patterny = []
+            for xs in range(0, xSizeN):
+                for ys in range(0, ySizeN):
+                    x = xs * xStep + xOrig
+                    y = ys * yStep + yOrig
+                    patternx.append(x)
+                    patterny.append(y)
+            pattern = np.transpose(np.array((patternx, patterny)))
+            samplesPerWl = int(s.inputField['samplesPerWl'][0].text())
+            samplingRate = int(s.inputField['samplingRate'][0].text())
+            speed = float(s.inputField['speed'][0].text())
+            self.scanImagParameters.patterns.append(pattern)
+            self.scanImagParameters.sampleNumbers.append(samplesPerWl)
+            self.scanImagParameters.sampleRates.append(samplingRate)
+            self.scanImagParameters.speeds.append(speed)
+        if self.wlUnits == 'invcm':
+            self.scanImagParameters.units = 'invcm'
+        else: # Default to micrometers
+            self.scanImagParameters.units = 'um'
+        ### Parameter checks
+        # if self.scanImagParameters.start == self.scanImagParameters.end: # Requested limits are equal
+        #     print('Limits cannot be equal.')
+        #     self.btn['Start'][0].setChecked(False)
+        #     # GUIInstance.btn['Stop'][0].setChecked(False)
+        #     self.btn['Sweep'][0].setChecked(False)
+        #     return
+        ### Lock GUI controls
+        self.lock_controls()
+        self.statusbar.showMessage('Busy')
+        ### Run acquisition in separate thread
+        self.threadRun = QThread()
+        self.worker = imagingScan()
+        self.worker.parameters = self.scanImagParameters
+        self.worker.moveToThread(self.threadRun)
+        self.threadRun.started.connect(self.worker.run)
+        self.worker.finished.connect(self.threadRun.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.threadRun.finished.connect(self.threadRun.deleteLater)
+        self.threadRun.start()
+        ### Plot data
+        # self.worker.outData.connect(self.plot)
+        ### Save current QCLs, ranges and limits for use with "repeat" function
+        # self.worker.outParams.connect(self.update_parameters)
+        ### Unlock GUI controls
+        self.worker.finished.connect(lambda: self.lock_controls(lock=False))
+        self.worker.finished.connect(lambda: self.statusbar.showMessage('Ready'))
+        ### Uncheck UI buttons
+        self.worker.finished.connect(lambda: self.tabImagButtons['Start'][0].setChecked(False))
+        # self.worker.finished.connect(lambda: self.btn['Sweep'][0].setChecked(False))
+        ### Save UI screenshot
+        self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
+
     def stage_motion_window(self):
         '''Multiple acquisitions menu'''
         self.stageMotionWindow.show()
@@ -1012,11 +1097,35 @@ class mainWindow(QMainWindow):
 
     def update_imaging_scanning_plot(self):
         '''Update patterns on imaging scanning plot.'''
+        for p in self.stagePlotCanvas.patterns:
+            p.remove()
+        self.stagePlotCanvas.patterns = [] # Re-initialize list
         for s in self.scanBrowser.scans:
             ### Get pattern parameters for this scan
-            print(s.inputFields['xOrig'][0].text())
+            xOrig = int(s.inputFields['xOrig'][0].text())
+            yOrig = int(s.inputFields['yOrig'][0].text())
+            xStep = int(s.inputFields['xStep'][0].text())
+            yStep = int(s.inputFields['yStep'][0].text())
+            xSizeN = int(s.inputFields['xSizeN'][0].text())
+            ySizeN = int(s.inputFields['ySizeN'][0].text())
             ### Construct pattern
+            patternx = []
+            patterny = []
+            for xs in range(0, xSizeN):
+                for ys in range(0, ySizeN):
+                    x = xs * xStep + xOrig
+                    y = ys * yStep + yOrig
+                    patternx.append(x)
+                    patterny.append(y)
+            pattern = np.transpose(np.array((patternx, patterny)))
             ### Display pattern on plot
+            patternPlot = self.stagePlotCanvas.axes.scatter(pattern[:,0],
+                                                      pattern[:,1],
+                                            c = defaults.STG_COLORS['pattern'],
+                                            marker = '.',
+                                            zorder = 6)
+            self.stagePlotCanvas.patterns.append(patternPlot)
+        self.stagePlotCanvas.figure.canvas.draw()
 
     def update_parameters(self, parameters):
         '''Update class instance experiment parameters with last used set, which
@@ -1265,6 +1374,32 @@ class multipleAcquisitionsWindow(QMainWindow):
             self.acquisitions))
         self.labelHead['timer'][0].setText(
             'Elapsed: {:02.0f} : {:02.0f} : {:02.0f}'.format(0, 0, 0))
+
+
+class scanningImagingParameters():
+    '''Holds experiment parameters for scanning imaging.'''
+
+    def __init__(self):
+        # self.acquisitions = 0 # Number of acquisitions
+        # self.acq_time_interval_s = 300 # Interval between acquisitions, s
+        # self.end = 100 # Placeholder value, no unit
+        self.laser = [] # Placeholder value
+        self.latestDir = 0 # Latest experiment directory, placeholder value
+        # self.notes = [] # Placeholder value
+        self.qcl = [] # QCL modules to be used, placeholder value
+        self.patterns = [] # Scanning imaging patters, placeholder value
+        self.ranges = [] # Wavelength/wavenumber ranges, placeholder value
+        self.refDir = '' # Reference experiment directory
+        # self.reference = np.zeros((1, 2)) # Placeholder value
+        self.sampleNumbers = [] # Sample numbers, placeholder value
+        self.sampleRates = [] # Sample rates, placeholder value
+        self.speeds = [] # Sweeping speeds, placeholder value
+        # self.start = 0 # Placeholder value, no unit
+        # self.step = 1 # Placeholder value, no unit
+        # self.sweeping = True # By default, use the sweep routine
+        # self.sweepLimits = [] # Placeholder value
+        self.units = 'um' # By default, wavelengths in micrometers
+        # self.useRef = False # By default, do not use reference
 
 
 if __name__ == '__main__':

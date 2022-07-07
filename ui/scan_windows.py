@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (QGridLayout,
                              QSizePolicy,
                              QWidget)
 
-class scan_browser(QTabWidget):
+class scanBrowser(QTabWidget):
     '''Multi-tab scan browser'''
 
     def __init__(self, mainGUI):
@@ -40,7 +40,7 @@ class scan_browser(QTabWidget):
 
     def add_scan_tab(self):
         '''Add a new tab with scan parameters'''
-        scan = scan_ui(self.mainGUI)
+        scan = scanUI(self.mainGUI)
         scans = len(self.scans)
         scan.scanID = scans + 1
         scanLabel = 'Scan{}{:.0f}'.format(self.tabTitleSeparator, scan.scanID)
@@ -69,7 +69,8 @@ class scan_browser(QTabWidget):
                 # print(self.scans)
         self.removeTab(ti)
 
-class scan_ui(QWidget):
+
+class scanUI(QWidget):
     '''Widget with scan controls'''
 
     def __init__(self, mainGUI):
@@ -91,6 +92,11 @@ class scan_ui(QWidget):
         self.labels['Step'] = [QLabel('Step (μm)'), 0, 2, 1, 1]
         self.labels['x'] = [QLabel('x'), 1, 0, 1, 1]
         self.labels['y'] = [QLabel('y'), 2, 0, 1, 1]
+        self.labels['SamplingRate'] = [QLabel('Sampl. Rate (Hz)'),
+                                            3, 1, 1, 1]
+        self.labels['SamplesPerWl'] = [QLabel('Sampl. per Wl.'),
+                                            3, 2, 1, 1]
+        self.labels['Speed'] = [QLabel('Speed (μm/s)'), 3, 3, 1, 1]
         for _, k in self.labels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
@@ -99,7 +105,7 @@ class scan_ui(QWidget):
         self.buttons = dict() # [button, row, col, rowSpan, colSpan]
         self.buttons['ScanSizeN'] = [QPushButton('Scan size\n(μm)'), 0, 3, 1, 1]
         self.buttons['ScanSizeN'][0].setToolTip('Toggle between scan size and number of points')
-        self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 3, 0, 1, 1]
+        self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 5, 0, 3, 1]
         self.buttons['WlWn'][0].setToolTip('Toggle between wavelengths and wavenumbers')
         for x, k in self.buttons.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
@@ -127,6 +133,17 @@ class scan_ui(QWidget):
         self.inputFields['ySizeN'] = [QLineEdit('{}'.format(
                                     defaults.IMAG_SCAN_SIZE_X_UM )), 2, 3, 1, 1]
         self.inputFields['ySizeN'][0].setToolTip('Scan x size')
+        self.inputFields['samplingRate'] = [QLineEdit('{}'.format(
+                                    defaults.DEF_SAMPLERATE)), 4, 1, 1, 1]
+        self.inputFields['samplingRate'][0].setToolTip(
+                                    'Acquisition card sampling rate')
+        self.inputFields['samplesPerWl'] = [QLineEdit('{}'.format(
+                                    defaults.DEF_SAMPLES)), 4, 2, 1, 1]
+        self.inputFields['samplesPerWl'][0].setToolTip(
+                                    'Voltage points per wavelength/number step')
+        self.inputFields['speed'] = [QLineEdit('{}'.format(
+                                    defaults.MAX_SWEEP_SPEED_UM)), 4, 3, 1, 1]
+        self.inputFields['speed'][0].setToolTip('Sweep speed')
         for _, k in self.inputFields.items(): # Arrange labels in grid
             k[0].returnPressed.connect(lambda: self.mainGUI.update_imaging_scanning_plot())
             k[0].setFont(font)
@@ -137,4 +154,4 @@ class scan_ui(QWidget):
         self.wlwnList.setFont(font)
         self.wlwnList.setStyleSheet(defaults.STYLE_TEXT)
         self.wlwnList.setToolTip('List of wavelengths (format: 1000, 1100:1200, ...)')
-        self.grid.addWidget(self.wlwnList, 3, 1, 4, 4)
+        self.grid.addWidget(self.wlwnList, 5, 1, 3, 4)
