@@ -9,6 +9,7 @@ Created 2021-Mar-03
 
 import os
 import sys
+import re
 import matplotlib as mpl
 import numpy as np
 from matplotlib import rcParams
@@ -489,7 +490,7 @@ class mainWindow(QMainWindow):
             self.labelInstr[labelString].setFont(font)
             self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
             self.labelInstr[labelString].setToolTip('Reading from laser')
-            self.tabSingleGrid.addWidget(self.labelInstr[labelString], 2*qcl+1, 1, 1, 4)
+            self.tabSingleGrid.addWidget(self.labelInstr[labelString], 2*qcl, 1, 2, 4)
         # Labels: read wavelengths (blank at startup)
         for qcl in range(1, self.laser.numQCL + 1):
             labelString = 'QCL{:d}Wavelength'.format(qcl)
@@ -619,7 +620,7 @@ class mainWindow(QMainWindow):
         self.scanBrowser = scanBrowser(self)
         self.tabImagGrid.addWidget(self.scanBrowser, 7, 0, 6, 6)
         ### Scanning imaging tab - Scan options
-        scanFilePathLabel = QLabel('Scan file path')
+        scanFilePathLabel = QLabel('Scan configuration file path')
         scanFilePathLabel.setFont(font)
         scanFilePathLabel.setStyleSheet(defaults.STYLE_LABEL_EMPH)
         self.tabImagGrid.addWidget(scanFilePathLabel, 7, 6, 1, 6)
@@ -644,7 +645,7 @@ class mainWindow(QMainWindow):
             k[0].setCheckable(True)
             # k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            # k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             if x in ['Start', 'Stop']:
                 k[0].setStyleSheet(defaults.STYLE_ARMED)
             else:
@@ -1019,24 +1020,32 @@ class mainWindow(QMainWindow):
                     patternx.append(x)
                     patterny.append(y)
             pattern = np.transpose(np.array((patternx, patterny)))
-            samplesPerWl = int(s.inputField['samplesPerWl'][0].text())
-            samplingRate = int(s.inputField['samplingRate'][0].text())
-            speed = float(s.inputField['speed'][0].text())
+            samplesPerWl = int(s.inputFields['samplesPerWl'][0].text())
+            samplingRate = int(s.inputFields['samplingRate'][0].text())
+            speed = float(s.inputFields['speed'][0].text())
+            wlwnStr = s.wlwnList.toPlainText()
+            wlwnListStr = re.split('[ ,;\n]+', wlwnStr)
+            wlwnList = []
+            for s in wlwnListStr:
+                try:
+                    n = float(s)
+                    wlwnList.append(n)
+                except Exception as exc:
+                    print('String "{}" cannot be converted to wavelength/number.'.format(s))
+            if not len(wlwnList) > 0:
+                print('No wavelengths or wavenumbers in list.')
+                self.tabImagButtons['Start'][0].setChecked(False)
+                return
+            wlwnList.sort()
             self.scanImagParameters.patterns.append(pattern)
             self.scanImagParameters.sampleNumbers.append(samplesPerWl)
             self.scanImagParameters.sampleRates.append(samplingRate)
             self.scanImagParameters.speeds.append(speed)
+            self.scanImagParameters.wlwnList.append(wlwnList)
         if self.wlUnits == 'invcm':
             self.scanImagParameters.units = 'invcm'
         else: # Default to micrometers
             self.scanImagParameters.units = 'um'
-        ### Parameter checks
-        # if self.scanImagParameters.start == self.scanImagParameters.end: # Requested limits are equal
-        #     print('Limits cannot be equal.')
-        #     self.btn['Start'][0].setChecked(False)
-        #     # GUIInstance.btn['Stop'][0].setChecked(False)
-        #     self.btn['Sweep'][0].setChecked(False)
-        #     return
         ### Lock GUI controls
         self.lock_controls()
         self.statusbar.showMessage('Busy')
@@ -1145,7 +1154,7 @@ class mainWindow(QMainWindow):
         qclPulseWidth = self.laser.get_pulse_width(qcl)
         tecTemp = self.laser.get_temperature(qcl)
         labelString = 'QCL{:d}Current'.format(qcl)
-        labelText = '{:.2f}°C | {:.0f} mA | {:.0f} ns @ {:.0f} Hz'.format(
+        labelText = '{:.2f}°C, {:.0f} mA\n{:.0f} ns @ {:.0f} Hz'.format(
                                tecTemp, qclCurrent, qclPulseWidth, qclPulseRate)
         self.labelInstr[labelString].setText(labelText)
         qclWl = self.laser.get_wavelength()
@@ -1400,6 +1409,7 @@ class scanningImagingParameters():
         # self.sweepLimits = [] # Placeholder value
         self.units = 'um' # By default, wavelengths in micrometers
         # self.useRef = False # By default, do not use reference
+        self.wlwnList = [] # List of wavelengths (um) or wavenumbers (cm^-1)
 
 
 if __name__ == '__main__':

@@ -150,7 +150,7 @@ class scanUI(QWidget):
             k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Text field for list of wavelengths or wavenumbers
-        self.wlwnList = QTextEdit('')
+        self.wlwnList = QTextEdit(defaults.IMAG_SCAN_WL_LIST)
         self.wlwnList.setFont(font)
         self.wlwnList.setStyleSheet(defaults.STYLE_TEXT)
         self.wlwnList.setToolTip('List of wavelengths (format: 1000, 1100:1200, ...)')

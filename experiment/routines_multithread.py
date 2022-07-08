@@ -406,11 +406,11 @@ class imagingScan(QObject):
     '''Manages directiories and scanning imaging routines.
        Runs in a separate thread.'''
     # acquisitionTimer = pyqtSignal(int)
-    # finished = pyqtSignal()
+    finished = pyqtSignal()
     # finishedOne = pyqtSignal(int)
     # finishedMulti = pyqtSignal()
-    # outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
-    # outParams = pyqtSignal(object) # Return parameters for re-use with "re"
+    outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
+    outParams = pyqtSignal(object) # Return parameters for re-use with "re"
     # startedOne = pyqtSignal(int)
     # stopped = False
 
@@ -423,57 +423,57 @@ class imagingScan(QObject):
         '''Run experiment, calling "scan".'''
         ### Zero previous ranges and limits, if any
         # self.parameters.sweepLimits = []
-        '''TO HERE'''
         self.parameters.ranges = []
         self.parameters.qcl = []
-        ### Make "raw" range with requested values
-        if self.parameters.start > self.parameters.end:
-            self.parameters.start, self.parameters.end = self.parameters.end, self.parameters.start
-        rawRange = np.arange(self.parameters.start, self.parameters.end, self.parameters.step)
-        if len(rawRange) < 1: # Requested limits are out of QCL bounds
-            print('Cannot sweep requested range.')
-            return [[], self]
-        ### Make a separate range for each QCL
-        ranges = [[], [], [], []] # Store allowed wavelengths/numbers per QCL
-        if self.parameters.units == 'invcm':
-            for wn in rawRange:
-                if WN_NRANGE_QCL1[0] >= wn >= WN_NRANGE_QCL1[1]:
-                    ranges[0].append(wn)
-                elif WN_NRANGE_QCL2[0] > wn >= WN_NRANGE_QCL2[1]:
-                    ranges[1].append(wn)
-                elif WN_NRANGE_QCL3[0] > wn >= WN_NRANGE_QCL3[1]:
-                    ranges[2].append(wn)
-                elif WN_NRANGE_QCL4[0] >= wn >= WN_NRANGE_QCL4[1]:
-                    ranges[3].append(wn)
-        else: # Default to micrometers
-            for wl in rawRange:
-                if WL_NRANGE_QCL1[0] <= wl <= WL_NRANGE_QCL1[1]:
-                    ranges[0].append(wl)
-                elif WL_NRANGE_QCL2[0] < wl <= WL_NRANGE_QCL2[1]:
-                    ranges[1].append(wl)
-                elif WL_NRANGE_QCL3[0] < wl <= WL_NRANGE_QCL3[1]:
-                    ranges[2].append(wl)
-                elif WL_NRANGE_QCL4[0] <= wl <= WL_NRANGE_QCL4[1]:
-                    ranges[3].append(wl)
-        ### Determine which QCL modules need to be used
-        for x, r in enumerate(ranges):
-            if r != []: # if this range is not empty
-                self.parameters.qcl.append(x+1) # QCLs are numbered 1--4
-        ### Compile QCL ranges in class variable, if not empty
-        for r in ranges:
-            if len(r) > 0: # If not empty
-                self.parameters.ranges.append(r)
-        ### Compile sweep ranges, adding margins
-        if self.parameters.sweeping:
+        for p, sn, sr, sp, w in zip(self.parameters.patterns,
+                                    self.parameters.sampleNumbers,
+                                    self.parameters.sampleRates,
+                                    self.parameters.speeds,
+                                    self.parameters.wlwnList):
+            ### Make a separate range for each QCL
+            ranges = [[], [], [], []] # Store allowed wavelengths/numbers per QCL
             if self.parameters.units == 'invcm':
-                for r in self.parameters.ranges:
-                    r.reverse() # Default order is from higher energy down
-                    self.parameters.sweepLimits.append([r[0] + WN_MAR_INVCM,
-                                             r[-1] - WN_MAR_INVCM])
+                for wn in w:
+                    if WN_NRANGE_QCL1[0] >= wn >= WN_NRANGE_QCL1[1]:
+                        ranges[0].append(wn)
+                    elif WN_NRANGE_QCL2[0] > wn >= WN_NRANGE_QCL2[1]:
+                        ranges[1].append(wn)
+                    elif WN_NRANGE_QCL3[0] > wn >= WN_NRANGE_QCL3[1]:
+                        ranges[2].append(wn)
+                    elif WN_NRANGE_QCL4[0] >= wn >= WN_NRANGE_QCL4[1]:
+                        ranges[3].append(wn)
             else: # Default to micrometers
-                for r in self.parameters.ranges:
-                    self.parameters.sweepLimits.append([r[0] - WL_MAR_UM,
-                                             r[-1] + WL_MAR_UM])
+                for wl in w:
+                    if WL_NRANGE_QCL1[0] <= wl <= WL_NRANGE_QCL1[1]:
+                        ranges[0].append(wl)
+                    elif WL_NRANGE_QCL2[0] < wl <= WL_NRANGE_QCL2[1]:
+                        ranges[1].append(wl)
+                    elif WL_NRANGE_QCL3[0] < wl <= WL_NRANGE_QCL3[1]:
+                        ranges[2].append(wl)
+                    elif WL_NRANGE_QCL4[0] <= wl <= WL_NRANGE_QCL4[1]:
+                        ranges[3].append(wl)
+            ### Determine which QCL modules need to be used
+            targetQcls, targetRanges = [], []
+            for x, r in enumerate(ranges):
+                if r != []: # if this range is not empty
+                    targetQcls.append(x+1) # QCLs are numbered 1--4
+            ### Compile QCL ranges in class variable, if not empty
+            for r in ranges:
+                if len(r) > 0: # If not empty
+                    targetRanges.append(r)
+            self.parameters.qcl.append(targetQcls)
+            self.parameters.ranges.append(targetRanges)
+        ### Compile sweep ranges, adding margins
+        # if self.parameters.sweeping:
+        #     if self.parameters.units == 'invcm':
+        #         for r in self.parameters.ranges:
+        #             r.reverse() # Default order is from higher energy down
+        #             self.parameters.sweepLimits.append([r[0] + WN_MAR_INVCM,
+        #                                      r[-1] - WN_MAR_INVCM])
+        #     else: # Default to micrometers
+        #         for r in self.parameters.ranges:
+        #             self.parameters.sweepLimits.append([r[0] - WL_MAR_UM,
+        #                                      r[-1] + WL_MAR_UM])
         ### Create individual experiment folder
         workDir = defaults.DEF_DATA_DIRECTORY
         os.chdir(workDir)
@@ -491,42 +491,46 @@ class imagingScan(QObject):
         os.chdir(expDir)
         self.parameters.latestDir = expDir
         ### Save experiment notes to file
-        if not len(self.parameters.notes) == 0:
-            noteFile = open('notes.txt', 'w')
-            noteFile.write(self.parameters.notes)
-            noteFile.close()
+        # if not len(self.parameters.notes) == 0:
+        #     noteFile = open('notes.txt', 'w')
+        #     noteFile.write(self.parameters.notes)
+        #     noteFile.close()
         ### Write parameters to log
         logFile = open('experiment.log', 'w')
-        logFile.write('QCL/Microscope experiment log\n')
+        logFile.write('QCL/Microscope scanning imaging experiment log\n')
         timeStr = time.strftime('%Y-%m-%d %H:%M:%S\n')
         logFile.write('{}'.format(timeStr))
         logFile.write('No. {:.0f}\n'.format(newExpNo))
         logFile.write('\n')
-        for qclNo in self.parameters.qcl:
-            qclCurr = self.parameters.laser.get_current(qclNo)
-            qclRate = self.parameters.laser.get_pulse_rate(qclNo)
-            qclWidth = self.parameters.laser.get_pulse_width(qclNo)
-            logFile.write('QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
-                                            qclNo, qclCurr, qclRate, qclWidth))
+        # for qclNo in self.parameters.qcl:
+        #     qclCurr = self.parameters.laser.get_current(qclNo)
+        #     qclRate = self.parameters.laser.get_pulse_rate(qclNo)
+        #     qclWidth = self.parameters.laser.get_pulse_width(qclNo)
+        #     logFile.write('QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
+        #                                     qclNo, qclCurr, qclRate, qclWidth))
         logFile.write('\n')
-        if self.parameters.sweeping:
-            logFile.write('Type: sweep\n')
-        else:
-            logFile.write('Type: step-and-measure\n')
-        logFile.write('\n')
-        logFile.write('Target wavelengths/wavenumbers:\n')
-        logFile.write('{}\n'.format(self.parameters.ranges))
-        logFile.write('\n')
-        logFile.write('Sweep limits:\n')
-        logFile.write('{}\n'.format(self.parameters.sweepLimits))
-        logFile.write('\n')
-        logFile.close()
+        # if self.parameters.sweeping:
+        #     logFile.write('Type: sweep\n')
+        # else:
+        #     logFile.write('Type: step-and-measure\n')
+        # logFile.write('\n')
+        # logFile.write('Target wavelengths/wavenumbers:\n')
+        # logFile.write('{}\n'.format(self.parameters.ranges))
+        # logFile.write('\n')
+        # logFile.write('Sweep limits:\n')
+        # logFile.write('{}\n'.format(self.parameters.sweepLimits))
+        # logFile.write('\n')
+        # logFile.close()
         ### Run a sweep or a step-and-measure scan
         data = []
-        if self.parameters.sweeping:
-            data = self.sweep()
-        else: # Default to step-and-measure
-            data = self.scan()
-        self.outData.emit(data)
-        self.outParams.emit(self.parameters)
+        # if self.parameters.sweeping:
+        #     data = self.sweep()
+        # else: # Default to step-and-measure
+        #     data = self.scan()
+        data = self.scan()
+        # self.outData.emit(data)
+        # self.outParams.emit(self.parameters)
         self.finished.emit()
+
+    def scan(self):
+        pass
