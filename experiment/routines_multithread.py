@@ -539,10 +539,70 @@ class imagingScan(QObject):
         # print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
         #       .format(self.parameters.sampleNumber, self.parameters.sampleRate))
         startRun = timer()
-        ### Run multi-range scan
-        numRanges = len(self.parameters.ranges)
         match self.parameters.scanMode:
             case 'step_one':
+                scanData = []
+                for p, sn, sr, sp, w, qcl, r in zip(self.parameters.patterns,
+                                                    self.parameters.sampleNumbers,
+                                                    self.parameters.sampleRates,
+                                                    self.parameters.speeds,
+                                                    self.parameters.wlwnList,
+                                                    self.parameters.qcl,
+                                                    self.parameters.ranges):
+                    posData = []
+                    '''Setup acquisition'''
+                    multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
+                    multipleAI.configure(sn, sr)
+                    '''Take measurements'''
+                    numRanges = len(r)
+                    steps = 0
+                    voltages, wavelengths = [], []
+                    for i, rw in enumerate(r):
+                        steps += len(rw)
+                        wavelengths += rw
+                        print('Range {}/{}, using QCL module {}...'.format(
+                                                                    i+1, numRanges, qcl[i]))
+                        ### Acquisition
+                        rangeVoltages = []
+                        try: # Failure here likely due to timeout because of skipped points
+                            for wl in rw:
+                                ### Tune
+                                self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
+                                '''Move'''
+                                for x, y in zip(p[:, 0], p[:, 1]):
+                                    self.parameters.stage.goto(x, y)
+                                    while int(self.parameters.stage.busy()) > 0:
+                                        time.sleep(0.1)
+                                    ### Acquire
+                                    rangeVoltages.append(multipleAI.acquire(sn))
+                        except Exception as exc:
+                            print('Scan did not complete:\n{}'.format(exc))
+                            print('Partial data may still be usable.')
+                        voltages += rangeVoltages
+                    ### Clear triggered acquisition task
+                    multipleAI.clear_task()
+                    ### Format data
+                    data = np.zeros((steps, 4)) # wl, X, Y, R
+                    try:
+                        for x, v in enumerate(voltages):
+                            data[x, 0] = wavelengths[x]
+                            data[x, 1] = np.sum(v[0])/sn # Lock-in X
+                            data[x, 2] = np.sum(v[1])/sn # Lock-in Y
+                            data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
+                                                np.power(data[x, 2], 2))) # Lock-in R
+                    except Exception as exc:
+                        print('Data formatting did not complete:\n{}'.format(exc))
+                        print('Data was not saved.')
+                    data = data[data[:, 0] != 0] # Remove zero-wavelength values
+                    print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
+                                                                len(wavelengths)))
+                    ### Flip data order if it was reversed by repeat
+                    # if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
+                    #     or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
+                    #     data = np.flip(data, 0)
+                    posData.append(data)
+                    scanData.append(posData)
+            case 'step_all':
                 scanData = []
                 for p, sn, sr, sp, w, qcl, r in zip(self.parameters.patterns,
                                                     self.parameters.sampleNumbers,
@@ -561,6 +621,7 @@ class imagingScan(QObject):
                         while int(self.parameters.stage.busy()) > 0:
                             time.sleep(0.1)
                         '''Take measurements'''
+                        numRanges = len(r)
                         steps = 0
                         voltages, wavelengths = [], []
                         for i, rw in enumerate(r):
@@ -603,9 +664,6 @@ class imagingScan(QObject):
                         #     data = np.flip(data, 0)
                         posData.append(data)
                     scanData.append(posData)
-            case 'step_all':
-                print('Not implemented.')
-                return []
             case 'sweep':
                 print('Not implemented.')
                 return []
