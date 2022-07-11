@@ -183,6 +183,29 @@ class mainWindow(QMainWindow):
         # else:
         #     event.ignore()
 
+    def construct_pattern(self, xOrig = defaults.IMAG_SCAN_ORIGIN_X_UM,
+                                yOrig = defaults.IMAG_SCAN_ORIGIN_Y_UM,
+                                xSizeN = defaults.IMAG_SCAN_SIZE_X_UM,
+                                ySizeN = defaults.IMAG_SCAN_SIZE_Y_UM,
+                                xStep = defaults.IMAG_SCAN_STEP_X_UM,
+                                yStep = defaults.IMAG_SCAN_STEP_Y_UM,
+                                invert = 'even'):
+        '''Construct raster pattern for scanning imaging'''
+        patternx = []
+        patterny = []
+        for xs in range(0, xSizeN):
+            if (invert in ['even', 'Even'] and (xs % 2 == 0)) or \
+               (invert in ['odd', 'Odd'] and (xs % 2 == 0)):
+                yRange = range(ySizeN - 1, -1, -1)
+            else:
+                yRange = range(0, ySizeN)
+            for ys in yRange:
+                x = xs * xStep + xOrig
+                y = ys * yStep + yOrig
+                patternx.append(x)
+                patterny.append(y)
+        return(np.transpose(np.array((patternx, patterny))))
+
     def emission(self):
         '''Enable or disable laser emission.'''
         self.lock_controls(lock=True)
@@ -656,13 +679,16 @@ class mainWindow(QMainWindow):
         ### Scanning imaging tab - Drop-down scan pattern menu
         self.tabImageDropdowns = dict()
         self.tabImageDropdowns['ScanPattern'] = [QComboBox(), 11, 6, 1, 3]
+        self.tabImageDropdowns['ScanPattern'][0].addItem('Auto')
         self.tabImageDropdowns['ScanPattern'][0].addItem('Raster')
         self.tabImageDropdowns['ScanMode'] = [QComboBox(), 11, 9, 1, 3]
-        self.tabImageDropdowns['ScanMode'][0].addItem('Step')
+        self.tabImageDropdowns['ScanMode'][0].addItem('Step (one wavelength each position)')
+        self.tabImageDropdowns['ScanMode'][0].addItem('Step (all wavelengths each position')
+        self.tabImageDropdowns['ScanMode'][0].addItem('Sweep')
         self.tabImageDropdowns['ScanMode'][0].addItem('Continuous')
         for x, k in self.tabImageDropdowns.items(): # Arrange buttons in grid
             k[0].setFont(font)
-            k[0].setStyleSheet(defaults.STYLE_INPUT)
+            k[0].setStyleSheet(defaults.STYLE_COMBOBOX)
             self.tabImagGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Show main application window
         self.show()
@@ -997,6 +1023,7 @@ class mainWindow(QMainWindow):
         self.update_imaging_scanning_plot()
         ### Read and compile general experiment parameters
         self.scanImagParameters.laser = self.laser
+        self.scanImagParameters.stage = self.stage
         # self.scanImagParameters.notes = self.notes.toPlainText()
         # self.scanImagParameters.useRef = self.btn['RefEnable'][0].isChecked()
         self.scanImagParameters.sweeping = self.btn['Sweep'][0].isChecked()
@@ -1011,15 +1038,12 @@ class mainWindow(QMainWindow):
             xSizeN = int(s.inputFields['xSizeN'][0].text())
             ySizeN = int(s.inputFields['ySizeN'][0].text())
             ### Construct pattern
-            patternx = []
-            patterny = []
-            for xs in range(0, xSizeN):
-                for ys in range(0, ySizeN):
-                    x = xs * xStep + xOrig
-                    y = ys * yStep + yOrig
-                    patternx.append(x)
-                    patterny.append(y)
-            pattern = np.transpose(np.array((patternx, patterny)))
+            pattern = self.construct_pattern(xOrig = xOrig,
+                                             yOrig = yOrig,
+                                             xSizeN = xSizeN,
+                                             ySizeN = ySizeN,
+                                             xStep = xStep,
+                                             yStep = yStep)
             samplesPerWl = int(s.inputFields['samplesPerWl'][0].text())
             samplingRate = int(s.inputFields['samplingRate'][0].text())
             speed = float(s.inputFields['speed'][0].text())
@@ -1118,22 +1142,54 @@ class mainWindow(QMainWindow):
             xSizeN = int(s.inputFields['xSizeN'][0].text())
             ySizeN = int(s.inputFields['ySizeN'][0].text())
             ### Construct pattern
-            patternx = []
-            patterny = []
-            for xs in range(0, xSizeN):
-                for ys in range(0, ySizeN):
-                    x = xs * xStep + xOrig
-                    y = ys * yStep + yOrig
-                    patternx.append(x)
-                    patterny.append(y)
-            pattern = np.transpose(np.array((patternx, patterny)))
+            pattern = self.construct_pattern(xOrig = xOrig,
+                                             yOrig = yOrig,
+                                             xSizeN = xSizeN,
+                                             ySizeN = ySizeN,
+                                             xStep = xStep,
+                                             yStep = yStep)
             ### Display pattern on plot
             patternPlot = self.stagePlotCanvas.axes.scatter(pattern[:,0],
                                                       pattern[:,1],
                                             c = defaults.STG_COLORS['pattern'],
                                             marker = '.',
-                                            zorder = 6)
+                                            zorder = 8)
             self.stagePlotCanvas.patterns.append(patternPlot)
+            for p in range (0, pattern.shape[0] - 1):
+                p1x = pattern[p, 0]
+                p1y = pattern[p, 1]
+                p1 = [p1x, p1y]
+                p2x = pattern[p + 1, 0]
+                p2y = pattern[p + 1, 1]
+                p2 = [p2x, p2y]
+                xLine = [p1[0], p2[0]]
+                yLine = [p1[1], p2[1]]
+                line = self.stagePlotCanvas.axes.plot(xLine, yLine, 'k', zorder = 6)
+                self.stagePlotCanvas.patterns.append(line[0]) # Index to get actual object
+                xArrow = (p1[0] + p2[0]) / 2
+                yArrow = (p1[1] + p2[1]) / 2
+                arrowLength = 1800 # um, choose value for plot clarity
+                ### Angle between two positions, with inverted y axis
+                dirAngle = np.arctan2(-1 * (p2[1] - p1[1]), p2[0] - p1[0])
+                if p2[0] == p1[0]:
+                    dxArrow = 0
+                else:
+                    dxDir = (p2[0] - p1[0]) / np.abs(p2[0] - p1[0])
+                    dxArrow = arrowLength * np.abs(np.cos(dirAngle)) * dxDir
+                if p2[1] == p1[1]:
+                    dyArrow = 0
+                else: ### Corrections required for inverted y axis
+                    dyDir = (p2[1] - p1[1]) / np.abs(p2[1] - p1[1])
+                    dyArrow = arrowLength * np.abs(np.sin(dirAngle)) * dyDir
+                arrow = self.stagePlotCanvas.axes.arrow(xArrow, yArrow,
+                                                   dxArrow, dyArrow,
+                                                   lw = 1,
+                                                   length_includes_head = True,
+                                                   head_length = arrowLength,
+                                                   head_width = arrowLength,
+                                                   color = 'k',
+                                                   zorder = 7)
+                self.stagePlotCanvas.patterns.append(arrow)
         self.stagePlotCanvas.figure.canvas.draw()
 
     def update_parameters(self, parameters):
@@ -1392,7 +1448,7 @@ class scanningImagingParameters():
         # self.acquisitions = 0 # Number of acquisitions
         # self.acq_time_interval_s = 300 # Interval between acquisitions, s
         # self.end = 100 # Placeholder value, no unit
-        self.laser = [] # Placeholder value
+        self.laser = [] # Laser instance, laceholder value
         self.latestDir = 0 # Latest experiment directory, placeholder value
         # self.notes = [] # Placeholder value
         self.qcl = [] # QCL modules to be used, placeholder value
@@ -1402,7 +1458,9 @@ class scanningImagingParameters():
         # self.reference = np.zeros((1, 2)) # Placeholder value
         self.sampleNumbers = [] # Sample numbers, placeholder value
         self.sampleRates = [] # Sample rates, placeholder value
+        self.scanMode = 'step_one'
         self.speeds = [] # Sweeping speeds, placeholder value
+        self.stage = [] # Stage instance, laceholder value
         # self.start = 0 # Placeholder value, no unit
         # self.step = 1 # Placeholder value, no unit
         # self.sweeping = True # By default, use the sweep routine

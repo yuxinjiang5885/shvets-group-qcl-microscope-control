@@ -340,6 +340,12 @@ STYLE_BUTTON_UNIT = '''QPushButton {{
                  GS_COLORS['text'],
                  GS_COLORS['hover'],
                  GS_COLORS['hover'])
+STYLE_COMBOBOX ='''QComboBox {{
+        color: {};
+        border: 2px solid {};
+        border-radius: 5px;
+    }}'''.format(GS_COLORS['text-lo'],
+                 GS_COLORS['border'])
 STYLE_CONTAINER = '''QWidget {{
         background-color: {};
     }}'''.format(GS_COLORS['background'])
