@@ -549,7 +549,6 @@ class imagingScan(QObject):
                                                     self.parameters.wlwnList,
                                                     self.parameters.qcl,
                                                     self.parameters.ranges):
-                    posData = []
                     '''Setup acquisition'''
                     multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
                     multipleAI.configure(sn, sr)
@@ -563,7 +562,7 @@ class imagingScan(QObject):
                         print('Range {}/{}, using QCL module {}...'.format(
                                                                     i+1, numRanges, qcl[i]))
                         ### Acquisition
-                        rangeVoltages = []
+                        xyVoltages = []
                         try: # Failure here likely due to timeout because of skipped points
                             for wl in rw:
                                 ### Tune
@@ -574,14 +573,12 @@ class imagingScan(QObject):
                                     while int(self.parameters.stage.busy()) > 0:
                                         time.sleep(0.1)
                                     ### Acquire
-                                    rangeVoltages.append(multipleAI.acquire(sn))
+                                    xyVoltages.append(multipleAI.acquire(sn))
                         except Exception as exc:
                             print('Scan did not complete:\n{}'.format(exc))
                             print('Partial data may still be usable.')
-                        voltages += rangeVoltages
-                    ### Clear triggered acquisition task
-                    multipleAI.clear_task()
-                    ### Format data
+                        voltages += xyVoltages
+                        ### Format data
                     data = np.zeros((steps, 4)) # wl, X, Y, R
                     try:
                         for x, v in enumerate(voltages):
@@ -600,8 +597,9 @@ class imagingScan(QObject):
                     # if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
                     #     or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
                     #     data = np.flip(data, 0)
-                    posData.append(data)
-                    scanData.append(posData)
+                    ### Clear triggered acquisition task
+                    multipleAI.clear_task()
+                    scanData.append(data)
             case 'step_all':
                 scanData = []
                 for p, sn, sr, sp, w, qcl, r in zip(self.parameters.patterns,
@@ -675,6 +673,7 @@ class imagingScan(QObject):
                 return []
         endRun = timer()
         print('Scan complete (%.3f s).' % (endRun-startRun))
+        '''Format data for saving'''
         ### Save data as text file
         currentDir = os.getcwd()
         if platform.system() == 'Windows':
@@ -682,5 +681,5 @@ class imagingScan(QObject):
         else:
             currentDirSplit = currentDir.split('/')
         currentFolder = currentDirSplit[-1]
-        np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME), data)
+        np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME_XY), data)
         return scanData

@@ -86,6 +86,7 @@ PLOT_COLOR_T_DARK = '#FF0000'
 ### Directories
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
 DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
+DEF_FILENAME_XY = '_stg-x-um_stg-y-um_wl-um_lia-x-v_lia-y-v_lia-r-v.txt' # Append to data files
 
 ### MIRcat default pulse parameters
 ### These cannot be queried from the laser
