@@ -11,8 +11,9 @@ import os
 import sys
 import re
 import matplotlib as mpl
-import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import rcParams
+import numpy as np
 import experiment.defaults as defaults
 from experiment.routines_multithread import experiment, imagingScan
 from ui.laser_windows import (laserInitializer,
@@ -64,6 +65,19 @@ class experimentParameters():
         self.sweepLimits = [] # Placeholder value
         self.units = 'um' # By default, wavelengths in micrometers
         self.useRef = False # By default, do not use reference
+
+
+class hyperspectral_slice():
+    '''Holds a wavelength slice of scanning imaging data'''
+
+    def __init__(self):
+        self.wavelength = 0
+        self.X_raw = []
+        self.Y_raw = []
+        self.Z_raw = []
+        self.X = []
+        self.Y = []
+        self.Z = []
 
 
 class mainWindow(QMainWindow):
@@ -849,6 +863,83 @@ class mainWindow(QMainWindow):
             self.plotCanvasRef.recolor(plotColor = defaults.PLOT_COLOR_REF)
             self.plotCanvasT.recolor(plotColor = defaults.PLOT_COLOR_T)
 
+    def plot_imaging(self, data):
+        '''Plot scanning imaging result'''
+        self.imagePlotCanvas.clear_plots()
+        try:
+            # self.imagePlotCanvas.axes.scatter(data[:,0], data[:,1],
+            #                                 c = defaults.STG_COLORS['pattern'],
+            #                                 marker = '.',
+            #                                 zorder = 40)
+            self.imagePlotCanvas.axes3D = self.imagePlotCanvas.figure.add_subplot(111, projection='3d', proj_type='ortho')
+            self.imagePlotCanvas.axes3D.patch.set_alpha(0)
+            WL, SLICES = [], []
+            '''Create data slices'''
+            for x, y, wl, r in zip(data[:, 0], data[:, 1], data[:, 2], data[:, 5]):
+                if wl not in WL:
+                    WL.append(wl)
+                    hsSlice = hyperspectral_slice()
+                    hsSlice.wavelength = wl
+                    hsSlice.X_raw.append(x)
+                    hsSlice.Y_raw.append(y)
+                    hsSlice.Z_raw.append(r)
+                    SLICES.append(hsSlice)
+                else:
+                    wli = WL.index(wl)
+                    SLICES[wli].X_raw.append(x)
+                    SLICES[wli].Y_raw.append(y)
+                    SLICES[wli].Z_raw.append(r)
+            '''Sort slices by wavelength'''
+            ### TODO
+            '''Format data slices'''
+            for s in SLICES:
+                X = np.unique(np.ndarray(s.X_raw.sort()))
+                Y = np.unique(np.ndarray(s.Y_raw.sort()))
+                Z = np.zeros(Y.size, X.size)
+            # data[:,5]
+            # for ix, x in enumerate(X):
+            #     for iy, y in enumerate(Y):
+                    # np.where(data[:,0:1] == ([x, y]))
+                    # zi = data[:,0:1].index([x, y])
+                    # Z[iy, ix] = data[zi, 5]
+            self.imagePlotCanvas.axes3D.plot_surface(X, Y, Z,
+                                                    cmap = mpl.cm.inferno,
+                                                    linewidth = 0,
+                                                    antialiased = False)
+            self.imagePlotCanvas.figure.canvas.draw()
+            # self.plotCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+            # # self.plotCanvas.axes.set_ylim(min(
+            # # plotData[:, 1]), max(plotData[-1, 0]))
+            # if self.darkMode.isChecked():
+            #     colorPick = defaults.PLOT_COLOR_DARK
+            # else:
+            #     colorPick = defaults.PLOT_COLOR
+            # self.plotCanvas.plot_line(plotData[:, 0], plotData[:, 3],
+            #                                color = colorPick)
+            # if self.btn['RefEnable'][0].isChecked():
+            #     self.parameters.useRef = True
+            #     if self.wlUnits == 'invcm':
+            #         # plotData = np.flip(data, 0)
+            #         # plotRef = np.flip(self.parameters.reference, 0)
+            #         plotData = data
+            #         plotRef = self.parameters.reference
+            #     else:
+            #         plotData = data
+            #         plotRef = self.parameters.reference
+            #     # self.plotCanvasT.flush_events()
+            #     self.plotCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
+            #     if self.darkMode.isChecked():
+            #         colorPick = defaults.PLOT_COLOR_T_DARK
+            #     else:
+            #         colorPick = defaults.PLOT_COLOR_T
+            #     self.plotCanvasT.plot_line(plotData[:, 0],
+            #                                    plotData[:, 3]/plotRef[:, 3],
+            #                                    color = colorPick)
+            # else:
+            #     self.parameters.useRef = False
+        except Exception as exc:
+            print('Failed to plot data:\n{}'.format(exc))
+
     def qcl(self, qclSelectNo):
         '''Handle button checked status and style sheet.'''
         self.lock_controls(lock=True)
@@ -1084,7 +1175,7 @@ class mainWindow(QMainWindow):
         self.threadRun.finished.connect(self.threadRun.deleteLater)
         self.threadRun.start()
         ### Plot data
-        # self.worker.outData.connect(self.plot)
+        self.worker.outData.connect(self.plot_imaging)
         ### Save current QCLs, ranges and limits for use with "repeat" function
         # self.worker.outParams.connect(self.update_parameters)
         ### Unlock GUI controls
