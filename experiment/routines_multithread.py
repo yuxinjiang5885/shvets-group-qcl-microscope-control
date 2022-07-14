@@ -539,9 +539,9 @@ class imagingScan(QObject):
         # print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
         #       .format(self.parameters.sampleNumber, self.parameters.sampleRate))
         startRun = timer()
-        '''Scan: one wavelenght per position'''
         match self.parameters.scanMode:
             case 'step_one':
+                '''Scan: one wavelenght per position'''
                 posx, posy, voltages, wavelengths = [], [], [], []
                 '''Iterate over scans'''
                 for p, sn, sr, sp, w, qcl, r in zip(self.parameters.patterns,
@@ -556,6 +556,11 @@ class imagingScan(QObject):
                     multipleAI.configure(sn, sr)
                     '''Iterate over QCL ranges'''
                     numRanges = len(r)
+                    print(p)
+                    print(sn)
+                    print(sr)
+                    print(qcl)
+                    print(r)
                     for i, rw in enumerate(r):
                         print('Range {}/{}, using QCL module {}...'.format(
                                                                     i+1, numRanges, qcl[i]))
@@ -564,20 +569,24 @@ class imagingScan(QObject):
                         try:
                             '''Iterate over wavelengths'''
                             for wl in rw:
+                                print(wl)
+                                print(rw)
                                 '''Tune'''
                                 self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
                                 '''Iterate over positions'''
                                 for x, y in zip(p[:, 0], p[:, 1]):
+                                    print(x)
+                                    print(y)
                                     self.parameters.stage.goto(x, y)
                                     while int(self.parameters.stage.busy()) > 0:
                                         time.sleep(0.1)
                                     '''Acquire'''
                                     measurements = multipleAI.acquire(sn)
                                     '''Append data'''
-                                    posx += x
-                                    posy += y
+                                    posx.append(x)
+                                    posy.append(y)
                                     voltages.append(measurements)
-                                    wavelengths += wl
+                                    wavelengths.append(wl)
                         except Exception as exc:
                             print('Scan did not complete:\n{}'.format(exc))
                             print('Partial data may still be usable.')
@@ -585,6 +594,10 @@ class imagingScan(QObject):
                     multipleAI.clear_task()
                 '''Format data'''
                 data = np.zeros((len(voltages), 6)) # x, y, wl, X, Y, R
+                print(posx)
+                print(posy)
+                print(wavelengths)
+                print(voltages)
                 try:
                     for i, v in enumerate(voltages):
                         data[i, 0] = posx[i]
@@ -605,6 +618,10 @@ class imagingScan(QObject):
                 # print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
                 #                                             len(wavelengths)))
             case 'step_all':
+                '''Scan: all wavelenghts at each position'''
+                '''NOT FUNCTIONAL: restructure as one-wl-per-step case'''
+                print('Not implemented.')
+                return []
                 scanData = []
                 for p, sn, sr, sp, w, qcl, r in zip(self.parameters.patterns,
                                                     self.parameters.sampleNumbers,
