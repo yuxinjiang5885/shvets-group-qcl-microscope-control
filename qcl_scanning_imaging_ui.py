@@ -72,9 +72,6 @@ class hyperspectral_slice():
 
     def __init__(self):
         self.wavelength = 0
-        self.X_raw = []
-        self.Y_raw = []
-        self.Z_raw = []
         self.X = []
         self.Y = []
         self.Z = []
@@ -206,7 +203,9 @@ class mainWindow(QMainWindow):
                                 invert = 'even'):
         '''Construct raster pattern for scanning imaging'''
         patternx = []
+        indexx = []
         patterny = []
+        indexy = []
         for xs in range(0, xSizeN):
             if (invert in ['even', 'Even'] and (xs % 2 == 0)) or \
                (invert in ['odd', 'Odd'] and (xs % 2 == 0)):
@@ -217,8 +216,11 @@ class mainWindow(QMainWindow):
                 x = xs * xStep + xOrig
                 y = ys * yStep + yOrig
                 patternx.append(x)
+                indexx.append(xs)
                 patterny.append(y)
-        return(np.transpose(np.array((patternx, patterny))))
+                indexy.append(ys)
+        return(np.transpose(np.array((patternx, patterny))),
+               np.transpose(np.array((indexx, indexy))))
 
     def emission(self):
         '''Enable or disable laser emission.'''
@@ -863,7 +865,7 @@ class mainWindow(QMainWindow):
             self.plotCanvasRef.recolor(plotColor = defaults.PLOT_COLOR_REF)
             self.plotCanvasT.recolor(plotColor = defaults.PLOT_COLOR_T)
 
-    def plot_imaging(self, data):
+    def plot_scanning_imaging(self, data):
         '''Plot scanning imaging result'''
         self.imagePlotCanvas.clear_plots()
         try:
@@ -874,35 +876,33 @@ class mainWindow(QMainWindow):
             self.imagePlotCanvas.axes3D = self.imagePlotCanvas.figure.add_subplot(111, projection='3d', proj_type='ortho')
             self.imagePlotCanvas.axes3D.patch.set_alpha(0)
             WL, SLICES = [], []
-            '''Create data slices'''
-            for x, y, wl, r in zip(data[:, 0], data[:, 1], data[:, 2], data[:, 5]):
+            ### Create data slices
+            for wl, ix, x, iy, y, r in zip(data[:, 0],
+                                           data[:, 1],
+                                           data[:, 2],
+                                           data[:, 3],
+                                           data[:, 4],
+                                           data[:, 7]):
                 if wl not in WL:
                     WL.append(wl)
                     hsSlice = hyperspectral_slice()
+                    hsSlice.Z = np.zeros((4, 4))
                     hsSlice.wavelength = wl
-                    hsSlice.X_raw.append(x)
-                    hsSlice.Y_raw.append(y)
-                    hsSlice.Z_raw.append(r)
+                    hsSlice.X.append(x)
+                    hsSlice.Y.append(y)
+                    hsSlice.Z[int(iy), int(ix)] = r
                     SLICES.append(hsSlice)
                 else:
                     wli = WL.index(wl)
-                    SLICES[wli].X_raw.append(x)
-                    SLICES[wli].Y_raw.append(y)
-                    SLICES[wli].Z_raw.append(r)
-            '''Sort slices by wavelength'''
+                    SLICES[wli].X.append(x)
+                    SLICES[wli].Y.append(y)
+                    SLICES[wli].Z[int(iy), int(ix)] = r
+            ### Sort slices by wavelength
             ### TODO
-            '''Format data slices'''
-            for s in SLICES:
-                X = np.unique(np.ndarray(s.X_raw.sort()))
-                Y = np.unique(np.ndarray(s.Y_raw.sort()))
-                Z = np.zeros(Y.size, X.size)
-            # data[:,5]
-            # for ix, x in enumerate(X):
-            #     for iy, y in enumerate(Y):
-                    # np.where(data[:,0:1] == ([x, y]))
-                    # zi = data[:,0:1].index([x, y])
-                    # Z[iy, ix] = data[zi, 5]
-            self.imagePlotCanvas.axes3D.plot_surface(X, Y, Z,
+            ### Plot
+            self.imagePlotCanvas.axes3D.plot_surface(np.unique(SLICES[0].X),
+                                                     np.unique(SLICES[0].Y),
+                                                     SLICES[0].Z,
                                                     cmap = mpl.cm.inferno,
                                                     linewidth = 0,
                                                     antialiased = False)
@@ -1111,7 +1111,7 @@ class mainWindow(QMainWindow):
             self.btn['Sweep'][0].setChecked(False)
             return
         ### Show patterns on plot
-        self.update_imaging_scanning_plot()
+        self.update_scanning_imaging_plot()
         ### Read and compile general experiment parameters
         self.scanImagParameters.laser = self.laser
         self.scanImagParameters.stage = self.stage
@@ -1129,7 +1129,7 @@ class mainWindow(QMainWindow):
             xSizeN = int(s.inputFields['xSizeN'][0].text())
             ySizeN = int(s.inputFields['ySizeN'][0].text())
             ### Construct pattern
-            pattern = self.construct_pattern(xOrig = xOrig,
+            pattern, indices = self.construct_pattern(xOrig = xOrig,
                                              yOrig = yOrig,
                                              xSizeN = xSizeN,
                                              ySizeN = ySizeN,
@@ -1153,6 +1153,8 @@ class mainWindow(QMainWindow):
                 return
             wlwnList.sort()
             self.scanImagParameters.patterns.append(pattern)
+            # self.scanImagParameters.patternSize.append(indices[:, 0].size)
+            self.scanImagParameters.patternIndices.append(indices)
             self.scanImagParameters.sampleNumbers.append(samplesPerWl)
             self.scanImagParameters.sampleRates.append(samplingRate)
             self.scanImagParameters.speeds.append(speed)
@@ -1175,9 +1177,9 @@ class mainWindow(QMainWindow):
         self.threadRun.finished.connect(self.threadRun.deleteLater)
         self.threadRun.start()
         ### Plot data
-        self.worker.outData.connect(self.plot_imaging)
+        self.worker.outData.connect(self.plot_scanning_imaging)
         ### Save current QCLs, ranges and limits for use with "repeat" function
-        # self.worker.outParams.connect(self.update_parameters)
+        self.worker.outParams.connect(self.update_scanning_imaging_parameters)
         ### Unlock GUI controls
         self.worker.finished.connect(lambda: self.lock_controls(lock=False))
         self.worker.finished.connect(lambda: self.statusbar.showMessage('Ready'))
@@ -1219,7 +1221,12 @@ class mainWindow(QMainWindow):
         '''Version of "tune" with less overhead. Use with caution.'''
         self.laser.tune(self.activeQcl, targetWl, self.wlUnits)
 
-    def update_imaging_scanning_plot(self):
+    def update_parameters(self, parameters):
+        '''Update class instance experiment parameters with last used set, which
+           may be re-used with "repeat".'''
+        self.parameters = parameters
+
+    def update_scanning_imaging_plot(self):
         '''Update patterns on imaging scanning plot.'''
         for p in self.stagePlotCanvas.patterns:
             p.remove()
@@ -1233,7 +1240,7 @@ class mainWindow(QMainWindow):
             xSizeN = int(s.inputFields['xSizeN'][0].text())
             ySizeN = int(s.inputFields['ySizeN'][0].text())
             ### Construct pattern
-            pattern = self.construct_pattern(xOrig = xOrig,
+            pattern, _ = self.construct_pattern(xOrig = xOrig,
                                              yOrig = yOrig,
                                              xSizeN = xSizeN,
                                              ySizeN = ySizeN,
@@ -1283,10 +1290,10 @@ class mainWindow(QMainWindow):
                 self.stagePlotCanvas.patterns.append(arrow)
         self.stagePlotCanvas.figure.canvas.draw()
 
-    def update_parameters(self, parameters):
+    def update_scanning_imaging_parameters(self, parameters):
         '''Update class instance experiment parameters with last used set, which
            may be re-used with "repeat".'''
-        self.parameters = parameters
+        self.scanImagParameters = parameters
 
     def update_qcl_reading(self, qcl):
         '''Read and display QCL "qcl" temperature, current, and wavelength.'''
@@ -1544,6 +1551,7 @@ class scanningImagingParameters():
         # self.notes = [] # Placeholder value
         self.qcl = [] # QCL modules to be used, placeholder value
         self.patterns = [] # Scanning imaging patters, placeholder value
+        self.patternIndices = [] # Indices of pattern positions, placeholder value
         self.ranges = [] # Wavelength/wavenumber ranges, placeholder value
         self.refDir = '' # Reference experiment directory
         # self.reference = np.zeros((1, 2)) # Placeholder value

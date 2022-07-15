@@ -529,7 +529,7 @@ class imagingScan(QObject):
         #     data = self.scan()
         data = self.scan()
         self.outData.emit(data)
-        # self.outParams.emit(self.parameters)
+        self.outParams.emit(self.parameters)
         self.finished.emit()
 
     def scan(self):
@@ -542,19 +542,20 @@ class imagingScan(QObject):
         match self.parameters.scanMode:
             case 'step_one':
                 '''Scan: one wavelenght per position'''
-                posx, posy, voltages, wavelengths = [], [], [], []
-                '''Iterate over scans'''
-                for p, sn, sr, sp, w, qcl, r in zip(self.parameters.patterns,
-                                                    self.parameters.sampleNumbers,
-                                                    self.parameters.sampleRates,
-                                                    self.parameters.speeds,
-                                                    self.parameters.wlwnList,
-                                                    self.parameters.qcl,
-                                                    self.parameters.ranges):
-                    '''Setup acquisition'''
+                posx, posy, indx, indy, voltages, wavelengths = [], [], [], [], [], []
+                ### Iterate over scans
+                for p, sn, sr, sp, w, qcl, r, ind in zip(self.parameters.patterns,
+                                                        self.parameters.sampleNumbers,
+                                                        self.parameters.sampleRates,
+                                                        self.parameters.speeds,
+                                                        self.parameters.wlwnList,
+                                                        self.parameters.qcl,
+                                                        self.parameters.ranges,
+                                                        self.parameters.patternIndices):
+                    ### Setup acquisition
                     multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
                     multipleAI.configure(sn, sr)
-                    '''Iterate over QCL ranges'''
+                    ### Iterate over QCL ranges
                     numRanges = len(r)
                     for i, rw in enumerate(r):
                         print('Range {}/{}, using QCL module {}...'.format(
@@ -562,39 +563,43 @@ class imagingScan(QObject):
                         ### Failure here likely due to timeout
                         ### because of skipped points
                         try:
-                            '''Iterate over wavelengths'''
+                            ### Iterate over wavelengths
                             for wl in rw:
-                                '''Tune'''
+                                ### Tune
                                 self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
-                                '''Iterate over positions'''
-                                for x, y in zip(p[:, 0], p[:, 1]):
+                                ### Iterate over positions
+                                for x, y, ix, iy in zip(p[:, 0], p[:, 1], ind[:, 0], ind[:, 1]):
                                     self.parameters.stage.goto(x, y)
                                     while int(self.parameters.stage.busy()) > 0:
                                         time.sleep(0.1)
-                                    '''Acquire'''
+                                    ### Acquire
                                     measurements = multipleAI.acquire(sn)
-                                    '''Append data'''
+                                    ### Append data
                                     posx.append(x)
                                     posy.append(y)
+                                    indx.append(ix)
+                                    indy.append(iy)
                                     voltages.append(measurements)
                                     wavelengths.append(wl)
                         except Exception as exc:
                             print('Scan did not complete:\n{}'.format(exc))
                             print('Partial data may still be usable.')
-                    '''Clear acquisition task'''
+                    ### Clear acquisition task
                     multipleAI.clear_task()
-                '''Format data'''
-                data = np.zeros((len(voltages), 6)) # x, y, wl, X, Y, R
+                ### Format data
+                data = np.zeros((len(voltages), 8)) # x, y, wl, X, Y, R
                 try:
                     for i, v in enumerate(voltages):
-                        data[i, 0] = posx[i]
-                        data[i, 1] = posy[i]
-                        data[i, 2] = wavelengths[i]
-                        data[i, 3] = np.sum(v[0])/sn # Lock-in X
-                        data[i, 4] = np.sum(v[1])/sn # Lock-in Y
-                        data[i, 5] = (np.sqrt(np.power(data[i, 1], 2) +
+                        data[i, 0] = wavelengths[i]
+                        data[i, 1] = indx[i]
+                        data[i, 2] = posx[i]
+                        data[i, 3] = indy[i]
+                        data[i, 4] = posy[i]
+                        data[i, 5] = np.sum(v[0])/sn # Lock-in X
+                        data[i, 6] = np.sum(v[1])/sn # Lock-in Y
+                        data[i, 7] = (np.sqrt(np.power(data[i, 1], 2) +
                                             np.power(data[i, 2], 2))) # Lock-in R
-                                            ### Flip data order if it was reversed by repeat
+                    ### Flip data order if it was reversed by repeat
                     # if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
                     #     or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
                     #     data = np.flip(data, 0)
