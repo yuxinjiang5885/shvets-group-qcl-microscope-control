@@ -42,6 +42,7 @@ from PyQt6.QtWidgets import (QApplication,
                              QTextEdit)
 rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
 
+
 class experimentParameters():
     '''Holds experiment parameters'''
 
@@ -67,7 +68,7 @@ class experimentParameters():
         self.useRef = False # By default, do not use reference
 
 
-class hyperspectral_slice():
+class hyperspectralSlice():
     '''Holds a wavelength slice of scanning imaging data'''
 
     def __init__(self):
@@ -885,7 +886,7 @@ class mainWindow(QMainWindow):
                                            data[:, 7]):
                 if wl not in WL:
                     WL.append(wl)
-                    hsSlice = hyperspectral_slice()
+                    hsSlice = hyperspectralSlice()
                     hsSlice.Z = np.zeros((4, 4))
                     hsSlice.wavelength = wl
                     hsSlice.X.append(x)
@@ -1159,6 +1160,15 @@ class mainWindow(QMainWindow):
             self.scanImagParameters.sampleRates.append(samplingRate)
             self.scanImagParameters.speeds.append(speed)
             self.scanImagParameters.wlwnList.append(wlwnList)
+            ### Prepare data variables.
+            self.scanImagParameters.data.indices.append(indices)
+            self.scanImagParameters.data.W.append(wlwnList)
+            xVector = np.sort(np.unique(np.asarray(pattern[:, 0])))
+            self.scanImagParameters.data.X.append(xVector)
+            yVector = np.sort(np.unique(np.asarray(pattern[:, 0])))
+            self.scanImagParameters.data.Y.append(yVector)
+            self.scanImagParameters.data.add_V()
+            self.scanImagParameters.data.add_Vtemp()
         if self.wlUnits == 'invcm':
             self.scanImagParameters.units = 'invcm'
         else: # Default to micrometers
@@ -1539,16 +1549,71 @@ class multipleAcquisitionsWindow(QMainWindow):
             'Elapsed: {:02.0f} : {:02.0f} : {:02.0f}'.format(0, 0, 0))
 
 
+class scanningImagingData():
+    '''Holds data from scanning imaging experiments.
+       Organized by pattern, each pattern organized by wavelength/wavenumber.'''
+
+    def __init__(self):
+        '''Prepare variables to hold data.
+           All these are lists of vectors, matrices or lists.
+           Data structure:
+
+           XY SCANNING PATTERN (one element of each of the list variables)
+                + ------ indices               (list)
+                + ------ V VOLTAGES            (list of matrices, one per wl/wn)
+                + ------ V_temp VOLTAGES       (list of lists, one per wl/wn)
+                + ------ W WAVELENGTHS/NUMBERS (list)
+                + ------ X POSITIONS           (vector)
+                + ------ Y POSITIONS           (vector)
+        '''
+        self.indices = [] # YX indices for temporary voltage list
+        self.V = []       # Voltage averages matrix: X columns, Y rows
+        self.Vtemp = []  # Voltage non-averaged list, used during acquisition
+        self.W = []       # Wavelengths or wavenumbers
+        self.X = []       # X positions vector
+        self.Y = []       # Y positions vector
+
+    def add_V(self, index = -1):
+        '''Make zero matrices to hold voltages, one per wl/wn.
+           X are columns, Y rows.
+           Use immediately after "add_W", "add_X" and "add_Y" to match index.'''
+        self.V.append([])
+        for wi, _ in enumerate(self.W[index]):
+            self.V[-1].append([])
+            self.V[-1][wi].append(np.zeros((self.Y[index].size, self.X[index].size)))
+
+    def add_Vtemp(self, index = -1):
+        '''Make lists to hold voltages during acquisition, one per wl/wn.
+           Use immediately after "add_W", "add_X" and "add_Y" to match index.'''
+        self.Vtemp.append([])
+        for wi, _ in enumerate(self.W[index]):
+            self.Vtemp[-1].append([])
+            self.Vtemp[-1][wi].append([])
+
+    # def add_W(self, wList):
+    #     '''Make wavelength/wavenumber vector out of "wList" and add to list'''
+    #     self.W.append(np.asarray(wList))
+
+    # def add_X(self, xList):
+    #     '''Make positions vector out of "xList" and add to list'''
+    #     self.X.append(np.asarray(xList))
+
+    # def add_Y(self, yList):
+    #     '''Make positions vector out of "yList" and add to list'''
+    #     self.Y.append(np.asarray(yList))
+
+
 class scanningImagingParameters():
     '''Holds experiment parameters for scanning imaging.'''
 
     def __init__(self):
         # self.acquisitions = 0 # Number of acquisitions
         # self.acq_time_interval_s = 300 # Interval between acquisitions, s
+        self.data = scanningImagingData() # Holds acquired data
         # self.end = 100 # Placeholder value, no unit
         self.laser = [] # Laser instance, laceholder value
         self.latestDir = 0 # Latest experiment directory, placeholder value
-        # self.notes = [] # Placeholder value
+        # self.notes = [] # Placeholder value\
         self.qcl = [] # QCL modules to be used, placeholder value
         self.patterns = [] # Scanning imaging patters, placeholder value
         self.patternIndices = [] # Indices of pattern positions, placeholder value

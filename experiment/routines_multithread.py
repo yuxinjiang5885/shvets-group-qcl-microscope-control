@@ -54,7 +54,7 @@ class experiment(QObject):
     finishedOne = pyqtSignal(int)
     finishedMulti = pyqtSignal()
     outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
-    outParams = pyqtSignal(object) # Return parameters for re-use with "re"
+    outParams = pyqtSignal(object) # Return parameters for re-use with "repeat"
     startedOne = pyqtSignal(int)
     stopped = False
 
@@ -409,7 +409,8 @@ class imagingScan(QObject):
     finished = pyqtSignal()
     # finishedOne = pyqtSignal(int)
     # finishedMulti = pyqtSignal()
-    outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
+    # outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
+    outData = pyqtSignal(object) # Return data to UI for plotting
     outParams = pyqtSignal(object) # Return parameters for re-use with "re"
     # startedOne = pyqtSignal(int)
     # stopped = False
@@ -528,7 +529,7 @@ class imagingScan(QObject):
         # else: # Default to step-and-measure
         #     data = self.scan()
         data = self.scan()
-        self.outData.emit(data)
+        self.outData.emit(self.parameters.data)
         self.outParams.emit(self.parameters)
         self.finished.emit()
 
@@ -543,6 +544,7 @@ class imagingScan(QObject):
             case 'step_one':
                 '''Scan: one wavelenght per position'''
                 posx, posy, indx, indy, voltages, wavelengths = [], [], [], [], [], []
+                dataIndexPattern = 0
                 ### Iterate over scans
                 for p, sn, sr, sp, w, qcl, r, ind in zip(self.parameters.patterns,
                                                         self.parameters.sampleNumbers,
@@ -565,6 +567,8 @@ class imagingScan(QObject):
                         try:
                             ### Iterate over wavelengths
                             for wl in rw:
+                                ### Get corresponding index in data variable
+                                dataIndexWl = self.parameters.data.W[dataIndexPattern].index(wl)
                                 ### Tune
                                 self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
                                 ### Iterate over positions
@@ -575,40 +579,52 @@ class imagingScan(QObject):
                                     ### Acquire
                                     measurements = multipleAI.acquire(sn)
                                     ### Append data
-                                    posx.append(x)
-                                    posy.append(y)
-                                    indx.append(ix)
-                                    indy.append(iy)
-                                    voltages.append(measurements)
-                                    wavelengths.append(wl)
+                                    # posx.append(x)
+                                    # posy.append(y)
+                                    # indx.append(ix)
+                                    # indy.append(iy)
+                                    # voltages.append(measurements)
+                                    # wavelengths.append(wl)
+                                    self.parameters.data.Vtemp[dataIndexPattern][dataIndexWl].append(measurements)
                         except Exception as exc:
                             print('Scan did not complete:\n{}'.format(exc))
                             print('Partial data may still be usable.')
                     ### Clear acquisition task
                     multipleAI.clear_task()
-                ### Format data
-                data = np.zeros((len(voltages), 8)) # x, y, wl, X, Y, R
-                try:
-                    for i, v in enumerate(voltages):
-                        data[i, 0] = wavelengths[i]
-                        data[i, 1] = indx[i]
-                        data[i, 2] = posx[i]
-                        data[i, 3] = indy[i]
-                        data[i, 4] = posy[i]
-                        data[i, 5] = np.sum(v[0])/sn # Lock-in X
-                        data[i, 6] = np.sum(v[1])/sn # Lock-in Y
-                        data[i, 7] = (np.sqrt(np.power(data[i, 1], 2) +
-                                            np.power(data[i, 2], 2))) # Lock-in R
-                    ### Flip data order if it was reversed by repeat
-                    # if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
-                    #     or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
-                    #     data = np.flip(data, 0)
-                except Exception as exc:
-                    print('Data formatting did not complete:\n{}'.format(exc))
-                    print('Data was not saved.')
-                # data = data[data[:, 0] != 0] # Remove zero-wavelength values
-                # print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
-                #                                             len(wavelengths)))
+                    ### Increment pattern-counting index
+                    dataIndexPattern += 1
+                    ### Format data
+                    # data = np.zeros((len(voltages), 8)) # x, y, wl, X, Y, R
+                    try:
+                        # for i, v in enumerate(voltages):
+                        #     data[i, 0] = wavelengths[i]
+                        #     data[i, 1] = indx[i]
+                        #     data[i, 2] = posx[i]
+                        #     data[i, 3] = indy[i]
+                        #     data[i, 4] = posy[i]
+                        #     data[i, 5] = np.sum(v[0])/sn # Lock-in X
+                        #     data[i, 6] = np.sum(v[1])/sn # Lock-in Y
+                        #     data[i, 7] = (np.sqrt(np.power(data[i, 1], 2) +
+                        #                         np.power(data[i, 2], 2))) # Lock-in R
+                        ### Flip data order if it was reversed by repeat
+                        # if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
+                        #     or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
+                        #     data = np.flip(data, 0)
+                        for iv, v in enumerate(self.parameters.data.Vtemp):
+                            for iw, _ in enumerate(self.parameters.data.W[iv]):
+                                for ix in self.parameters.data.indices[iv][:, 0]:
+                                    for iy in self.parameters.data.indices[iv][:, 1]:
+                                        liX = np.sum(v[iw][0])/sn # Lock-in X
+                                        liY = np.sum(v[iw][1])/sn # Lock-in Y
+                                        liR = (np.sqrt(np.power(liX, 2) +
+                                                np.power(liY, 2))) # Lock-in R
+                                        self.parameters.data.V[iv][iw][ix][iy] = liR
+                    except Exception as exc:
+                        print('Data formatting did not complete:\n{}'.format(exc))
+                        print('Data was not saved.')
+                    # data = data[data[:, 0] != 0] # Remove zero-wavelength values
+                    # print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
+                    #                                             len(wavelengths)))
             case 'step_all':
                 '''Scan: all wavelenghts at each position'''
                 '''NOT FUNCTIONAL: restructure as one-wl-per-step case'''
@@ -693,5 +709,5 @@ class imagingScan(QObject):
         else:
             currentDirSplit = currentDir.split('/')
         currentFolder = currentDirSplit[-1]
-        np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME_XY), data)
-        return data
+        # np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME_XY), data)
+        return self.parameters.data
