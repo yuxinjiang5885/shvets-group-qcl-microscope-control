@@ -870,74 +870,33 @@ class mainWindow(QMainWindow):
         '''Plot scanning imaging result'''
         self.imagePlotCanvas.clear_plots()
         try:
-            # self.imagePlotCanvas.axes.scatter(data[:,0], data[:,1],
-            #                                 c = defaults.STG_COLORS['pattern'],
-            #                                 marker = '.',
-            #                                 zorder = 40)
-            self.imagePlotCanvas.axes3D = self.imagePlotCanvas.figure.add_subplot(111, projection='3d', proj_type='ortho')
-            self.imagePlotCanvas.axes3D.patch.set_alpha(0)
-            WL, SLICES = [], []
-            ### Create data slices
-            for wl, ix, x, iy, y, r in zip(data[:, 0],
-                                           data[:, 1],
-                                           data[:, 2],
-                                           data[:, 3],
-                                           data[:, 4],
-                                           data[:, 7]):
-                if wl not in WL:
-                    WL.append(wl)
-                    hsSlice = hyperspectralSlice()
-                    hsSlice.Z = np.zeros((4, 4))
-                    hsSlice.wavelength = wl
-                    hsSlice.X.append(x)
-                    hsSlice.Y.append(y)
-                    hsSlice.Z[int(iy), int(ix)] = r
-                    SLICES.append(hsSlice)
-                else:
-                    wli = WL.index(wl)
-                    SLICES[wli].X.append(x)
-                    SLICES[wli].Y.append(y)
-                    SLICES[wli].Z[int(iy), int(ix)] = r
-            ### Sort slices by wavelength
-            ### TODO
-            ### Plot
-            self.imagePlotCanvas.axes3D.plot_surface(np.unique(SLICES[0].X),
-                                                     np.unique(SLICES[0].Y),
-                                                     SLICES[0].Z,
-                                                    cmap = mpl.cm.inferno,
-                                                    linewidth = 0,
-                                                    antialiased = False)
+            # self.imagePlotCanvas.axes3D = self.imagePlotCanvas.figure.add_subplot(111, projection='3d', proj_type='ortho')
+            # self.imagePlotCanvas.axes3D.patch.set_alpha(0)
+            # self.imagePlotCanvas.axes3D.azim = 90
+            # self.imagePlotCanvas.axes3D.elev = 90
+            # # self.imagePlotCanvas.axes3D.set_aspect('equal')
+            # self.imagePlotCanvas.axes3D.set_xlabel('x (μm)')
+            xTravel = defaults.STAGE_X_TRAVEL_UM
+            xMax = 1.1 * xTravel / 2
+            xMin = -1 * xMax
+            # self.imagePlotCanvas.axes3D.set_xlim(xMin, xMax)
+            # self.imagePlotCanvas.axes3D.set_ylabel('y (μm)')
+            yTravel = defaults.STAGE_Y_TRAVEL_UM
+            yMax = 1.1 * yTravel / 2
+            yMin = -1 * yMax
+            # self.imagePlotCanvas.axes3D.set_ylim(yMin, yMax)
+            # self.imagePlotCanvas.axes3D.invert_yaxis() # Positive y is towards user
+            # X, Y = np.meshgrid(data.X[0], data.Y[0])
+            Z = data.V[0][0]
+            # Z = np.random.rand(4,4)
+            # self.imagePlotCanvas.axes3D.set_zlim(np.min(Z), np.max(Z))
+            # self.imagePlotCanvas.axes3D.plot_surface(X, Y, Z,
+            #                                         cmap = mpl.cm.inferno,
+            #                                         linewidth = 0,
+            #                                         antialiased = False)
+            self.imagePlotCanvas.axes.imshow(Z, cmap=mpl.cm.inferno, alpha=.5, interpolation='bilinear',
+                 extent=(xMin, xMax, yMin, yMax), zorder=80)
             self.imagePlotCanvas.figure.canvas.draw()
-            # self.plotCanvas.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-            # # self.plotCanvas.axes.set_ylim(min(
-            # # plotData[:, 1]), max(plotData[-1, 0]))
-            # if self.darkMode.isChecked():
-            #     colorPick = defaults.PLOT_COLOR_DARK
-            # else:
-            #     colorPick = defaults.PLOT_COLOR
-            # self.plotCanvas.plot_line(plotData[:, 0], plotData[:, 3],
-            #                                color = colorPick)
-            # if self.btn['RefEnable'][0].isChecked():
-            #     self.parameters.useRef = True
-            #     if self.wlUnits == 'invcm':
-            #         # plotData = np.flip(data, 0)
-            #         # plotRef = np.flip(self.parameters.reference, 0)
-            #         plotData = data
-            #         plotRef = self.parameters.reference
-            #     else:
-            #         plotData = data
-            #         plotRef = self.parameters.reference
-            #     # self.plotCanvasT.flush_events()
-            #     self.plotCanvasT.axes.set_xlim(plotData[0, 0], plotData[-1, 0])
-            #     if self.darkMode.isChecked():
-            #         colorPick = defaults.PLOT_COLOR_T_DARK
-            #     else:
-            #         colorPick = defaults.PLOT_COLOR_T
-            #     self.plotCanvasT.plot_line(plotData[:, 0],
-            #                                    plotData[:, 3]/plotRef[:, 3],
-            #                                    color = colorPick)
-            # else:
-            #     self.parameters.useRef = False
         except Exception as exc:
             print('Failed to plot data:\n{}'.format(exc))
 
@@ -1580,7 +1539,7 @@ class scanningImagingData():
         self.V.append([])
         for wi, _ in enumerate(self.W[index]):
             self.V[-1].append([])
-            self.V[-1][wi].append(np.zeros((self.Y[index].size, self.X[index].size)))
+            self.V[-1][wi] = np.zeros((self.Y[index].size, self.X[index].size))
 
     def add_Vtemp(self, index = -1):
         '''Make lists to hold voltages during acquisition, one per wl/wn.
@@ -1589,18 +1548,6 @@ class scanningImagingData():
         for wi, _ in enumerate(self.W[index]):
             self.Vtemp[-1].append([])
             self.Vtemp[-1][wi].append([])
-
-    # def add_W(self, wList):
-    #     '''Make wavelength/wavenumber vector out of "wList" and add to list'''
-    #     self.W.append(np.asarray(wList))
-
-    # def add_X(self, xList):
-    #     '''Make positions vector out of "xList" and add to list'''
-    #     self.X.append(np.asarray(xList))
-
-    # def add_Y(self, yList):
-    #     '''Make positions vector out of "yList" and add to list'''
-    #     self.Y.append(np.asarray(yList))
 
 
 class scanningImagingParameters():
