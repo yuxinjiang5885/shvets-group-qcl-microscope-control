@@ -535,6 +535,15 @@ class imagingScan(QObject):
 
     def scan(self):
         '''Run scanning imaging experiment and output data.'''
+        ### Prepare to save data
+        currentDir = os.getcwd()
+        if platform.system() == 'Windows':
+            currentDirSplit = currentDir.split('\\')
+        else:
+            currentDirSplit = currentDir.split('/')
+        scanImagDir = os.path.join(currentDir, defaults.DEF_SCAN_IMAG_SUBFOLDER)
+        os.mkdir(scanImagDir)
+        os.chdir(scanImagDir)
         ### Preamble
         print('Scan started ...')
         # print('One wavelength point per step, avg. of {:.0f} samples at {:.0f} Hz'
@@ -579,12 +588,6 @@ class imagingScan(QObject):
                                     ### Acquire
                                     measurements = multipleAI.acquire(sn)
                                     ### Append data
-                                    # posx.append(x)
-                                    # posy.append(y)
-                                    # indx.append(ix)
-                                    # indy.append(iy)
-                                    # voltages.append(measurements)
-                                    # wavelengths.append(wl)
                                     self.parameters.data.Vtemp[dataIndexPattern][dataIndexWl].append(measurements)
                         except Exception as exc:
                             print('Scan did not complete:\n{}'.format(exc))
@@ -594,34 +597,37 @@ class imagingScan(QObject):
                     ### Increment pattern-counting index
                     dataIndexPattern += 1
                     ### Format data
-                    # data = np.zeros((len(voltages), 8)) # x, y, wl, X, Y, R
-                    try:
-                        # for i, v in enumerate(voltages):
-                        #     data[i, 0] = wavelengths[i]
-                        #     data[i, 1] = indx[i]
-                        #     data[i, 2] = posx[i]
-                        #     data[i, 3] = indy[i]
-                        #     data[i, 4] = posy[i]
-                        #     data[i, 5] = np.sum(v[0])/sn # Lock-in X
-                        #     data[i, 6] = np.sum(v[1])/sn # Lock-in Y
-                        #     data[i, 7] = (np.sqrt(np.power(data[i, 1], 2) +
-                        #                         np.power(data[i, 2], 2))) # Lock-in R
-                        ### Flip data order if it was reversed by repeat
-                        # if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
-                        #     or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
-                        #     data = np.flip(data, 0)
-                        for iv, v in enumerate(self.parameters.data.Vtemp):
-                            for iw, _ in enumerate(self.parameters.data.W[iv]):
-                                for ix in self.parameters.data.indices[iv][:, 0]:
-                                    for iy in self.parameters.data.indices[iv][:, 1]:
-                                        liX = np.sum(v[iw][0])/sn # Lock-in X
-                                        liY = np.sum(v[iw][1])/sn # Lock-in Y
-                                        liR = (np.sqrt(np.power(liX, 2) +
-                                                np.power(liY, 2))) # Lock-in R
-                                        self.parameters.data.V[iv][iw][ix][iy] = liR
-                    except Exception as exc:
-                        print('Data formatting did not complete:\n{}'.format(exc))
-                        print('Data was not saved.')
+                try:
+                    for iv, v in enumerate(self.parameters.data.Vtemp):
+                        ### Save X, Y positions for this pattern
+                        np.savetxt('scan{:03.0f}{}'.format(
+                            iv + 1,
+                            defaults.DEF_FILENAME_SCAN_IMAG_X),
+                            self.parameters.data.X[iv])
+                        np.savetxt('scan{:03.0f}{}'.format(
+                            iv + 1,
+                            defaults.DEF_FILENAME_SCAN_IMAG_Y),
+                            self.parameters.data.Y[iv])
+                        for iw, w in enumerate(self.parameters.data.W[iv]):
+                            for ix in self.parameters.data.indices[iv][:, 0]:
+                                for iy in self.parameters.data.indices[iv][:, 1]:
+                                    liX = np.sum(v[iw][0])/sn # Lock-in X
+                                    liY = np.sum(v[iw][1])/sn # Lock-in Y
+                                    liR = (np.sqrt(np.power(liX, 2) +
+                                            np.power(liY, 2))) # Lock-in R
+                                    self.parameters.data.V[iv][iw][ix][iy] = liR
+                            if self.parameters.units in ['invcm']:
+                                wStr = 'wm-{:05.0f}invcm'.format(w)
+                            else:
+                                wStr = 'wl-{:02.3f}um'.format(w)
+                            np.savetxt('scan{:03.0f}_{}{}'.format(
+                                iv + 1,
+                                wStr,
+                                defaults.DEF_FILENAME_SCAN_IMAG_V),
+                                self.parameters.data.V[iv][iw])
+                except Exception as exc:
+                    print('Data formatting did not complete:\n{}'.format(exc))
+                    print('Data was not saved.')
                     # data = data[data[:, 0] != 0] # Remove zero-wavelength values
                     # print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
                     #                                             len(wavelengths)))
@@ -702,12 +708,14 @@ class imagingScan(QObject):
                 return []
         endRun = timer()
         print('Scan complete (%.3f s).' % (endRun-startRun))
-        '''Save data as text file'''
-        currentDir = os.getcwd()
-        if platform.system() == 'Windows':
-            currentDirSplit = currentDir.split('\\')
-        else:
-            currentDirSplit = currentDir.split('/')
-        currentFolder = currentDirSplit[-1]
+        # '''Save data as text file'''
+        ### Return to experiment folder
+        os.chdir(currentDir)
+        # currentDir = os.getcwd()
+        # if platform.system() == 'Windows':
+        #     currentDirSplit = currentDir.split('\\')
+        # else:
+        #     currentDirSplit = currentDir.split('/')
+        # currentFolder = currentDirSplit[-1]
         # np.savetxt('{}{}'.format(currentFolder, defaults.DEF_FILENAME_XY), data)
         return self.parameters.data

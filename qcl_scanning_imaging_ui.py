@@ -869,34 +869,21 @@ class mainWindow(QMainWindow):
     def plot_scanning_imaging(self, data):
         '''Plot scanning imaging result'''
         self.imagePlotCanvas.clear_plots()
+        wIndex = 0 # Wavelength/number index. Controlled by the scroll bar
         try:
-            # self.imagePlotCanvas.axes3D = self.imagePlotCanvas.figure.add_subplot(111, projection='3d', proj_type='ortho')
-            # self.imagePlotCanvas.axes3D.patch.set_alpha(0)
-            # self.imagePlotCanvas.axes3D.azim = 90
-            # self.imagePlotCanvas.axes3D.elev = 90
-            # # self.imagePlotCanvas.axes3D.set_aspect('equal')
-            # self.imagePlotCanvas.axes3D.set_xlabel('x (μm)')
-            xTravel = defaults.STAGE_X_TRAVEL_UM
-            xMax = 1.1 * xTravel / 2
-            xMin = -1 * xMax
-            # self.imagePlotCanvas.axes3D.set_xlim(xMin, xMax)
-            # self.imagePlotCanvas.axes3D.set_ylabel('y (μm)')
-            yTravel = defaults.STAGE_Y_TRAVEL_UM
-            yMax = 1.1 * yTravel / 2
-            yMin = -1 * yMax
-            # self.imagePlotCanvas.axes3D.set_ylim(yMin, yMax)
-            # self.imagePlotCanvas.axes3D.invert_yaxis() # Positive y is towards user
-            # X, Y = np.meshgrid(data.X[0], data.Y[0])
-            Z = data.V[0][0]
-            # Z = np.random.rand(4,4)
-            # self.imagePlotCanvas.axes3D.set_zlim(np.min(Z), np.max(Z))
-            # self.imagePlotCanvas.axes3D.plot_surface(X, Y, Z,
-            #                                         cmap = mpl.cm.inferno,
-            #                                         linewidth = 0,
-            #                                         antialiased = False)
-            self.imagePlotCanvas.axes.imshow(Z, cmap=mpl.cm.inferno, alpha=.5, interpolation='bilinear',
-                 extent=(xMin, xMax, yMin, yMax), zorder=80)
-            self.imagePlotCanvas.figure.canvas.draw()
+            for iv, v in enumerate(data.V):
+                xMin = np.min(data.X[iv])
+                xMax = np.max(data.X[iv])
+                yMin = np.min(data.Y[iv])
+                yMax = np.max(data.Y[iv])
+                Z = v[wIndex]
+                self.imagePlotCanvas.axes.imshow(Z,
+                    cmap=mpl.cm.inferno,
+                    alpha=1.,
+                    interpolation='bilinear',
+                    extent=(xMin, xMax, yMin, yMax),
+                    zorder=80)
+                self.imagePlotCanvas.figure.canvas.draw()
         except Exception as exc:
             print('Failed to plot data:\n{}'.format(exc))
 
