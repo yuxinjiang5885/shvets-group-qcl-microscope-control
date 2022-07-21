@@ -528,7 +528,7 @@ class imagingScan(QObject):
         #     data = self.sweep()
         # else: # Default to step-and-measure
         #     data = self.scan()
-        data = self.scan()
+        self.parameters.data = self.scan()
         self.outData.emit(self.parameters.data)
         self.outParams.emit(self.parameters)
         self.finished.emit()
@@ -609,13 +609,15 @@ class imagingScan(QObject):
                             defaults.DEF_FILENAME_SCAN_IMAG_Y),
                             self.parameters.data.Y[iv])
                         for iw, w in enumerate(self.parameters.data.W[iv]):
-                            for ix in self.parameters.data.indices[iv][:, 0]:
-                                for iy in self.parameters.data.indices[iv][:, 1]:
-                                    liX = np.sum(v[iw][0])/sn # Lock-in X
-                                    liY = np.sum(v[iw][1])/sn # Lock-in Y
+                            vpos = 0
+                            for ix, iy in zip(self.parameters.data.indices[iv][:, 0],
+                                self.parameters.data.indices[iv][:, 1]):
+                                    liX = np.sum(v[iw][vpos][0])/sn # Lock-in X
+                                    liY = np.sum(v[iw][vpos][1])/sn # Lock-in Y
                                     liR = (np.sqrt(np.power(liX, 2) +
                                             np.power(liY, 2))) # Lock-in R
                                     self.parameters.data.V[iv][iw][ix][iy] = liR
+                                    vpos += 1
                             if self.parameters.units in ['invcm']:
                                 wStr = 'wm-{:05.0f}invcm'.format(w)
                             else:

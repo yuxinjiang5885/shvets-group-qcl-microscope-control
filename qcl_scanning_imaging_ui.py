@@ -876,13 +876,18 @@ class mainWindow(QMainWindow):
                 xMax = np.max(data.X[iv])
                 yMin = np.min(data.Y[iv])
                 yMax = np.max(data.Y[iv])
-                Z = v[wIndex]
-                self.imagePlotCanvas.axes.imshow(Z,
+                self.imagePlotCanvas.axes.set_xlim(xMin, xMax)
+                self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
+                # self.imagePlotCanvas.axes.invert_yaxis() # Positive y is towards user
+                self.imagePlotCanvas.axes.invert_xaxis()
+                Z = np.flip(np.transpose(v[wIndex]), axis = 1)
+                img = self.imagePlotCanvas.axes.imshow(Z,
                     cmap=mpl.cm.inferno,
                     alpha=1.,
                     interpolation='bilinear',
                     extent=(xMin, xMax, yMin, yMax),
                     zorder=80)
+                self.imagePlotCanvas.plots.append(img)
                 self.imagePlotCanvas.figure.canvas.draw()
         except Exception as exc:
             print('Failed to plot data:\n{}'.format(exc))
@@ -1059,6 +1064,7 @@ class mainWindow(QMainWindow):
             return
         ### Show patterns on plot
         self.update_scanning_imaging_plot()
+        self.scanImagParameters = scanningImagingParameters()
         ### Read and compile general experiment parameters
         self.scanImagParameters.laser = self.laser
         self.scanImagParameters.stage = self.stage
@@ -1111,7 +1117,7 @@ class mainWindow(QMainWindow):
             self.scanImagParameters.data.W.append(wlwnList)
             xVector = np.sort(np.unique(np.asarray(pattern[:, 0])))
             self.scanImagParameters.data.X.append(xVector)
-            yVector = np.sort(np.unique(np.asarray(pattern[:, 0])))
+            yVector = np.sort(np.unique(np.asarray(pattern[:, 1])))
             self.scanImagParameters.data.Y.append(yVector)
             self.scanImagParameters.data.add_V()
             self.scanImagParameters.data.add_Vtemp()
@@ -1526,7 +1532,7 @@ class scanningImagingData():
         self.V.append([])
         for wi, _ in enumerate(self.W[index]):
             self.V[-1].append([])
-            self.V[-1][wi] = np.zeros((self.Y[index].size, self.X[index].size))
+            self.V[-1][wi] = np.zeros((self.X[index].size, self.Y[index].size))
 
     def add_Vtemp(self, index = -1):
         '''Make lists to hold voltages during acquisition, one per wl/wn.
@@ -1534,7 +1540,7 @@ class scanningImagingData():
         self.Vtemp.append([])
         for wi, _ in enumerate(self.W[index]):
             self.Vtemp[-1].append([])
-            self.Vtemp[-1][wi].append([])
+            # self.Vtemp[-1][wi].append([])
 
 
 class scanningImagingParameters():
