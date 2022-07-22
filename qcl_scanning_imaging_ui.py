@@ -880,11 +880,13 @@ class mainWindow(QMainWindow):
                 self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
                 # self.imagePlotCanvas.axes.invert_yaxis() # Positive y is towards user
                 self.imagePlotCanvas.axes.invert_xaxis()
-                Z = np.flip(np.transpose(v[wIndex]), axis = 1)
+                # Z = np.transpose(v[wIndex])
+                # Z = np.flip(np.transpose(v[wIndex]), axis = 1)
+                Z = np.flip(np.transpose(v[wIndex]), axis = 0)
                 img = self.imagePlotCanvas.axes.imshow(Z,
                     cmap=mpl.cm.inferno,
                     alpha=1.,
-                    interpolation='bilinear',
+                    interpolation='none',
                     extent=(xMin, xMax, yMin, yMax),
                     zorder=80)
                 self.imagePlotCanvas.plots.append(img)
@@ -1063,7 +1065,7 @@ class mainWindow(QMainWindow):
             self.btn['Sweep'][0].setChecked(False)
             return
         ### Show patterns on plot
-        self.update_scanning_imaging_plot()
+        self.update_scanning_imaging_plot_patterns()
         self.scanImagParameters = scanningImagingParameters()
         ### Read and compile general experiment parameters
         self.scanImagParameters.laser = self.laser
@@ -1134,6 +1136,7 @@ class mainWindow(QMainWindow):
         self.worker.parameters = self.scanImagParameters
         self.worker.moveToThread(self.threadRun)
         self.threadRun.started.connect(self.worker.run)
+        # self.worker.stageMoved.connect(self.update_scanning_imaging_plot_position)
         self.worker.finished.connect(self.threadRun.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.threadRun.finished.connect(self.threadRun.deleteLater)
@@ -1188,8 +1191,8 @@ class mainWindow(QMainWindow):
            may be re-used with "repeat".'''
         self.parameters = parameters
 
-    def update_scanning_imaging_plot(self):
-        '''Update patterns on imaging scanning plot.'''
+    def update_scanning_imaging_plot_patterns(self):
+        '''Update patterns on imaging scanning stage position plot.'''
         for p in self.stagePlotCanvas.patterns:
             p.remove()
         self.stagePlotCanvas.patterns = [] # Re-initialize list
@@ -1250,6 +1253,27 @@ class mainWindow(QMainWindow):
                                                    color = 'k',
                                                    zorder = 7)
                 self.stagePlotCanvas.patterns.append(arrow)
+        self.stagePlotCanvas.figure.canvas.draw()
+
+    def update_scanning_imaging_plot_position(self, x = 0, y = 0):
+        '''Update stage position on imaging scanning stage position plot.'''
+        self.stagePlotCanvas.clear_plots()
+        plot = self.stagePlotCanvas.axes.scatter(x, y,
+            c = defaults.STG_COLORS['marker'],
+            marker = '+',
+            zorder = 10)
+        self.stagePlotCanvas.plots.append(plot)
+        if (np.abs(x) < 1000) or (np.abs(y) < 1000):
+            textStr = '{:.0f}, {:.0f}'.format(x, y)
+        else:
+            textStr = '{:.0f},\n{:.0f}'.format(x, y)
+        text = self.stagePlotCanvas.axes.text(x + 2000, y + 0, textStr,
+                        color = defaults.STG_COLORS['text'],
+                        fontsize = 10,
+                        zorder = 11)
+        self.stagePlotCanvas.plots.append(text)
+        titleString = 'Stage Position: x {:.0f} μm, y  {:.0f} μm'.format(x, y)
+        self.stagePlotCanvas.axes.set_title(titleString)
         self.stagePlotCanvas.figure.canvas.draw()
 
     def update_scanning_imaging_parameters(self, parameters):

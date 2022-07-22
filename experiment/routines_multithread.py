@@ -412,6 +412,7 @@ class imagingScan(QObject):
     # outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
     outData = pyqtSignal(object) # Return data to UI for plotting
     outParams = pyqtSignal(object) # Return parameters for re-use with "re"
+    # stageMoved = pyqtSignal(float, float)
     # startedOne = pyqtSignal(int)
     # stopped = False
 
@@ -582,9 +583,16 @@ class imagingScan(QObject):
                                 self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
                                 ### Iterate over positions
                                 for x, y, ix, iy in zip(p[:, 0], p[:, 1], ind[:, 0], ind[:, 1]):
+                                    ### Move stage
                                     self.parameters.stage.goto(x, y)
                                     while int(self.parameters.stage.busy()) > 0:
                                         time.sleep(0.1)
+                                    (stgx, stgy) = self.parameters.stage.get_position()
+                                    # print('{}/{} patterns, '.format(), end ='')
+                                    # print('{}/{} wavelengths, '.format(), end ='')
+                                    print('Scanning: x {:.0f} μm, y {:.0f} μm'.format(
+                                        stgx, stgy), end='\r')
+                                    # self.stageMoved.emit(stgx, stgy)
                                     ### Acquire
                                     measurements = multipleAI.acquire(sn)
                                     ### Append data

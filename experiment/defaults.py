@@ -207,7 +207,7 @@ IMAG_SCAN_STEP_X_UM = 4000
 IMAG_SCAN_STEP_Y_UM = 4000
 IMAG_SCAN_SIZE_X_UM = 4
 IMAG_SCAN_SIZE_Y_UM = 4
-IMAG_SCAN_WL_LIST = '5.5, 6, 7'
+IMAG_SCAN_WL_LIST = '6.7'
 
 ### Gamepad
 GAMEPAD_UPDATE_INTERVAL_S = 0.1 # update interval for the gamepad loop, s

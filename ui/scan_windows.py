@@ -145,7 +145,7 @@ class scanUI(QWidget):
                                     defaults.MAX_SWEEP_SPEED_UM)), 4, 3, 1, 1]
         self.inputFields['speed'][0].setToolTip('Sweep speed')
         for _, k in self.inputFields.items(): # Arrange labels in grid
-            k[0].returnPressed.connect(lambda: self.mainGUI.update_scanning_imaging_plot())
+            k[0].returnPressed.connect(lambda: self.mainGUI.update_scanning_imaging_plot_patterns())
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
