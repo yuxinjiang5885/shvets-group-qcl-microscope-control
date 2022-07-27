@@ -159,9 +159,9 @@ class laser():
             print('Laser emission already enabled.')
             return
         ret = SDK.MIRcatSDK_TurnEmissionOn()
-        while not self.isEmitting.value:
-            SDK.MIRcatSDK_IsEmissionOn(byref(self.isEmitting))
-            time.sleep(0.5) # DLS default wait: 0.5 s
+        # while not self.isEmitting.value:
+        #     SDK.MIRcatSDK_IsEmissionOn(byref(self.isEmitting))
+        #     time.sleep(0.5) # DLS default wait: 0.5 s
         print('Laser emission enabled.')
 
     def exit_program(self):
