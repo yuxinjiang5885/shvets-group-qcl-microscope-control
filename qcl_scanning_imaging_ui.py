@@ -695,9 +695,9 @@ class mainWindow(QMainWindow):
         self.tabImagButtons['Start'][0].clicked.connect(lambda: self.run_scanning_imaging())
         ### Scanning imaging tab - Drop-down scan pattern menu
         self.tabImageDropdowns = dict()
-        self.tabImageDropdowns['ScanPattern'] = [QComboBox(), 11, 6, 1, 3]
-        self.tabImageDropdowns['ScanPattern'][0].addItem('Auto')
-        self.tabImageDropdowns['ScanPattern'][0].addItem('Raster')
+        # self.tabImageDropdowns['ScanPattern'] = [QComboBox(), 11, 6, 1, 3]
+        # self.tabImageDropdowns['ScanPattern'][0].addItem('Auto')
+        # self.tabImageDropdowns['ScanPattern'][0].addItem('Raster')
         self.tabImageDropdowns['ScanMode'] = [QComboBox(), 11, 9, 1, 3]
         self.tabImageDropdowns['ScanMode'][0].addItem('Step (one wavelength each position)')
         self.tabImageDropdowns['ScanMode'][0].addItem('Step (all wavelengths each position')
@@ -1064,6 +1064,14 @@ class mainWindow(QMainWindow):
             # GUIInstance.btn['Stop'][0].setChecked(False)
             self.btn['Sweep'][0].setChecked(False)
             return
+        ### Disable stage joystick(s)
+        self.stageMotionWindow.stage.joystick(enable=False)
+        self.stageMotionWindow.inputMethods['hw'][0].setChecked(False)
+        if self.stageMotionWindow.threadG not in [[]]:
+            if self.stageMotionWindow.threadG.isRunning:
+                self.workerG.stop = True
+                self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
+        print('All stage joysticks disabled')
         ### Show patterns on plot
         self.update_scanning_imaging_plot_patterns()
         self.scanImagParameters = scanningImagingParameters()

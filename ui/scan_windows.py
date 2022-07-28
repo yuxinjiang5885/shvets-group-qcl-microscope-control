@@ -7,14 +7,14 @@ Created 2022-Jun-24
 '''
 
 import experiment.defaults as defaults
-from PyQt6.QtGui import QAction, QFont
-from PyQt6.QtWidgets import (QGridLayout,
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (QComboBox,
+                             QGridLayout,
                              QLabel,
                              QLineEdit,
                              QPushButton,
                              QTabWidget,
                              QTextEdit,
-                             QToolBar,
                              QSizePolicy,
                              QWidget)
 
@@ -92,20 +92,22 @@ class scanUI(QWidget):
         self.labels['Step'] = [QLabel('Step (μm)'), 0, 2, 1, 1]
         self.labels['x'] = [QLabel('x'), 1, 0, 1, 1]
         self.labels['y'] = [QLabel('y'), 2, 0, 1, 1]
+        self.labels['RasterDir'] = [QLabel('Raster direction'), 3, 0, 1, 1]
         self.labels['SamplingRate'] = [QLabel('Sampl. Rate (Hz)'),
-                                            3, 1, 1, 1]
+                                            5, 1, 1, 1]
         self.labels['SamplesPerWl'] = [QLabel('Sampl. per Wl.'),
-                                            3, 2, 1, 1]
-        self.labels['Speed'] = [QLabel('Speed (μm/s)'), 3, 3, 1, 1]
+                                            5, 2, 1, 1]
+        self.labels['Speed'] = [QLabel('Speed (μm/s)'), 5, 3, 1, 1]
         for _, k in self.labels.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Buttons
         self.buttons = dict() # [button, row, col, rowSpan, colSpan]
-        self.buttons['ScanSizeN'] = [QPushButton('Scan size\n(μm)'), 0, 3, 1, 1]
+        self.buttons['ScanSizeN'] = [QPushButton('Scan points'), 0, 3, 1, 1]
+        # 'Scan size\n(μm)'
         self.buttons['ScanSizeN'][0].setToolTip('Toggle between scan size and number of points')
-        self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 5, 0, 3, 1]
+        self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 6, 0, 3, 1]
         self.buttons['WlWn'][0].setToolTip('Toggle between wavelengths and wavenumbers')
         for x, k in self.buttons.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
@@ -134,24 +136,34 @@ class scanUI(QWidget):
                                     defaults.IMAG_SCAN_SIZE_X_UM )), 2, 3, 1, 1]
         self.inputFields['ySizeN'][0].setToolTip('Scan x size')
         self.inputFields['samplingRate'] = [QLineEdit('{}'.format(
-                                    defaults.DEF_SAMPLERATE)), 4, 1, 1, 1]
+                                    defaults.DEF_SAMPLERATE)), 6, 1, 1, 1]
         self.inputFields['samplingRate'][0].setToolTip(
                                     'Acquisition card sampling rate')
         self.inputFields['samplesPerWl'] = [QLineEdit('{}'.format(
-                                    defaults.DEF_SAMPLES)), 4, 2, 1, 1]
+                                    defaults.DEF_SAMPLES)), 6, 2, 1, 1]
         self.inputFields['samplesPerWl'][0].setToolTip(
                                     'Voltage points per wavelength/number step')
         self.inputFields['speed'] = [QLineEdit('{}'.format(
-                                    defaults.MAX_SWEEP_SPEED_UM)), 4, 3, 1, 1]
+                                    defaults.MAX_SWEEP_SPEED_UM)), 6, 3, 1, 1]
         self.inputFields['speed'][0].setToolTip('Sweep speed')
         for _, k in self.inputFields.items(): # Arrange labels in grid
             k[0].returnPressed.connect(lambda: self.mainGUI.update_scanning_imaging_plot_patterns())
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Drop-down raster pattern direction selector
+        self.scanDropdowns = dict()
+        self.scanDropdowns['RasterDir'] = [QComboBox(), 4, 0, 1, 2]
+        self.scanDropdowns['RasterDir'][0].addItem('Longest side')
+        self.scanDropdowns['RasterDir'][0].addItem('Along x')
+        self.scanDropdowns['RasterDir'][0].addItem('Along y')
+        for x, k in self.scanDropdowns.items(): # Arrange buttons in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_COMBOBOX)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Text field for list of wavelengths or wavenumbers
         self.wlwnList = QTextEdit(defaults.IMAG_SCAN_WL_LIST)
         self.wlwnList.setFont(font)
         self.wlwnList.setStyleSheet(defaults.STYLE_TEXT)
         self.wlwnList.setToolTip('List of wavelengths (format: 1000, 1100:1200, ...)')
-        self.grid.addWidget(self.wlwnList, 5, 1, 3, 4)
+        self.grid.addWidget(self.wlwnList, 7, 1, 2, 4)

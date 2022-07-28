@@ -345,12 +345,35 @@ STYLE_BUTTON_UNIT = '''QPushButton {{
                  GS_COLORS['text'],
                  GS_COLORS['hover'],
                  GS_COLORS['hover'])
-STYLE_COMBOBOX ='''QComboBox {{
+STYLE_COMBOBOX =''' QComboBox {{
         color: {};
         border: 2px solid {};
         border-radius: 5px;
-    }}'''.format(GS_COLORS['text-lo'],
-                 GS_COLORS['border'])
+    }}
+    ::drop-down {{
+        width: 25px;
+    }}
+    ::down-arrow {{
+        border-radius: 2px;
+        border: 2px solid {};
+        image: url(icons/arrow.png);
+        height: 14px;
+        width: 14px;
+    }}
+    ::down-arrow:on {{
+        top: 1px;
+        left: 1px;
+    }}
+    QListView {{
+        border: 1px solid {};
+        border-radius: 5px;
+        color: {};
+    }}
+    '''.format(GS_COLORS['text-lo'],
+               GS_COLORS['border'],
+               GS_COLORS['border'],
+               GS_COLORS['border'],
+               GS_COLORS['text-lo'])
 STYLE_CONTAINER = '''QWidget {{
         background-color: {};
     }}'''.format(GS_COLORS['background'])
