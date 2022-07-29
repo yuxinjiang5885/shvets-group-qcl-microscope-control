@@ -324,6 +324,11 @@ class mainWindow(QMainWindow):
         self.repeatShow.setChecked(True) # Checked by default
         self.repeatShow.setStatusTip('Update plots when using "Repeat"')
         optionsMenu.addAction(self.repeatShow)
+        self.imageViewAbove = QAction(QIcon(None),
+                          'Show image from above', self, checkable=True)
+        self.imageViewAbove.setChecked(True) # Checked by default
+        self.imageViewAbove.setStatusTip('Show image as if from above the stage')
+        optionsMenu.addAction(self.imageViewAbove)
         self.darkMode = QAction(QIcon(None), 'Dark mode', self, checkable=True, checked=True)
         self.darkMode.setShortcut('Ctrl+D')
         self.darkMode.setStatusTip('Dark mode for plots')
@@ -372,8 +377,6 @@ class mainWindow(QMainWindow):
                 self.tabSingleGrid.setColumnStretch(col, 2)
             if col in [2, 4, 6]: # Scl setting labels
                 self.tabSingleGrid.setColumnStretch(col, 1)
-            # elif col in [3]:
-            #     self.tabSingleGrid.setColumnStretch(col, 4)
             else:
                 self.tabSingleGrid.setColumnStretch(col, 20)
         ### Plot: latest spectrum
@@ -488,6 +491,7 @@ class mainWindow(QMainWindow):
         for _, k in self.inputField.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_INPUT)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Labels: headers, in a dict for ease of positioning
         self.labelHead = dict() # [label, row, col, rowSpan, colSpan]
@@ -500,6 +504,7 @@ class mainWindow(QMainWindow):
         for _, k in self.labelHead.items(): # Arrange labels in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
+            # k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Labels: experiment controls sub-headers
         self.labelSubHead = dict() # [label, row, col, rowSpan, colSpan]
@@ -521,12 +526,13 @@ class mainWindow(QMainWindow):
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
             self.tabSingleGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+            # k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         # Labels: instrument readings, in a dict for reference by other methods
         self.labelInstr = dict() # [label, row, col, rowSpan, colSpan]
         # Labels: read currents
         for qcl in range(1, self.laser.numQCL + 1):
             labelString = 'QCL{:d}Current'.format(qcl)
-            self.labelInstr[labelString] = QLabel('n/a')
+            self.labelInstr[labelString] = QLabel('n/a\nn/a')
             self.labelInstr[labelString].setFont(font)
             self.labelInstr[labelString].setStyleSheet(defaults.STYLE_LABEL_READ_ALT)
             self.labelInstr[labelString].setToolTip('Reading from laser')
@@ -617,7 +623,7 @@ class mainWindow(QMainWindow):
         darkBackground = defaults.DARK_PLOT_BACKGROUND
         darkColor = defaults.PLOT_COLOR_DARK
         self.stagePlotCanvas.recolor(darkAxes, darkBackground, darkColor)
-        self.tabImagGrid.addWidget(self.stagePlotCanvas, 0, 0, 4, 4)
+        self.tabImagGrid.addWidget(self.stagePlotCanvas, 0, 0, 4, 6)
         ### Scanning imaging tab - Plot: image
         self.imagePlotCanvas = mplCanvas(width=5, height=4)
         self.imagePlotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
@@ -640,22 +646,14 @@ class mainWindow(QMainWindow):
         yMin = -1 * yMax
         self.imagePlotCanvas.axes.set_axisbelow(True)
         self.imagePlotCanvas.axes.grid(color='gray', linestyle='dashed')
-        patch = mpl.patches.Rectangle((xMin, yMin), xTravel, yTravel,
-                                    alpha = 0.5,
-                                    edgecolor = defaults.STG_COLORS['edge'],
-                                    facecolor = defaults.STG_COLORS['fill'],
-                                    fill = True,
-                                    lw = 2,
-                                    zorder = 1)
-        self.imagePlotCanvas.axes.add_patch(patch)
         darkAxes = defaults.DARK_PLOT_AXES
         darkBackground = defaults.DARK_PLOT_BACKGROUND
         darkColor = defaults.PLOT_COLOR_DARK
         self.imagePlotCanvas.recolor(darkAxes, darkBackground, darkColor)
         self.tabImagGrid.addWidget(self.imagePlotCanvas, 0, 6, 4, 4)
         ### Scanning imaging tab - Image wavelength/wavenumber selector
-        self.imageWlSlider = QSlider(Qt.Orientation.Horizontal)
-        self.tabImagGrid.addWidget(self.imageWlSlider, 4, 6, 1, 6)
+        # self.imageWlSlider = QSlider(Qt.Orientation.Horizontal)
+        # self.tabImagGrid.addWidget(self.imageWlSlider, 4, 6, 1, 6)
         ### Scanning imaging tab - Scan browser
         self.scanBrowser = scanBrowser(self)
         self.tabImagGrid.addWidget(self.scanBrowser, 7, 0, 6, 6)
@@ -669,9 +667,9 @@ class mainWindow(QMainWindow):
         self.scanFilePath.setStyleSheet(defaults.STYLE_INPUT)
         self.tabImagGrid.addWidget(self.scanFilePath, 8, 6, 1, 6)
         self.tabImagButtons = dict()
-        self.tabImagButtons['Update'] = [QPushButton('Update'), 13, 0, 2, 3]
+        self.tabImagButtons['Update'] = [QPushButton('Update'), 13, 0, 1, 3]
         self.tabImagButtons['Update'][0].setToolTip('Update scan in plot')
-        self.tabImagButtons['Clear'] = [QPushButton('Clear'), 13, 3, 2, 3]
+        self.tabImagButtons['Clear'] = [QPushButton('Clear'), 13, 3, 1, 3]
         self.tabImagButtons['Clear'][0].setToolTip('Clear scans')
         self.tabImagButtons['Save'] = [QPushButton('Save'), 9, 6, 1, 2]
         self.tabImagButtons['Save'][0].setToolTip('Save scan file')
@@ -707,6 +705,22 @@ class mainWindow(QMainWindow):
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_COMBOBOX)
             self.tabImagGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Scanning imaging tab - set grid spacing
+        self.tabImagGrid.setSpacing(10)
+        for row in range(0, 14): # Set row stretch
+            self.tabImagGrid.setRowStretch(row, 1)
+            # if row in [0]:
+            #     self.tabImagGrid.setRowStretch(row, 8)
+            # else:
+            #     self.tabImagGrid.setRowStretch(row, 1)
+        for col in range(0, 11): # Set column stretch
+            self.tabImagGrid.setColumnStretch(col, 1)
+            # if col in [1, 3, 5]: # QCL settings
+            #     self.tabImagGrid.setColumnStretch(col, 2)
+            # if col in [2, 4, 6]: # Scl setting labels
+            #     self.tabImagGrid.setColumnStretch(col, 1)
+            # else:
+            #     self.tabImagGrid.setColumnStretch(col, 20)
         ### Show main application window
         self.show()
 
@@ -878,11 +892,11 @@ class mainWindow(QMainWindow):
                 yMax = np.max(data.Y[iv])
                 self.imagePlotCanvas.axes.set_xlim(xMin, xMax)
                 self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
-                # self.imagePlotCanvas.axes.invert_yaxis() # Positive y is towards user
-                self.imagePlotCanvas.axes.invert_xaxis()
-                # Z = np.transpose(v[wIndex])
-                # Z = np.flip(np.transpose(v[wIndex]), axis = 1)
-                Z = np.flip(np.transpose(v[wIndex]), axis = 0)
+                if self.imageViewAbove.isChecked():
+                    self.imagePlotCanvas.axes.invert_xaxis()
+                    Z = np.flip(np.transpose(v[wIndex]), axis = 0)
+                else:
+                    Z = np.transpose(v[wIndex])
                 img = self.imagePlotCanvas.axes.imshow(Z,
                     cmap=mpl.cm.inferno,
                     alpha=1.,
@@ -936,7 +950,7 @@ class mainWindow(QMainWindow):
 
     def reference_enable(self):
         '''Enable use of reference'''
-        if self.btn['RefEnable'][0].isChecked:
+        if self.btn['RefEnable'][0].isChecked():
             self.btn['RefEnable'][0].setText('Ref. ON')
         else:
             self.btn['RefEnable'][0].setText('Ref. Off')
@@ -1464,8 +1478,8 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.tabSingleGrid = QGridLayout()
         self.containerMultiple.setLayout(self.tabSingleGrid)
         self.tabSingleGrid.setSpacing(10)
-        for row in range(0, 9): # Set row spacing
-            self.tabSingleGrid.setRowStretch(row, 1)
+        # for row in range(0, defaults.NUMBER_OF_ROWS): # Set row spacing
+        #     self.tabSingleGrid.setRowStretch(row, 1)
         ### Buttons
         self.btn = dict() # Contains buttons: [btn, row, col, rowSpan, colSpan]
         self.btn['Start'] = [QPushButton('Start'), 5, 0, 2, 1]

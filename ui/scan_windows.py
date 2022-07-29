@@ -107,7 +107,7 @@ class scanUI(QWidget):
         self.buttons['ScanSizeN'] = [QPushButton('Scan points'), 0, 3, 1, 1]
         # 'Scan size\n(μm)'
         self.buttons['ScanSizeN'][0].setToolTip('Toggle between scan size and number of points')
-        self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 6, 0, 3, 1]
+        self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 7, 0, 2, 1]
         self.buttons['WlWn'][0].setToolTip('Toggle between wavelengths and wavenumbers')
         for x, k in self.buttons.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
@@ -166,4 +166,4 @@ class scanUI(QWidget):
         self.wlwnList.setFont(font)
         self.wlwnList.setStyleSheet(defaults.STYLE_TEXT)
         self.wlwnList.setToolTip('List of wavelengths (format: 1000, 1100:1200, ...)')
-        self.grid.addWidget(self.wlwnList, 7, 1, 2, 4)
+        self.grid.addWidget(self.wlwnList, 7, 1, 2, 3)
