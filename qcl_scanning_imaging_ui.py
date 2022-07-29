@@ -195,7 +195,8 @@ class mainWindow(QMainWindow):
         # else:
         #     event.ignore()
 
-    def construct_pattern(self, xOrig = defaults.IMAG_SCAN_ORIGIN_X_UM,
+    def construct_pattern(self, scanDir = 0,
+                                xOrig = defaults.IMAG_SCAN_ORIGIN_X_UM,
                                 yOrig = defaults.IMAG_SCAN_ORIGIN_Y_UM,
                                 xSizeN = defaults.IMAG_SCAN_SIZE_X_UM,
                                 ySizeN = defaults.IMAG_SCAN_SIZE_Y_UM,
@@ -1105,13 +1106,15 @@ class mainWindow(QMainWindow):
             yStep = int(s.inputFields['yStep'][0].text())
             xSizeN = int(s.inputFields['xSizeN'][0].text())
             ySizeN = int(s.inputFields['ySizeN'][0].text())
+            scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
-            pattern, indices = self.construct_pattern(xOrig = xOrig,
-                                             yOrig = yOrig,
-                                             xSizeN = xSizeN,
-                                             ySizeN = ySizeN,
-                                             xStep = xStep,
-                                             yStep = yStep)
+            pattern, indices = self.construct_pattern(scanDir,
+                xOrig = xOrig,
+                yOrig = yOrig,
+                xSizeN = xSizeN,
+                ySizeN = ySizeN,
+                xStep = xStep,
+                yStep = yStep)
             samplesPerWl = int(s.inputFields['samplesPerWl'][0].text())
             samplingRate = int(s.inputFields['samplingRate'][0].text())
             speed = float(s.inputFields['speed'][0].text())

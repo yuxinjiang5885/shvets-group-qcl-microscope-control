@@ -154,9 +154,9 @@ class scanUI(QWidget):
         ### Drop-down raster pattern direction selector
         self.scanDropdowns = dict()
         self.scanDropdowns['RasterDir'] = [QComboBox(), 4, 0, 1, 2]
-        self.scanDropdowns['RasterDir'][0].addItem('Longest side')
-        self.scanDropdowns['RasterDir'][0].addItem('Along x')
-        self.scanDropdowns['RasterDir'][0].addItem('Along y')
+        self.scanDropdowns['RasterDir'][0].addItem('Longest side', 0)
+        self.scanDropdowns['RasterDir'][0].addItem('Along x', 1)
+        self.scanDropdowns['RasterDir'][0].addItem('Along y', 2)
         for x, k in self.scanDropdowns.items(): # Arrange buttons in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_COMBOBOX)
