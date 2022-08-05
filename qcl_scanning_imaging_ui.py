@@ -208,19 +208,49 @@ class mainWindow(QMainWindow):
         indexx = []
         patterny = []
         indexy = []
-        for xs in range(0, xSizeN):
-            if (invert in ['even', 'Even'] and (xs % 2 == 0)) or \
-               (invert in ['odd', 'Odd'] and (xs % 2 == 0)):
-                yRange = range(ySizeN - 1, -1, -1)
-            else:
-                yRange = range(0, ySizeN)
-            for ys in yRange:
-                x = xs * xStep + xOrig
-                y = ys * yStep + yOrig
-                patternx.append(x)
-                indexx.append(xs)
-                patterny.append(y)
-                indexy.append(ys)
+        match scanDir:
+            ### Scan along longest side
+            case 0:
+                if ySizeN * yStep > xSizeN * xStep:
+                    scanPatternDir = 'x'
+                else:
+                    scanPatternDir = 'y'
+            ### Scan along x, turn along y
+            case 1:
+                scanPatternDir = 'x'
+            case 2:
+                scanPatternDir = 'y'
+        match scanPatternDir:
+            ### Scan along x, turn along y
+            case 'x':
+                for ys in range(0, ySizeN):
+                    if (invert in ['even', 'Even'] and (ys % 2 == 0)) or \
+                    (invert in ['odd', 'Odd'] and (ys % 2 == 0)):
+                        xRange = range(xSizeN - 1, -1, -1)
+                    else:
+                        xRange = range(0, xSizeN)
+                    for xs in xRange:
+                        y = ys * yStep + yOrig
+                        x = xs * xStep + xOrig
+                        patternx.append(x)
+                        indexx.append(xs)
+                        patterny.append(y)
+                        indexy.append(ys)
+            ### Scan along y, turn along x
+            case 'y':
+                for xs in range(0, xSizeN):
+                    if (invert in ['even', 'Even'] and (xs % 2 == 0)) or \
+                    (invert in ['odd', 'Odd'] and (xs % 2 == 0)):
+                        yRange = range(ySizeN - 1, -1, -1)
+                    else:
+                        yRange = range(0, ySizeN)
+                    for ys in yRange:
+                        x = xs * xStep + xOrig
+                        y = ys * yStep + yOrig
+                        patternx.append(x)
+                        indexx.append(xs)
+                        patterny.append(y)
+                        indexy.append(ys)
         return(np.transpose(np.array((patternx, patterny))),
                np.transpose(np.array((indexx, indexy))))
 
@@ -1229,13 +1259,15 @@ class mainWindow(QMainWindow):
             yStep = int(s.inputFields['yStep'][0].text())
             xSizeN = int(s.inputFields['xSizeN'][0].text())
             ySizeN = int(s.inputFields['ySizeN'][0].text())
+            scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
-            pattern, _ = self.construct_pattern(xOrig = xOrig,
-                                             yOrig = yOrig,
-                                             xSizeN = xSizeN,
-                                             ySizeN = ySizeN,
-                                             xStep = xStep,
-                                             yStep = yStep)
+            pattern, _ = self.construct_pattern(scanDir,
+                xOrig = xOrig,
+                yOrig = yOrig,
+                xSizeN = xSizeN,
+                ySizeN = ySizeN,
+                xStep = xStep,
+                yStep = yStep)
             ### Display pattern on plot
             patternPlot = self.stagePlotCanvas.axes.scatter(pattern[:,0],
                                                       pattern[:,1],
