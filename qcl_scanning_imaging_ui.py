@@ -33,10 +33,12 @@ from PyQt6.QtWidgets import (QApplication,
                              QGridLayout,
                              QLabel,
                              QLineEdit,
+                             QListWidget,
                              QMainWindow,
                              QMessageBox,
                              QPushButton,
                              QWidget,
+                             QScrollArea,
                              QSizePolicy,
                              QTabWidget,
                              QTextEdit)
@@ -260,6 +262,9 @@ class mainWindow(QMainWindow):
         font = QFont()
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE_MEDIUM)
+        fontSmall = QFont()
+        font.setFamily(defaults.FONT_FAMILY)
+        fontSmall.setPointSize(defaults.FONT_SIZE_SMALL)
         # self.setWindowModality(Qt.ApplicationModal)
         ### Set title and icon
         self.setWindowTitle('QCL Scanning and Imaging UI')
@@ -619,7 +624,7 @@ class mainWindow(QMainWindow):
         darkBackground = defaults.DARK_PLOT_BACKGROUND
         darkColor = defaults.PLOT_COLOR_DARK
         self.stagePlotCanvas.recolor(darkAxes, darkBackground, darkColor)
-        self.tabImagGrid.addWidget(self.stagePlotCanvas, 0, 0, 4, 6)
+        self.tabImagGrid.addWidget(self.stagePlotCanvas, 0, 0, 6, 6)
         ### Scanning imaging tab - Plot: image
         self.imagePlotCanvas = mplCanvas(width=5, height=4)
         self.imagePlotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
@@ -646,18 +651,37 @@ class mainWindow(QMainWindow):
         darkBackground = defaults.DARK_PLOT_BACKGROUND
         darkColor = defaults.PLOT_COLOR_DARK
         self.imagePlotCanvas.recolor(darkAxes, darkBackground, darkColor)
-        self.tabImagGrid.addWidget(self.imagePlotCanvas, 0, 6, 4, 4)
+        self.tabImagGrid.addWidget(self.imagePlotCanvas, 0, 6, 6, 4)
         ### Scanning imaging tab - Image wavelength/wavenumber selector
         # self.imageWlSlider = QSlider(Qt.Orientation.Horizontal)
         # self.tabImagGrid.addWidget(self.imageWlSlider, 4, 6, 1, 6)
+        ### Scanning imaging tab - Image wavelength/number and scan selector
+        self.imagePlotScanSelectorLabel = QLabel('Scan')
+        self.imagePlotScanSelectorLabel.setFont(font)
+        self.imagePlotScanSelectorLabel.setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        self.tabImagGrid.addWidget(self.imagePlotScanSelectorLabel, 0, 10, 1, 2)
+        self.imagePlotScanSelector = QListWidget()
+        self.imagePlotScanSelector.setFont(fontSmall)
+        self.imagePlotScanSelector.setStyleSheet(defaults.STYLE_LIST_WIDGET)
+        self.imagePlotScanSelector.itemClicked.connect(lambda: self.update_scanning_imaging_image())
+        self.tabImagGrid.addWidget(self.imagePlotScanSelector, 1, 10, 2, 2)
+        self.imagePlotWSelectorLabel = QLabel('Wavelength')
+        self.imagePlotWSelectorLabel.setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        self.imagePlotWSelectorLabel.setFont(font)
+        self.tabImagGrid.addWidget(self.imagePlotWSelectorLabel, 3, 10, 1, 2)
+        self.imagePlotWSelector = QListWidget()
+        self.imagePlotWSelector.setFont(fontSmall)
+        self.imagePlotWSelector.setStyleSheet(defaults.STYLE_LIST_WIDGET)
+        self.imagePlotWSelector.itemClicked.connect(lambda: self.update_scanning_imaging_image())
+        self.tabImagGrid.addWidget(self.imagePlotWSelector, 4, 10, 2, 2)
         ### Scanning imaging tab - Scan browser
         self.scanBrowser = scanBrowser(self)
         self.tabImagGrid.addWidget(self.scanBrowser, 7, 0, 6, 6)
         ### Scanning imaging tab - Scan options
-        scanFilePathLabel = QLabel('Scan configuration file path')
-        scanFilePathLabel.setFont(font)
-        scanFilePathLabel.setStyleSheet(defaults.STYLE_LABEL_EMPH)
-        self.tabImagGrid.addWidget(scanFilePathLabel, 7, 6, 1, 6)
+        self.scanFilePathLabel = QLabel('Scan configuration file path')
+        self.scanFilePathLabel.setFont(font)
+        self.scanFilePathLabel.setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        self.tabImagGrid.addWidget(self.scanFilePathLabel, 7, 6, 1, 6)
         self.scanFilePath = QLineEdit('C:\\')
         self.scanFilePath.setFont(font)
         self.scanFilePath.setStyleSheet(defaults.STYLE_INPUT)
@@ -876,31 +900,47 @@ class mainWindow(QMainWindow):
             self.plotCanvasRef.recolor(plotColor = defaults.PLOT_COLOR_REF)
             self.plotCanvasT.recolor(plotColor = defaults.PLOT_COLOR_T)
 
-    def plot_scanning_imaging(self, data):
-        '''Plot scanning imaging result'''
+    def plot_scanning_imaging(self, data, scanIndex = 0, wIndex = 0):
+        '''Plot scanning imaging result.
+           By default, plot index 0 scan and wavelength/wavenumber'''
+        ### Clear previous plot
         self.imagePlotCanvas.clear_plots()
-        wIndex = 0 # Wavelength/number index. Controlled by the scroll bar
+        ### Make list of available scans
+        self.imagePlotScanSelector.clear()
+        for iv, _ in enumerate(data.V):
+            self.imagePlotScanSelector.addItem('{:.0f}'.format(iv))
+        self.imagePlotScanSelector.setCurrentRow(0)
+        ### Make list of wavelengths/wavenumbers for indexed scan
+        self.imagePlotWSelector.clear()
+        for w in data.W[scanIndex]:
+            self.imagePlotWSelector.addItem('{:.3f}'.format(w))
+        self.imagePlotWSelector.setCurrentRow(0)
+        ### Display indexed scan and wavelength/wavenumber in title
+        titleStr = 'Scan {:.0f} {:.3f} μm'.format(scanIndex,
+            data.W[scanIndex][wIndex])
+        self.imagePlotCanvas.axes.set_title(titleStr)
         try:
-            for iv, v in enumerate(data.V):
-                xMin = np.min(data.X[iv])
-                xMax = np.max(data.X[iv])
-                yMin = np.min(data.Y[iv])
-                yMax = np.max(data.Y[iv])
-                self.imagePlotCanvas.axes.set_xlim(xMin, xMax)
-                self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
-                if self.imageViewAbove.isChecked():
-                    self.imagePlotCanvas.axes.invert_xaxis()
-                    Z = np.flip(np.transpose(v[wIndex]), axis = 0)
-                else:
-                    Z = np.transpose(v[wIndex])
-                img = self.imagePlotCanvas.axes.imshow(Z,
-                    cmap=mpl.cm.inferno,
-                    alpha=1.,
-                    interpolation='none',
-                    extent=(xMin, xMax, yMin, yMax),
-                    zorder=80)
-                self.imagePlotCanvas.plots.append(img)
-                self.imagePlotCanvas.figure.canvas.draw()
+            self.imagePlotScanSelector.setCurrentRow(scanIndex)
+            self.imagePlotWSelector.setCurrentRow(wIndex)
+            xMin = np.min(data.X[scanIndex])
+            xMax = np.max(data.X[scanIndex])
+            yMin = np.min(data.Y[scanIndex])
+            yMax = np.max(data.Y[scanIndex])
+            self.imagePlotCanvas.axes.set_xlim(xMin, xMax)
+            self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
+            if self.imageViewAbove.isChecked():
+                self.imagePlotCanvas.axes.invert_xaxis()
+                Z = np.flip(np.transpose(data.V[scanIndex][wIndex]), axis = 0)
+            else:
+                Z = np.transpose(data.V[scanIndex][wIndex])
+            img = self.imagePlotCanvas.axes.imshow(Z,
+                cmap = mpl.cm.inferno,
+                alpha = 1.,
+                interpolation = 'none',
+                extent = (xMin, xMax, yMin, yMax),
+                zorder = 80)
+            self.imagePlotCanvas.plots.append(img)
+            self.imagePlotCanvas.figure.canvas.draw()
         except Exception as exc:
             print('Failed to plot data:\n{}'.format(exc))
 
@@ -1210,6 +1250,14 @@ class mainWindow(QMainWindow):
         '''Update class instance experiment parameters with last used set, which
            may be re-used with "repeat".'''
         self.parameters = parameters
+
+    def update_scanning_imaging_image(self, scanIndex = 0, wIndex = 0):
+        '''Update scanning imaging image when scan or wavelength/wavenumbers
+           are selected from lists'''
+        data = self.scanImagParameters.data
+        scanIndex = self.imagePlotScanSelector.currentRow()
+        wIndex = self.imagePlotWSelector.currentRow()
+        self.plot_scanning_imaging(data, scanIndex = scanIndex, wIndex = wIndex)
 
     def update_scanning_imaging_plot_patterns(self):
         '''Update patterns on imaging scanning stage position plot.'''

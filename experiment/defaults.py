@@ -432,11 +432,23 @@ STYLE_LABEL_UNIT = '''QLabel {{
         qproperty-alignment: AlignLeft;
         qproperty-alignment: AlignMiddle;
     }}'''.format(GS_COLORS['text-lo'])
+STYLE_LIST_WIDGET = '''QListWidget {{
+        border: 2px solid {};
+        border-radius: 5px;
+        color:{};
+    }}
+    ::item {{
+        color:{};
+        background-color: {};
+    }}'''.format(GS_COLORS['border'],
+            GS_COLORS['bg-alt'],
+            GS_COLORS['text-lo'],
+            'transparent')
 STYLE_MENU = ''' QMenu {{
         background-color: {};
         color: {};
     }}'''.format(GS_COLORS['menu'],
-                 GS_COLORS['text'])
+            GS_COLORS['text'])
 STYLE_MENUBAR = ''' QMenuBar {{
         background-color: {};
         color: {};

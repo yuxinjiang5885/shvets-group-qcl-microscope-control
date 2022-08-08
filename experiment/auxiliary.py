@@ -1,5 +1,5 @@
 '''
-auxiliary_classes
+auxiliary
 Giovanni Sartorello (srtgnn@gmail.com)
 Classes used by the QCL UI to store parameters data
 Python 3.10.5 on Windows 10
