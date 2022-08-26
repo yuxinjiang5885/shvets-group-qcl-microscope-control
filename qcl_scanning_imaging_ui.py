@@ -3,7 +3,7 @@ qcl_spectral_scan_ui_multithread
 Giovanni Sartorello (srtgnn@gmail.com)
 UI for QCL scanning spectroscopy experiments
 Multi-threaded version of "qcl_spectral_scan_ui"
-Python 3.9.6 on Windows 10
+Python 3.10.5 64-bit on Windows 10
 Created 2021-Mar-03
 '''
 
@@ -38,7 +38,6 @@ from PyQt6.QtWidgets import (QApplication,
                              QMessageBox,
                              QPushButton,
                              QWidget,
-                             QScrollArea,
                              QSizePolicy,
                              QTabWidget,
                              QTextEdit)
@@ -179,9 +178,9 @@ class mainWindow(QMainWindow):
             ### Scan along longest side
             case 0:
                 if ySizeN * yStep > xSizeN * xStep:
-                    scanPatternDir = 'x'
-                else:
                     scanPatternDir = 'y'
+                else:
+                    scanPatternDir = 'x'
             ### Scan along x, turn along y
             case 1:
                 scanPatternDir = 'x'
@@ -257,8 +256,11 @@ class mainWindow(QMainWindow):
 
     def make_gui(self):
         '''Create main GUI window.'''
+        ### Set size
         self.setGeometry(0, 0, 1200, 900)
+        ### Center on screen
         self.center_window()
+        ### Set fonts
         font = QFont()
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE_MEDIUM)
@@ -1110,9 +1112,9 @@ class mainWindow(QMainWindow):
         ### Initial checks
         if not self.btn['Arm'][0].isChecked():
             print('Laser is not armed.')
-            self.btn['Start'][0].setChecked(False)
+            self.tabImagButtons['Start'][0].setChecked(False)
             # GUIInstance.btn['Stop'][0].setChecked(False)
-            self.btn['Sweep'][0].setChecked(False)
+            # self.btn['Sweep'][0].setChecked(False)
             return
         ### Disable stage joystick(s)
         self.stageMotionWindow.stage.joystick(enable=False)

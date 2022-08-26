@@ -585,6 +585,7 @@ class imagingScan(QObject):
                                 for x, y, ix, iy in zip(p[:, 0], p[:, 1], ind[:, 0], ind[:, 1]):
                                     ### Move stage
                                     self.parameters.stage.goto(x, y)
+                                    ### Wait for stage to stop moving
                                     while int(self.parameters.stage.busy()) > 0:
                                         time.sleep(0.1)
                                     (stgx, stgy) = self.parameters.stage.get_position()

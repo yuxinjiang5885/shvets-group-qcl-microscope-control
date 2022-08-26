@@ -2,17 +2,20 @@
 defaults
 Giovanni Sartorello (srtgnn@gmail.com)
 Default values for MIRcat spectral scan UI
-Python 3.8.3 on Windows 10
+Python 3.10.5 on Windows 10
 Created 2020-Oct-20
 '''
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 ### NI PCIe channels. Should be binary strings (b'') for compatibility
 ### Use NI MAX to verify device and channel names.
 PCI_CH_X = b'Dev1/ai0'
 PCI_CH_Y = b'Dev1/ai1'
 PCI_TRIG = b'/Dev1/PFI12'
+
+STAGE_COM_PORT = 3
+# STAGE_COM_PORT = 5
 
 ### Color dictionaries
 NEW_TAB10 = {'blue' : '#4e79a7',
@@ -377,14 +380,11 @@ STYLE_COMBOBOX =''' QComboBox {{
 STYLE_CONTAINER = '''QWidget {{
         background-color: {};
     }}'''.format(GS_COLORS['background'])
-STYLE_LABEL_EMPH = '''QLabel {{
-        color:{};
-        qproperty-alignment: AlignLeft;
-    }}'''.format(GS_COLORS['text'])
-STYLE_LABEL_EMPH_CENTER = '''QLabel {{
-        color:{};
-        qproperty-alignment: AlignCenter;
-    }}'''.format(GS_COLORS['text'])
+STYLE_GAMEPAD_BINDINGS_WINDOW = '''QMainWindow {{
+        background-image: url(images/xbox_controller_white_resize.jpg);
+        background-position: center;
+        background-repeat: no-repeat;
+    }}'''.format()
 STYLE_INPUT = '''QLineEdit {{
         color: {};
         border: 2px solid {};
@@ -419,6 +419,14 @@ STYLE_LABEL_ALT = '''QLabel {{
         color:{};
         qproperty-alignment: AlignCenter;
     }}'''.format(GS_COLORS['text-hi'])
+STYLE_LABEL_EMPH = '''QLabel {{
+        color:{};
+        qproperty-alignment: AlignLeft;
+    }}'''.format(GS_COLORS['text'])
+STYLE_LABEL_EMPH_CENTER = '''QLabel {{
+        color:{};
+        qproperty-alignment: AlignCenter;
+    }}'''.format(GS_COLORS['text'])
 STYLE_LABEL_READ = '''QLabel {{
         color:{};
         qproperty-alignment: AlignCenter;

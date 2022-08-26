@@ -6,8 +6,6 @@ Python 3.9.6 on Windows 10
 Created 2021-Dec-07
 '''
 
-from cgitb import enable
-from multiprocessing.dummy import JoinableQueue
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,21 +16,6 @@ from .xbox_controller import xboxController
 import time
 from time import perf_counter as timer, sleep
 from ui.plot_widgets import mplCanvas
-# from PyQt5.QtCore import Qt, QThread
-# from PyQt5.QtCore import QObject, pyqtSignal
-# from PyQt5.QtGui import QIntValidator, QIcon, QFont
-# from PyQt5.QtWidgets import (QAction,
-#                              QDesktopWidget,
-#                              QDialog,
-#                              QGridLayout,
-#                              QLabel,
-#                              QLineEdit,
-#                              QMainWindow,
-#                              QPushButton,
-#                              QTabWidget,
-#                              QSizePolicy,
-#                              QVBoxLayout,
-#                              QWidget)
 from PyQt6.QtCore import QThread
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QFont
@@ -156,6 +139,53 @@ class gamepad(QObject):
         self.gamepad.stop()
         print('Gamepad stopped')
         self.stopped.emit()
+
+
+class gamepadBindingsWindow(QMainWindow):
+    '''Shows gamepad bindings'''
+
+    def __init__(self):
+        super().__init__()
+        self.make_gui()
+
+    def center_window(self):
+        '''Center window on screen'''
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
+
+    def make_gui(self):
+        '''Create UI with grid layout'''
+        ### Set size
+        self.setGeometry(0, 0, 675, 380)
+        ### Center on screen
+        self.center_window()
+        ### Set fonts
+        font = QFont()
+        font.setFamily(defaults.FONT_FAMILY)
+        font.setPointSize(defaults.FONT_SIZE_MEDIUM)
+        fontSmall = QFont()
+        font.setFamily(defaults.FONT_FAMILY)
+        fontSmall.setPointSize(defaults.FONT_SIZE_SMALL)
+        ### Set title and icon
+        self.setWindowTitle('Gamepad Bindings')
+        self.setWindowIcon(QIcon('icons/xbox.png'))
+        ### Actions
+        exitAction = QAction(QIcon(None), 'Close Window', self)
+        exitAction.setShortcut('Ctrl+W')
+        exitAction.setToolTip('Close stage motion window')
+        exitAction.triggered.connect(lambda: self.close())
+        ### Bars
+        self.menubar = self.menuBar()
+        self.menubar.setStyleSheet(defaults.STYLE_MENUBAR)
+        ### Menus
+        fileMenu = self.menubar.addMenu('Actions')
+        fileMenu.setStyleSheet(defaults.STYLE_MENU)
+        fileMenu.addAction(exitAction)
+        ### Set controller picture as background
+        self.setStyleSheet(defaults.STYLE_GAMEPAD_BINDINGS_WINDOW)
+        ### Set text
 
 
 class stageInitializer(QObject):
@@ -284,7 +314,6 @@ class stageMotionWindow(QMainWindow):
     '''GUI for stage motion control'''
 
     def __init__(self, mainGUI):
-        # super().__init__(None, Qt.WindowStaysOnTopHint)
         super().__init__()
         self.paramNames = ['x_um', 'y_um', 'v_um_per_s', 'a_um_per_s2']
         self.mainGUI = mainGUI
@@ -297,10 +326,7 @@ class stageMotionWindow(QMainWindow):
         self.workerMW = [] # Multiwell worker
         self.threadG = [] # Gamepad thread
         self.workerG = [] # Gamepad worker
-        # try:
-        #     self.gamepad = xboxController()
-        # except Exception as exc:
-        #     print('Could not connect to gamepad:\n{}'.format(exc))
+        self.gamepadBindingsWindow = gamepadBindingsWindow()
         self.make_gui()
 
     def center_window(self):
@@ -310,9 +336,13 @@ class stageMotionWindow(QMainWindow):
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
-    def closeEvent(self, event): # Redefined from parent QMainWindow
-        '''Show warning dialog on close.'''
-        event.accept()
+    # def closeEvent(self, event): # Redefined from parent QMainWindow
+    #     '''Show warning dialog on close.'''
+    #     event.accept()
+
+    def gamepad_bindings(self):
+        '''View gamepad bindings'''
+        self.gamepadBindingsWindow.show()
 
     def goto(self, targetx=-1, targety=-1):
         '''Move to set x and y.
@@ -421,6 +451,10 @@ class stageMotionWindow(QMainWindow):
         updateAction.setShortcut('Ctrl+U')
         updateAction.setToolTip('Update x/y stage position readings')
         updateAction.triggered.connect(lambda: self.update_readings())
+        gamepadBindingsAction = QAction(QIcon(None), 'Gamepad bindings', self)
+        gamepadBindingsAction.setShortcut('Ctrl+G')
+        gamepadBindingsAction.setToolTip('View gamepad bindings')
+        gamepadBindingsAction.triggered.connect(lambda: self.gamepad_bindings())
         ### Control options
         # self.hwJoystickEnable = QAction(QIcon(None), 'Enable hardware joystick',
         #                                 self, checkable=True, checked=True)
@@ -456,6 +490,9 @@ class stageMotionWindow(QMainWindow):
         patternMenu.setStyleSheet(defaults.STYLE_MENU)
         patternMenu.addAction(self.reverse)
         patternMenu.addAction(self.timeBehavior)
+        helpMenu = self.menubar.addMenu('Help')
+        helpMenu.setStyleSheet(defaults.STYLE_MENU)
+        helpMenu.addAction(gamepadBindingsAction)
         ### Configure main grid layout
         self.container = QWidget()
         self.container.setStyleSheet(defaults.STYLE_CONTAINER)
@@ -946,7 +983,8 @@ class stageStartupDialog(QDialog):
         ### Dialog text
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
-        self.textBox = QLabel('Initializing HLD117 stage. Please wait.')
+        initString = 'Initializing stage (COM port {:.0f}). Please wait.'.format(defaults.STAGE_COM_PORT)
+        self.textBox = QLabel(initString)
         self.textBox.setFont(self.font)
         self.textBox.setStyleSheet(defaults.STYLE_LABEL_ALT)
         self.layout.addWidget(self.textBox)
