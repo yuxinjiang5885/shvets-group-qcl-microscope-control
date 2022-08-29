@@ -27,7 +27,7 @@ class scanBrowser(QTabWidget):
         self.setDocumentMode(True)
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.close_scan_tab)
-        self.tabBarDoubleClicked.connect(self.add_scan_tab_double_click)
+        self.tabBarDoubleClicked.connect(self.add_scan_tab)
         self.tabTitleSeparator = ' '
         self.scans = []
         # self.toolbar = QToolBar('Scan tabs')
@@ -42,20 +42,19 @@ class scanBrowser(QTabWidget):
         '''Add a new tab with scan parameters'''
         scan = scanUI(self.mainGUI)
         scans = len(self.scans)
-        scan.scanID = scans + 1
+        scan.scanID = scans
         scanLabel = 'Scan{}{:.0f}'.format(self.tabTitleSeparator, scan.scanID)
         self.scans.append(scan)
         ti = self.addTab(scan, scanLabel)
         self.setCurrentIndex(ti)
 
-    def add_scan_tab_double_click(self, ti):
-        '''Add tab by double-clicking the tabs bar'''
-        if ti == -1:
-            self.add_scan_tab()
+    # def add_scan_tab_double_click(self):
+    #     '''Add tab by double-clicking the tabs bar'''
+    #     self.add_scan_tab()
 
     def close_scan_tab(self, ti):
         '''Close tab'''
-        if self.count() < 2:
+        if self.count() < 2: ### If there are fewer than 1 tabs
             print('Cannot close the last scan tab.')
             return
         for si, s in enumerate(self.scans):
@@ -68,6 +67,7 @@ class scanBrowser(QTabWidget):
                 self.scans[si] = []
                 # print(self.scans)
         self.removeTab(ti)
+        self.scans = [s for s in self.scans if s]
 
 
 class scanUI(QWidget):
