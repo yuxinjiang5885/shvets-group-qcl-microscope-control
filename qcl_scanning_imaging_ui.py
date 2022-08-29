@@ -265,7 +265,7 @@ class mainWindow(QMainWindow):
         font.setFamily(defaults.FONT_FAMILY)
         font.setPointSize(defaults.FONT_SIZE_MEDIUM)
         fontSmall = QFont()
-        font.setFamily(defaults.FONT_FAMILY)
+        fontSmall.setFamily(defaults.FONT_FAMILY)
         fontSmall.setPointSize(defaults.FONT_SIZE_SMALL)
         # self.setWindowModality(Qt.ApplicationModal)
         ### Set title and icon

@@ -222,6 +222,7 @@ FONT_FAMILY = 'Open Sans Semibold'
 FONT_SIZE = 12
 FONT_SIZE_MEDIUM = 11
 FONT_SIZE_SMALL = 10
+FONT_SIZE_TINY = 8
 NUMBER_OF_ROWS = 14 # UI grid template rows
 NUMBER_OF_COLS = 12 # UI grid template columns
 MSG_TIMEOUT = 1000 # ms
@@ -427,6 +428,11 @@ STYLE_LABEL_EMPH_CENTER = '''QLabel {{
         color:{};
         qproperty-alignment: AlignCenter;
     }}'''.format(GS_COLORS['text'])
+STYLE_LABEL_GAMEPAD = '''QLabel {{
+        background-color:#ffffff;
+        color:#000000;
+        qproperty-alignment: AlignLeft;
+    }}'''.format()
 STYLE_LABEL_READ = '''QLabel {{
         color:{};
         qproperty-alignment: AlignCenter;

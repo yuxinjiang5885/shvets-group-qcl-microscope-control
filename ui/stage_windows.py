@@ -159,15 +159,15 @@ class gamepadBindingsWindow(QMainWindow):
         '''Create UI with grid layout'''
         ### Set size
         self.setGeometry(0, 0, 675, 380)
+        ### Add central widget
+        # self.container = QWidget()
+        # self.setCentralWidget(self.container)
         ### Center on screen
         self.center_window()
         ### Set fonts
-        font = QFont()
-        font.setFamily(defaults.FONT_FAMILY)
-        font.setPointSize(defaults.FONT_SIZE_MEDIUM)
         fontSmall = QFont()
-        font.setFamily(defaults.FONT_FAMILY)
-        fontSmall.setPointSize(defaults.FONT_SIZE_SMALL)
+        fontSmall.setFamily(defaults.FONT_FAMILY)
+        fontSmall.setPointSize(defaults.FONT_SIZE_TINY)
         ### Set title and icon
         self.setWindowTitle('Gamepad Bindings')
         self.setWindowIcon(QIcon('icons/xbox.png'))
@@ -186,7 +186,22 @@ class gamepadBindingsWindow(QMainWindow):
         ### Set controller picture as background
         self.setStyleSheet(defaults.STYLE_GAMEPAD_BINDINGS_WINDOW)
         ### Set text
-
+        self.labels = dict() # [label, pixels x, pixels y]
+        noteText = 'CONNECT GAMEPAD TO PC BEFORE LAUNCHING UI'
+        self.labels['Note'] = [QLabel(noteText, self), 5, 25]
+        self.labels['ConnectToPC'] = [QLabel('Connect to PC', self), 170, 70]
+        self.labels['StopGamepad'] = [QLabel('Stop\ngamepad', self), 170, 100]
+        self.labels['Move'] = [QLabel('Move stage\nPress: return to zero', self), 20, 120]
+        self.labels['MoveByStep'] = [QLabel('Move by step', self), 150, 225]
+        self.labels['StopStage'] = [QLabel('Stop stage', self), 325, 130]
+        self.labels['IncreaseSpeed'] = [QLabel('Increase Speed', self), 370, 30]
+        self.labels['DecreaseSpeed'] = [QLabel('Decrease Speed', self), 530, 40]
+        for _, k in self.labels.items(): # Arrange labels in grid
+            l = k[0]
+            l.setFont(fontSmall)
+            l.setStyleSheet(defaults.STYLE_LABEL_GAMEPAD)
+            l.move(k[1], k[2])
+            l.adjustSize()
 
 class stageInitializer(QObject):
     '''Initialize stage'''
