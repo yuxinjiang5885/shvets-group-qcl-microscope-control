@@ -538,10 +538,10 @@ class imagingScan(QObject):
         '''Run scanning imaging experiment and output data.'''
         ### Prepare to save data
         currentDir = os.getcwd()
-        if platform.system() == 'Windows':
-            currentDirSplit = currentDir.split('\\')
-        else:
-            currentDirSplit = currentDir.split('/')
+        # if platform.system() == 'Windows':
+        #     currentDirSplit = currentDir.split('\\')
+        # else:
+        #     currentDirSplit = currentDir.split('/')
         scanImagDir = os.path.join(currentDir, defaults.DEF_SCAN_IMAG_SUBFOLDER)
         os.mkdir(scanImagDir)
         os.chdir(scanImagDir)
@@ -708,10 +708,13 @@ class imagingScan(QObject):
                         #     data = np.flip(data, 0)
                         posData.append(data)
                     scanData.append(posData)
-            case 'sweep':
+            case 'step_sweep':
                 print('Not implemented.')
                 return []
-            case 'continuous':
+            case 'continuous_one':
+                print('Not implemented.')
+                return []
+            case 'continuous_sweep':
                 print('Not implemented.')
                 return []
             case _:

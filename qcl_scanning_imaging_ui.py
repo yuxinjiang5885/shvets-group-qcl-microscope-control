@@ -720,9 +720,10 @@ class mainWindow(QMainWindow):
         # self.tabImageDropdowns['ScanPattern'][0].addItem('Raster')
         self.tabImageDropdowns['ScanMode'] = [QComboBox(), 11, 9, 1, 3]
         self.tabImageDropdowns['ScanMode'][0].addItem('Step (one wavelength each position)')
-        self.tabImageDropdowns['ScanMode'][0].addItem('Step (all wavelengths each position')
-        self.tabImageDropdowns['ScanMode'][0].addItem('Sweep')
-        self.tabImageDropdowns['ScanMode'][0].addItem('Continuous')
+        self.tabImageDropdowns['ScanMode'][0].addItem('Step (all wavelengths each position)')
+        self.tabImageDropdowns['ScanMode'][0].addItem('Step (sweep)')
+        self.tabImageDropdowns['ScanMode'][0].addItem('Continuous (one wavelength each position)')
+        self.tabImageDropdowns['ScanMode'][0].addItem('Continuous (sweep)')
         for x, k in self.tabImageDropdowns.items(): # Arrange buttons in grid
             k[0].setFont(font)
             k[0].setStyleSheet(defaults.STYLE_COMBOBOX)
@@ -1133,6 +1134,20 @@ class mainWindow(QMainWindow):
         # self.scanImagParameters.notes = self.notes.toPlainText()
         # self.scanImagParameters.useRef = self.btn['RefEnable'][0].isChecked()
         self.scanImagParameters.sweeping = self.btn['Sweep'][0].isChecked()
+        ### Define scan mode
+        match self.tabImageDropdowns['ScanMode'][0].currentIndex():
+            case 0: # Step (one wavelength each position)
+                self.scanImagParameters.scanMode = 'step_one'
+            case 1: # Step (all wavelengths each position)
+                self.scanImagParameters.scanMode = 'step_all'
+            case 2: # Step (sweep)
+                self.scanImagParameters.scanMode = 'step_sweep'
+            case 3: # Continuous (one wavelength each position)
+                self.scanImagParameters.scanMode = 'continuous_one'
+            case 4: # Continuous (sweep)
+                self.scanImagParameters.scanMode = 'continuous_sweep'
+            case _: # Default
+                self.scanImagParameters.scanMode = 'step_one'
         ### Read and compile scanning patterns
         self.scanImagParameters.patterns = []
         for s in self.scanBrowser.scans:
