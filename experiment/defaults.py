@@ -35,7 +35,7 @@ STAGE_DEF_X_STEP_UM = 1000 # um
 STAGE_DEF_Y_STEP_UM = 1000 # um
 
 ### Generic default port, should never be needed in practice
-STAGE_DEF_COM_PORT = 5
+STAGE_DEF_COM_PORT = 3
 
 '''Color dictionaries'''
 

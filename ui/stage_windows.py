@@ -203,6 +203,7 @@ class gamepadBindingsWindow(QMainWindow):
             l.move(k[1], k[2])
             l.adjustSize()
 
+
 class stageInitializer(QObject):
     '''Initialize stage'''
     stageInitialized = pyqtSignal() # Emitted when stage is initialized

@@ -10,6 +10,7 @@ Created 2021-Mar-03
 import os
 import sys
 import re
+import time
 import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import rcParams
@@ -73,10 +74,9 @@ class mainWindow(QMainWindow):
         else:
             self.xTravel = defaults.HLD117_X_TRAVEL_UM
             self.yTravel = defaults.HLD117_Y_TRAVEL_UM
-        self.make_gui()
         self.stage = []
         self.threadStg = QThread()
-        self.stageWorker = stageInitializer(COM_PORT = STAGE_COM_PORT)
+        self.stageWorker = stageInitializer(MODEL = STAGE_MODEL, COM_PORT = STAGE_COM_PORT)
         self.stageWorker.moveToThread(self.threadStg)
         self.threadStg.started.connect(self.stageWorker.stage_initialize)
         self.stageWorker.stageInitialized.connect(self.threadStg.quit)
@@ -1622,6 +1622,7 @@ class multipleAcquisitionsWindow(QMainWindow):
 
 
 if __name__ == '__main__':
-    APP = QApplication(sys.argv)
+    # APP = QApplication(sys.argv)
+    APP = QApplication([])
     GUI1 = mainWindow()
     sys.exit(APP.exec())
