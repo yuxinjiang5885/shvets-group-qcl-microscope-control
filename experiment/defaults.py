@@ -16,20 +16,8 @@ PCI_TRIG = b'/Dev1/PFI12'
 '''Stage ports and parameters
    One set for the HLD117 in 147, one for the H117 in BE13.'''
 
-### Generic default port, should never be needed in practice
-STAGE_DEF_COM_PORT = 5
-
-# STAGE_COM_PORT = 3
-# STAGE_COM_PORT = 5
-# STAGE_COM_PORT = 7
-
-# STAGE_X_TRAVEL_UM = 120000 # um
-# STAGE_Y_TRAVEL_UM = 80000 # um
-# DEF_STAGE_X_STEP_UM = 1000 # um
-# DEF_STAGE_Y_STEP_UM = 1000 # um
-
 ### HLD117 parameters (linear drive, 147)
-HLD117_COM_PORT = 5
+HLD117_COM_PORT = 3
 HLD117_MAX_SPEED = 30000 # Maximum stage speed, um/s, found in Prior demo app
 HLD117_MAX_ACC = 142750 # Maximum stage acceleration, um/s^2, found in Prior demo app
 HLD117_X_TRAVEL_UM = 120000 # um
@@ -45,6 +33,9 @@ H117_Y_TRAVEL_UM = 75000 # um
 ### Common parameters
 STAGE_DEF_X_STEP_UM = 1000 # um
 STAGE_DEF_Y_STEP_UM = 1000 # um
+
+### Generic default port, should never be needed in practice
+STAGE_DEF_COM_PORT = 5
 
 '''Color dictionaries'''
 

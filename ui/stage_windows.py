@@ -227,10 +227,11 @@ class stageMotion(QObject):
     currentPosition = pyqtSignal(float, float, list, list)
     stopped = False
 
-    def __init__(self):
+    def __init__(self, mainGUI):
         '''Parameters must be set by caller for any method to work.'''
         super().__init__()
         self.parameters = [] # Parameters from caller, placeholder value
+        self.mainGUI = mainGUI
 
     def goto_and_wait(self, targetx, targety):
         '''Move to set x and y. Wait for stage to finish moving.'''
@@ -245,6 +246,14 @@ class stageMotion(QObject):
     def multiwell(self):
         '''Multiwell scan: move to a number of positions in a sequence, stop and
            dwell at each'''
+        ### Disable stage joystick(s)
+        self.parameters.stage.joystick(enable=False)
+        self.mainGUI.inputMethods['hw'][0].setChecked(False)
+        if self.mainGUI.threadG not in [[]]:
+            if self.mainGUI.threadG.isRunning:
+                self.mainGUI.workerG.stop = True
+                self.mainGUI.inputMethods['gp'][0].setChecked(False)
+        print('All stage joysticks disabled')
         ### Read parameters
         acquisitions = self.parameters.acquisitions
         xWells = self.parameters.xWells
@@ -826,7 +835,7 @@ class stageMotionWindow(QMainWindow):
         #     return
         ### Run stage scan in separate thread
         self.threadMW = QThread()
-        self.workerMW = stageMotion()
+        self.workerMW = stageMotion(self)
         self.btn['Stop'][0].clicked.connect(self.workerMW.stop)
         self.workerMW.parameters = self.parameters
         self.workerMW.moveToThread(self.threadMW)

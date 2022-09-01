@@ -161,7 +161,7 @@ class stage():
 
     def goto(self, x=0, y=0):
         '''Go to specified position.'''
-        self.message('controller.stage.goto-position {:.1f} {:.1f}'.format(x, y))
+        self.message('controller.stage.goto-position {:.0f} {:.0f}'.format(x, y))
 
     def identify(self):
         '''Identify controller'''
@@ -202,7 +202,7 @@ class stage():
             print('Failure to communicate: API error {}'.format(ret))
         # else:
         #     print('Success: {}'.format(self.rx.value.decode()))
-        return ret, self.rx.value.decode()\
+        return ret, self.rx.value.decode()
 
     def move_at_velocity(self, vx=0, vy=0):
         '''Move at constant velocity.'''
@@ -210,7 +210,7 @@ class stage():
 
     def move_rel(self, x=0, y=0):
         '''Move relative to current position.'''
-        self.message('controller.stage.move-relative {:.1f} {:.1f}'.format(x, y))
+        self.message('controller.stage.move-relative {:.0f} {:.0f}'.format(x, y))
 
     def reference(self):
         '''Move stage to reference position'''

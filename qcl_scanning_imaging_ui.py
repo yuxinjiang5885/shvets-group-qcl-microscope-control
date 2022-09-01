@@ -1131,7 +1131,7 @@ class mainWindow(QMainWindow):
         self.stageMotionWindow.inputMethods['hw'][0].setChecked(False)
         if self.stageMotionWindow.threadG not in [[]]:
             if self.stageMotionWindow.threadG.isRunning:
-                self.workerG.stop = True
+                self.stageMotionWindow.workerG.stop = True
                 self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
         print('All stage joysticks disabled')
         ### Show patterns on plot
