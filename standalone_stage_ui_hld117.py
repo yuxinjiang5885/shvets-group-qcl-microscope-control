@@ -1,21 +1,18 @@
 '''
-standalone_stage_ui
+standalone_stage_ui_hld117
 Giovanni Sartorello (srtgnn@gmail.com)
-Control HLD-117 stage only
+Control HLD117 stage only
 Created 2022-Feb-03
 '''
 
 import sys
 import experiment.defaults as defaults
-from ui.stage_windows import (stageInitializer,
-                                      stageMotionWindow,
-                                      stageStartupDialog)
-# from PyQt5.QtCore import QThread
-# from PyQt5.QtWidgets import (QApplication,
-#                              QMainWindow)
+from ui.stage_windows import (stageInitializer, stageMotionWindow, stageStartupDialog)
 from PyQt6.QtCore import QThread
-from PyQt6.QtWidgets import (QApplication,
-                             QMainWindow)
+from PyQt6.QtWidgets import (QApplication, QMainWindow)
+
+MODEL = 'HLD117'
+COM_PORT = defaults.H117_COM_PORT
 
 class mainWindow(QMainWindow):
     '''Dummy application window.'''
@@ -27,7 +24,7 @@ class mainWindow(QMainWindow):
         ### Initialize stage
         self.stage = []
         self.threadStg = QThread()
-        self.stageWorker = stageInitializer()
+        self.stageWorker = stageInitializer(COM_PORT = COM_PORT)
         self.stageWorker.moveToThread(self.threadStg)
         self.threadStg.started.connect(self.stageWorker.stage_initialize)
         self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)
@@ -35,7 +32,7 @@ class mainWindow(QMainWindow):
         self.threadStg.finished.connect(self.threadStg.deleteLater)
         self.threadStg.start()
         ### Show stage startup dialog
-        startupDialog2 = stageStartupDialog() # Closes when startup finishes
+        startupDialog2 = stageStartupDialog(COM_PORT = COM_PORT) # Closes when startup finishes
         self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
         startupDialog2.exec()
         ### Connection check: WIP
@@ -45,7 +42,7 @@ class mainWindow(QMainWindow):
         #     print('Available ports are listed in Device Manager.')
         #     return
         ### Create window with stage motion controls
-        self.stageMotionWindow = stageMotionWindow(self)
+        self.stageMotionWindow = stageMotionWindow(mainGUI = self, model = MODEL)
         ### Show stage motions control window
         self.stage_motion_window()
 

@@ -7,8 +7,7 @@ Created 2021-Nov-26 for Python 3.9.6 64-bit
 
 from ctypes import WinDLL, create_string_buffer
 import os, sys, time
-from inspect import currentframe, getfile
-from os.path import abspath, join, split, realpath
+from experiment import defaults
 
 ### Look for modules in "instruments", https://stackoverflow.com/a/6098238
 # mDir = realpath(abspath(split(getfile(currentframe()))[0]))
@@ -20,24 +19,29 @@ from os.path import abspath, join, split, realpath
 # if mSubdir not in sys.path:
 #     sys.path.append(mSubdir)
 
-COM_PORT = 3 # Controller COM port
-# COM_PORT = 5 # Controller COM port
 DLL_PATH = 'instruments/prior/PriorScientificSDK.dll' # Prior SDK DLL path
 
-MAX_SPEED = 30000 # Maximum stage speed, um/s, found in Prior example app
-MAX_ACC = 142750 # Maximum stage acceleration, um/s^2, found in Prior example app
+'''Stage parameters'''
 
-DEFAULT_SPEED = MAX_SPEED # Default stage speed, um/s
-DEFAULT_ACC = MAX_ACC # Default stage acceleration, um/s^2
+### HLD117
+HLD117_DEFAULT_SPEED = defaults.HLD117_MAX_SPEED # Default stage speed, um/s
+HLD117_DEFAULT_ACC = defaults.HLD117_MAX_ACC # Default stage acceleration, um/s^2
+HLD117_SPEEDS = [10, 100, 1000, 10000, defaults.HLD117_MAX_SPEED] # Select stage speeds, um/s
+HLD117_ACCS = [defaults.HLD117_MAX_ACC] # Select stage accelerations, um/s^2
 
-SPEEDS = [10, 100, 1000, 10000, MAX_SPEED] # Select stage speeds, um/s
+### H117
+H117_DEFAULT_SPEED = defaults.H117_MAX_SPEED # Default stage speed, um/s
+H117_DEFAULT_ACC = defaults.H117_MAX_ACC # Default stage acceleration, um/s^2
+H117_SPEEDS = [10, 100, 1000, 10000, defaults.H117_MAX_SPEED] # Select stage speeds, um/s
+H117_ACCS = [defaults.H117_MAX_ACC] # Select stage accelerations, um/s^2
+
+### Common
 STEPS = [10, 100, 1000, 10000] # Select stage steps, um
-ACCS = [MAX_ACC] # Select stage accelerations, um/s^2
 
 class stage():
     '''HLD117 stage class'''
 
-    def __init__(self):
+    def __init__(self, model = 'HLD117'):
         '''Initialize Prior SDK DLL'''
         if os.path.exists(DLL_PATH):
             self.SDK = WinDLL(DLL_PATH)
@@ -68,8 +72,18 @@ class stage():
         #     self.session, create_string_buffer(b"dll.apitest -300 stillgoodresponse"), self.rx)
         # print(f"api response {ret}, rx = {self.rx.value.decode()}")
         '''Stage parameters'''
-        self.speeds = SPEEDS
-        self.steps = STEPS
+        if model in ['H117', 'h117']:
+            self.defaultSpeed = H117_DEFAULT_SPEED
+            self.defaultAcc = H117_DEFAULT_ACC
+            self.speeds = H117_SPEEDS
+            self.steps = STEPS
+            self.accs = H117_ACCS
+        else:
+            self.defaultSpeed = HLD117_DEFAULT_SPEED
+            self.defaultAcc = HLD117_DEFAULT_ACC
+            self.speeds = HLD117_SPEEDS
+            self.steps = STEPS
+            self.accs = HLD117_ACCS
 
     def busy(self):
         '''Check whether stage is busy:
@@ -77,7 +91,7 @@ class stage():
         busy = self.message('controller.stage.busy.get')
         return busy[1]
 
-    def connect(self):
+    def connect(self, COM_PORT = defaults.STAGE_DEF_COM_PORT):
         '''Connect controller'''
         print('Connecting to stage on COM port {}'.format(COM_PORT))
         self.message('controller.connect {:0f}'.format(COM_PORT))
@@ -202,13 +216,19 @@ class stage():
         '''Move stage to reference position'''
         self.message('controller.stage.reference.set')
 
-    def set_acc(self, a = DEFAULT_ACC):
+    def set_acc(self, a = 0):
         '''Set the maximum acceleration during a point to point move
            or velocity move'''
+        if a == 0:
+            a = self.defaultAcc
+            print('Switched to default acceleration')
         self.message('controller.stage.acc.set {:.0f}'.format(a))
 
-    def set_speed(self, v = DEFAULT_SPEED):
+    def set_speed(self, v = 0):
         '''Set the maximum speed during a point to point move'''
+        if v == 0:
+            v = self.defaultSpeed
+            print('Switched to default velocity')
         self.message('controller.stage.speed.set {:.0f}'.format(v))
 
     def stop_smoothly(self):

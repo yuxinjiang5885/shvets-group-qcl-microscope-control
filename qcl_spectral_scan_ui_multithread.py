@@ -48,6 +48,9 @@ from PyQt5.QtWidgets import (QAction,
                              QVBoxLayout)
 rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
 
+STAGE_COM_PORT = defaults.HLD117_COM_PORT
+STAGE_MODEL = 'HLD117'
+
 class experimentParameters():
     '''Holds experiment parameters'''
 
@@ -98,14 +101,14 @@ class mainWindow(QMainWindow):
         self.threadStg = QThread()
         self.stageWorker = stageInitializer()
         self.stageWorker.moveToThread(self.threadStg)
-        self.threadStg.started.connect(self.stageWorker.stage_initialize)
+        self.threadStg.started.connect(self.stageWorker.stage_initialize(COM_PORT = STAGE_COM_PORT))
         self.stageWorker.stageInitialized.connect(self.threadStg.quit)
         self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)
         self.stageWorker.stageInstance.connect(self.stage_set)
         self.threadStg.finished.connect(self.threadStg.deleteLater)
         self.threadStg.start()
         ### Show stage startup dialog
-        startupDialog2 = stageStartupDialog() # Closes when startup finishes
+        startupDialog2 = stageStartupDialog(COM_PORT = STAGE_COM_PORT) # Closes when startup finishes
         self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
         startupDialog2.exec()
         ### Prepare text for "about" dialog
@@ -129,7 +132,7 @@ class mainWindow(QMainWindow):
         self.laserMenu = laserSettingWindow(self)
         self.multiMenu = multipleAcquisitionsWindow(self)
         self.multiMenu.btn['Start'][0].clicked.connect(lambda: self.multiple())
-        self.stageMotionWindow = stageMotionWindow(self)
+        self.stageMotionWindow = stageMotionWindow(mainGUI = self, model = STAGE_MODEL)
         self.statusbar.showMessage('Ready')
 
     def about(self):

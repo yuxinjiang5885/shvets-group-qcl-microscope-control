@@ -208,12 +208,14 @@ class stageInitializer(QObject):
     stageInitialized = pyqtSignal() # Emitted when stage is initialized
     stageInstance = pyqtSignal(object) # Returns stage instance
 
-    def __init__(self):
+    def __init__(self, MODEL = 'HLD117', COM_PORT = defaults.STAGE_DEF_COM_PORT):
         super().__init__()
+        self.stageModel = MODEL
+        self.COMPort = COM_PORT
 
     def stage_initialize(self):
-        stage0 = stage() # Initialize stage
-        stage0.connect()
+        stage0 = stage(model = self.stageModel) # Initialize stage
+        stage0.connect(self.COMPort)
         stage0.identify()
         self.stageInstance.emit(stage0)
         self.stageInitialized.emit()
@@ -328,7 +330,7 @@ class stageMotionParameters():
 class stageMotionWindow(QMainWindow):
     '''GUI for stage motion control'''
 
-    def __init__(self, mainGUI):
+    def __init__(self, mainGUI, model = 'HLD117'):
         super().__init__()
         self.paramNames = ['x_um', 'y_um', 'v_um_per_s', 'a_um_per_s2']
         self.mainGUI = mainGUI
@@ -342,6 +344,12 @@ class stageMotionWindow(QMainWindow):
         self.threadG = [] # Gamepad thread
         self.workerG = [] # Gamepad worker
         self.gamepadBindingsWindow = gamepadBindingsWindow()
+        if model in ['H117', 'h117']:
+            self.xTravel = defaults.H117_X_TRAVEL_UM
+            self.yTravel = defaults.H117_Y_TRAVEL_UM
+        else:
+            self.xTravel = defaults.HLD117_X_TRAVEL_UM
+            self.yTravel = defaults.HLD117_Y_TRAVEL_UM
         self.make_gui()
 
     def center_window(self):
@@ -552,7 +560,7 @@ class stageMotionWindow(QMainWindow):
             self.stgControlsGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Stage controls - input fields
         blankLine = ''
-        initStep = '{:.0f}'.format(defaults.DEF_STAGE_X_STEP_UM)
+        initStep = '{:.0f}'.format(defaults.STAGE_DEF_X_STEP_UM)
         self.inputField = dict() # to collect all input fields
         self.inputField['xSet'] = [QLineEdit(blankLine), 1, 3, 1, 1]
         self.inputField['ySet'] = [QLineEdit(blankLine), 1, 4, 1, 1]
@@ -568,12 +576,12 @@ class stageMotionWindow(QMainWindow):
         self.plotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvas.axes.set_aspect('equal')
         self.plotCanvas.axes.set_xlabel('x (μm)')
-        xTravel = defaults.STAGE_X_TRAVEL_UM
+        xTravel = self.xTravel
         xMax = 1.1 * xTravel / 2
         xMin = -1 * xMax
         self.plotCanvas.axes.set_xlim(xMin, xMax)
         self.plotCanvas.axes.set_ylabel('y (μm)')
-        yTravel = defaults.STAGE_Y_TRAVEL_UM
+        yTravel = self.yTravel
         yMax = 1.1 * yTravel / 2
         yMin = -1 * yMax
         self.plotCanvas.axes.set_ylim(yMin, yMax)
@@ -972,8 +980,9 @@ class stageMotionWindow(QMainWindow):
 class stageStartupDialog(QDialog):
     '''Show a dialog when stage is starting up.'''
 
-    def __init__(self):
+    def __init__(self, COM_PORT = defaults.STAGE_DEF_COM_PORT):
         super().__init__()
+        self.COMPort = COM_PORT
         self.make_dialog()
 
     def center_window(self):
@@ -998,7 +1007,7 @@ class stageStartupDialog(QDialog):
         ### Dialog text
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
-        initString = 'Initializing stage (COM port {:.0f}). Please wait.'.format(defaults.STAGE_COM_PORT)
+        initString = 'Initializing stage (COM port {:.0f}). Please wait.'.format(self.COMPort)
         self.textBox = QLabel(initString)
         self.textBox.setFont(self.font)
         self.textBox.setStyleSheet(defaults.STYLE_LABEL_ALT)

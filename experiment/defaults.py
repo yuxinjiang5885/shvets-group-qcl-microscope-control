@@ -6,18 +6,48 @@ Python 3.10.5 on Windows 10
 Created 2020-Oct-20
 '''
 
-# import matplotlib.pyplot as plt
+'''NI PCIe channels. Should be binary strings (b'') for compatibility
+   Use NI MAX to verify device and channel names.'''
 
-### NI PCIe channels. Should be binary strings (b'') for compatibility
-### Use NI MAX to verify device and channel names.
 PCI_CH_X = b'Dev1/ai0'
 PCI_CH_Y = b'Dev1/ai1'
 PCI_TRIG = b'/Dev1/PFI12'
 
-STAGE_COM_PORT = 3
-# STAGE_COM_PORT = 5
+'''Stage ports and parameters
+   One set for the HLD117 in 147, one for the H117 in BE13.'''
 
-### Color dictionaries
+### Generic default port, should never be needed in practice
+STAGE_DEF_COM_PORT = 5
+
+# STAGE_COM_PORT = 3
+# STAGE_COM_PORT = 5
+# STAGE_COM_PORT = 7
+
+# STAGE_X_TRAVEL_UM = 120000 # um
+# STAGE_Y_TRAVEL_UM = 80000 # um
+# DEF_STAGE_X_STEP_UM = 1000 # um
+# DEF_STAGE_Y_STEP_UM = 1000 # um
+
+### HLD117 parameters (linear drive, 147)
+HLD117_COM_PORT = 5
+HLD117_MAX_SPEED = 30000 # Maximum stage speed, um/s, found in Prior demo app
+HLD117_MAX_ACC = 142750 # Maximum stage acceleration, um/s^2, found in Prior demo app
+HLD117_X_TRAVEL_UM = 120000 # um
+HLD117_Y_TRAVEL_UM = 80000 # um
+
+### H117 parameters (stepper motors, BE13)
+H117_COM_PORT = 7
+H117_MAX_SPEED = 15000 # Maximum stage speed, um/s, found in Prior demo app
+H117_MAX_ACC = 28550 # Maximum stage acceleration, um/s^2, found in Prior demo app
+H117_X_TRAVEL_UM = 114000 # um
+H117_Y_TRAVEL_UM = 75000 # um
+
+### Common parameters
+STAGE_DEF_X_STEP_UM = 1000 # um
+STAGE_DEF_Y_STEP_UM = 1000 # um
+
+'''Color dictionaries'''
+
 NEW_TAB10 = {'blue' : '#4e79a7',
              'orange' : '#f28e2b',
              'red' : '#e15759',
@@ -71,7 +101,8 @@ STG_COLORS = {'acqText': '#FFFFFF',
               'pattern' : '#3333CC',
               'text' : '#FF0000'}
 
-### Individual colors
+'''Colors'''
+
 DARK_PLOT_AXES = GS_COLORS['text']
 DARK_PLOT_BACKGROUND = GS_COLORS['background']
 DEFAULT_PLOT_AXES = '#000000'
@@ -83,10 +114,12 @@ PLOT_COLOR_DARK = '#0000FF'
 PLOT_COLOR_REF_DARK = '#00FF00'
 PLOT_COLOR_T_DARK = '#FF0000'
 
-### Colormaps
+'''Colormaps'''
+
 # DEFAULT_COLORMAP = plt.cm.Spectral
 
-### Directories
+'''Directories'''
+
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
 DEF_SCAN_IMAG_SUBFOLDER = 'scanningimaging'
 DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
@@ -94,6 +127,8 @@ DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
 DEF_FILENAME_SCAN_IMAG_X = '_X-um.txt' # For scanning imaging experiments
 DEF_FILENAME_SCAN_IMAG_Y = '_Y-um.txt' # For scanning imaging experiments
 DEF_FILENAME_SCAN_IMAG_V = '_V-V.txt' # For scanning imaging experiments
+
+'''MIRcat QCL parameters'''
 
 ### MIRcat default pulse parameters
 ### These cannot be queried from the laser
@@ -163,9 +198,7 @@ WL_MINIMUMS_UM = [MIN_WL_QCL1_UM,
                   MIN_WL_QCL3_UM,
                   MIN_WL_QCL4_UM]
 
-### Default sweep parameters
-MAX_SWEEP_SPEED_UM = 0.5
-MAX_SWEEP_SPEED_INVCM = 100
+'''Experiment parameters'''
 
 ### Default NI PCIe card sampling parameters
 # DEF_SAMPLERATE = 1000 # Hz
@@ -180,11 +213,10 @@ DEF_WL_START_UM = 5.2 # Default scan/sweep start wavelength, um
 DEF_WL_END_UM = 5.8 # Default scan/sweep end wavelength, um
 DEF_WL_STEP_UM = 0.1 # Default scan/sweep wavelength step, um
 
-### Stage travel parameters
-STAGE_X_TRAVEL_UM = 120000 # um
-STAGE_Y_TRAVEL_UM = 80000 # um
-DEF_STAGE_X_STEP_UM = 1000 # um
-DEF_STAGE_Y_STEP_UM = 1000 # um
+### Default sweep parameters
+MAX_SWEEP_SPEED_UM = 0.5
+MAX_SWEEP_SPEED_INVCM = 100
+
 
 ### Multiwell holder and scan parameters
 DEF_WELLS_X = 8 # Default number of wells along x
@@ -212,21 +244,28 @@ IMAG_SCAN_SIZE_X_UM = 4
 IMAG_SCAN_SIZE_Y_UM = 4
 IMAG_SCAN_WL_LIST = '6.7'
 
-### Gamepad
+'''Gamepad parameters'''
+
 GAMEPAD_UPDATE_INTERVAL_S = 0.1 # update interval for the gamepad loop, s
 JOY_DEADZONE = 0.10 # Threshold for thumbstick deadzone
 
-### UI look and feel
-COL_WIDTH = 100
+'''UI look and feel'''
+
+### Fonts
 FONT_FAMILY = 'Open Sans Semibold'
 FONT_SIZE = 12
 FONT_SIZE_MEDIUM = 11
 FONT_SIZE_SMALL = 10
 FONT_SIZE_TINY = 8
+
+### UI parameters
+COL_WIDTH = 100
 NUMBER_OF_ROWS = 14 # UI grid template rows
 NUMBER_OF_COLS = 12 # UI grid template columns
 MSG_TIMEOUT = 1000 # ms
 ROW_HEIGHT = 20
+
+### Style sheets
 STYLE_ARMED = '''QPushButton {{
         background-color: {};
         border: 2px solid {};

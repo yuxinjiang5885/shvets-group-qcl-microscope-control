@@ -43,6 +43,8 @@ from PyQt6.QtWidgets import (QApplication,
                              QTextEdit)
 rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
 
+STAGE_COM_PORT = defaults.HLD117_COM_PORT
+STAGE_MODEL = 'HLD117'
 
 class mainWindow(QMainWindow):
     '''Main application window and instrument controls.'''
@@ -65,9 +67,16 @@ class mainWindow(QMainWindow):
         self.laserWorker.laserInitialized.connect(lambda: startupDialog.done(0))
         startupDialog.exec()
         ### Initialize stage
+        if STAGE_MODEL in ['H117', 'h117']:
+            self.xTravel = defaults.H117_X_TRAVEL_UM
+            self.yTravel = defaults.H117_Y_TRAVEL_UM
+        else:
+            self.xTravel = defaults.HLD117_X_TRAVEL_UM
+            self.yTravel = defaults.HLD117_Y_TRAVEL_UM
+        self.make_gui()
         self.stage = []
         self.threadStg = QThread()
-        self.stageWorker = stageInitializer()
+        self.stageWorker = stageInitializer(COM_PORT = STAGE_COM_PORT)
         self.stageWorker.moveToThread(self.threadStg)
         self.threadStg.started.connect(self.stageWorker.stage_initialize)
         self.stageWorker.stageInitialized.connect(self.threadStg.quit)
@@ -76,7 +85,7 @@ class mainWindow(QMainWindow):
         self.threadStg.finished.connect(self.threadStg.deleteLater)
         self.threadStg.start()
         ### Show stage startup dialog
-        startupDialog2 = stageStartupDialog() # Closes when startup finishes
+        startupDialog2 = stageStartupDialog(COM_PORT = STAGE_COM_PORT) # Closes when startup finishes
         self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
         startupDialog2.exec()
         ### Prepare text for "about" dialog
@@ -101,7 +110,7 @@ class mainWindow(QMainWindow):
         self.laserMenu = laserSettingWindow(self)
         self.multiMenu = multipleAcquisitionsWindow(self)
         self.multiMenu.btn['Start'][0].clicked.connect(lambda: self.multiple())
-        self.stageMotionWindow = stageMotionWindow(self)
+        self.stageMotionWindow = stageMotionWindow(mainGUI = self, model = STAGE_MODEL)
         self.statusbar.showMessage('Ready')
 
     def about(self):
@@ -597,12 +606,12 @@ class mainWindow(QMainWindow):
         self.stagePlotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.stagePlotCanvas.axes.set_aspect('equal')
         self.stagePlotCanvas.axes.set_xlabel('x (μm)')
-        xTravel = defaults.STAGE_X_TRAVEL_UM
+        xTravel = self.xTravel
         xMax = 1.1 * xTravel / 2
         xMin = -1 * xMax
         self.stagePlotCanvas.axes.set_xlim(xMin, xMax)
         self.stagePlotCanvas.axes.set_ylabel('y (μm)')
-        yTravel = defaults.STAGE_Y_TRAVEL_UM
+        yTravel = self.yTravel
         yMax = 1.1 * yTravel / 2
         yMin = -1 * yMax
         self.stagePlotCanvas.axes.set_ylim(yMin, yMax)
@@ -632,12 +641,12 @@ class mainWindow(QMainWindow):
         self.imagePlotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.imagePlotCanvas.axes.set_aspect('equal')
         self.imagePlotCanvas.axes.set_xlabel('x (μm)')
-        xTravel = defaults.STAGE_X_TRAVEL_UM
+        xTravel = self.xTravel
         xMax = 1.1 * xTravel / 2
         xMin = -1 * xMax
         self.imagePlotCanvas.axes.set_xlim(xMin, xMax)
         self.imagePlotCanvas.axes.set_ylabel('y (μm)')
-        yTravel = defaults.STAGE_Y_TRAVEL_UM
+        yTravel = self.yTravel
         yMax = 1.1 * yTravel / 2
         yMin = -1 * yMax
         self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
