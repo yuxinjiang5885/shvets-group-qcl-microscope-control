@@ -12,7 +12,7 @@ from PyQt6.QtCore import QThread
 from PyQt6.QtWidgets import (QApplication, QMainWindow)
 
 MODEL = 'HLD117'
-COM_PORT = defaults.H117_COM_PORT
+COM_PORT = defaults.HLD117_COM_PORT
 
 class mainWindow(QMainWindow):
     '''Dummy application window.'''
@@ -24,7 +24,7 @@ class mainWindow(QMainWindow):
         ### Initialize stage
         self.stage = []
         self.threadStg = QThread()
-        self.stageWorker = stageInitializer(COM_PORT = COM_PORT)
+        self.stageWorker = stageInitializer(MODEL = MODEL, COM_PORT = COM_PORT)
         self.stageWorker.moveToThread(self.threadStg)
         self.threadStg.started.connect(self.stageWorker.stage_initialize)
         self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)

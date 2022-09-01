@@ -257,21 +257,16 @@ class stageMotion(QObject):
         dwellTime = self.parameters.dwellTime
         ### Calculate positions vector
         positions = []
-        if xWells == 1:
-            pass
-        elif yWells == 1:
-            pass
-        else:
-            for x in range(0, xWells):
-                for y in range(0, yWells):
-                    ### Rectangle diagonal for this position
-                    # angle2 = np.arctan2(y, x)
-                    ### Angle of position relative to bottom left well
-                    # posAngle = angle + angle2
-                    ### Calculate positons. Note: stage y axis is inverted.
+        for x in range(0, xWells):
+            for y in range(0, yWells):
+                ### Calculate positons. Note: stage y axis is inverted.
+                if xWells > 1 and yWells > 1:
                     xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.sin(angle)
                     yPos = y1 + -1 * x*xWellSep*np.sin(angle) + -1 * y*yWellSep*np.cos(angle)
-                    positions.append([xPos, yPos])
+                else:
+                    xPos = x1 + x*xWellSep*np.cos(angle) - y*yWellSep*np.cos(angle)
+                    yPos = y1 + -1 * x*xWellSep*np.sin(angle) + -1 * y*yWellSep*np.sin(angle)
+                positions.append([xPos, yPos])
         if self.parameters.reverse:
             positions.reverse()
         ### Start timer
@@ -337,7 +332,7 @@ class stageMotionWindow(QMainWindow):
         self.stage = mainGUI.stage
         self.stage.set_acc() # Return acceleration to default
         self.stage.set_speed() # Return speed to default
-        self.stage.joystick(enable=False) # Disable hardware joystick
+        self.stage.joystick(enable = False) # Disable hardware joystick
         self.parameters = stageMotionParameters() # Passed to "run"
         self.threadMW = [] # Multiwell thread
         self.workerMW = [] # Multiwell worker
@@ -808,11 +803,9 @@ class stageMotionWindow(QMainWindow):
         y0 = y2Inv - y1Inv
         xMW = (self.parameters.xWells - 1) * self.parameters.xWellSep
         yMW = (self.parameters.yWells - 1) * self.parameters.yWellSep
-        if (xMW == 0) or (yMW == 0): # Then angle is between first and last well
+        if (xMW == 0) or (yMW == 0): # Angle is between first and last well
             angle = np.arctan2(y0, x0)
-        else: # Angle is that of multiwell holder
-            # sine = (y0 - (yMW/xMW)*x0) / (xMW + yMW**2/xMW)
-            # angle = np.arcsin(sine)
+        else: # Angle is that of the multiwell holder
             angle = np.arctan2(y0, x0) - np.arctan2(yMW, xMW)
         print('Multiwell holder angle : {:.2f}°.'.format(angle* 360 / (2 * np.pi)))
         self.parameters.xCornerRel = x0
