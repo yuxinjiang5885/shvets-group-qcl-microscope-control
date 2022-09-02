@@ -686,11 +686,21 @@ class imagingScan(QObject):
                                 dataIndexWl = self.parameters.data.W[dataIndexPattern].index(wl)
                                 ### Tune
                                 self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
-                                ### Iterate over positions
+                                ### Split pattern in starting and target positions
+                                targetSize0 = int(np.shape(fp)[0]/2)
+                                targetSize1 = np.shape(fp)[1]
+                                starting = np.zeros((targetSize0, targetSize1))
+                                target = np.zeros((targetSize0, targetSize1))
                                 for i, (x, y) in enumerate(zip(fp[:, 0], fp[:, 1])):
-                                    ### Only use even indices for scan lines
-                                    if not i % 2 == 0:
-                                        continue
+                                    j = int(np.floor(i/2))
+                                    if i % 2 == 0:
+                                        starting[j, 0] = x
+                                        starting[j, 1] = y
+                                    else:
+                                        target[j, 0] = x
+                                        target[j, 1] = y
+                                ### Iterate over positions
+                                for i, (x, y) in enumerate(zip(starting[:, 0], starting[:, 1])):
                                     ### Position stage for scan line
                                     self.parameters.stage.goto(x, y)
                                     ### Wait for stage to stop moving
@@ -701,13 +711,9 @@ class imagingScan(QObject):
                                     self.stageMoved.emit(xStg, yStg)
                                     print('Scanning line {:.0f}/{:.0f} starting x {:.0f} μm, y {:.0f} μm'.format(
                                         int(i/2) + 1, len(fp[:, 0])/2, xStg, yStg))
-                                    ### Assign scan line start and end points
-                                    try:
-                                        xEnd = fp[i + 1, 0]
-                                        yEnd = fp[i + 1, 1]
-                                    except Exception as exc:
-                                        print('No more points in pattern')
-                                        continue
+                                    ### Assign scan line end points
+                                    xEnd = target[i, 0]
+                                    yEnd = target[i, 1]
                                     ### Set conditions for stage stop
                                     ### Account for scans in negative direction
                                     if vx == 0:
