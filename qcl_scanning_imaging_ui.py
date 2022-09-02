@@ -1270,7 +1270,7 @@ class mainWindow(QMainWindow):
         self.worker.parameters = self.scanImagParameters
         self.worker.moveToThread(self.threadRun)
         self.threadRun.started.connect(self.worker.run)
-        # self.worker.stageMoved.connect(self.update_scanning_imaging_plot_position)
+        self.worker.stageMoved.connect(self.update_scanning_imaging_plot_position)
         self.worker.finished.connect(self.threadRun.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.threadRun.finished.connect(self.threadRun.deleteLater)
