@@ -79,6 +79,7 @@ class scanUI(QWidget):
         self.grid = QGridLayout()
         self.setLayout(self.grid)
         self.scanID = -1
+        self.sizeOrSteps = 'steps' # Scan defined by size or number of steps
         self.make_ui()
 
     def make_ui(self):
@@ -104,9 +105,9 @@ class scanUI(QWidget):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Buttons
         self.buttons = dict() # [button, row, col, rowSpan, colSpan]
-        self.buttons['ScanSizeN'] = [QPushButton('Scan points'), 0, 3, 1, 1]
+        self.buttons['ScanSizeSteps'] = [QPushButton('Scan steps'), 0, 3, 1, 1]
         # 'Scan size\n(μm)'
-        self.buttons['ScanSizeN'][0].setToolTip('Toggle between scan size and number of points')
+        self.buttons['ScanSizeSteps'][0].setToolTip('Toggle between scan size and number of steps')
         self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 7, 0, 2, 1]
         self.buttons['WlWn'][0].setToolTip('Toggle between wavelengths and wavenumbers')
         for x, k in self.buttons.items(): # Arrange buttons in grid
@@ -129,20 +130,20 @@ class scanUI(QWidget):
         self.inputFields['yStep'] = [QLineEdit('{}'.format(
                                     defaults.IMAG_SCAN_STEP_Y_UM )), 2, 2, 1, 1]
         self.inputFields['yStep'][0].setToolTip('Scan y step')
-        self.inputFields['xSizeN'] = [QLineEdit('{}'.format(
+        self.inputFields['xSizeSteps'] = [QLineEdit('{}'.format(
                                     defaults.IMAG_SCAN_SIZE_X_UM )), 1, 3, 1, 1]
-        self.inputFields['xSizeN'][0].setToolTip('Scan x size')
-        self.inputFields['ySizeN'] = [QLineEdit('{}'.format(
+        self.inputFields['xSizeSteps'][0].setToolTip('Scan x size or steps')
+        self.inputFields['ySizeSteps'] = [QLineEdit('{}'.format(
                                     defaults.IMAG_SCAN_SIZE_X_UM )), 2, 3, 1, 1]
-        self.inputFields['ySizeN'][0].setToolTip('Scan x size')
+        self.inputFields['ySizeSteps'][0].setToolTip('Scan x size or steps')
         self.inputFields['samplingRate'] = [QLineEdit('{}'.format(
                                     defaults.DEF_SAMPLERATE)), 6, 1, 1, 1]
         self.inputFields['samplingRate'][0].setToolTip(
                                     'Acquisition card sampling rate')
         self.inputFields['samplesPerWl'] = [QLineEdit('{}'.format(
-                                    defaults.DEF_SAMPLES)), 6, 2, 1, 1]
+                                    defaults.DEF_SAMPLES_IMAGING)), 6, 2, 1, 1]
         self.inputFields['samplesPerWl'][0].setToolTip(
-                                    'Voltage points per wavelength/number step')
+                                    'Voltage points per wavelength/wavenumber step')
         self.inputFields['speed'] = [QLineEdit('{}'.format(
                                     defaults.MAX_SWEEP_SPEED_UM)), 6, 3, 1, 1]
         self.inputFields['speed'][0].setToolTip('Sweep speed')
@@ -167,3 +168,31 @@ class scanUI(QWidget):
         self.wlwnList.setStyleSheet(defaults.STYLE_TEXT)
         self.wlwnList.setToolTip('List of wavelengths (format: 1000, 1100:1200, ...)')
         self.grid.addWidget(self.wlwnList, 7, 1, 2, 3)
+        ### Connect buttons to actions
+        self.buttons['ScanSizeSteps'][0].clicked.connect(lambda: self.switch_scan_size_steps())
+
+    def switch_scan_size_steps(self):
+        '''Switch between scan size and number of steps'''
+        for s in self.mainGUI.scanBrowser.scans:
+            if s.sizeOrSteps in ['Steps', 'steps']:
+                s.sizeOrSteps = 'size'
+                s.buttons['ScanSizeSteps'][0].setText('Scan size (μm)')
+                xStep = int(s.inputFields['xStep'][0].text())
+                yStep = int(s.inputFields['yStep'][0].text())
+                xSteps = int(s.inputFields['xSizeSteps'][0].text())
+                ySteps = int(s.inputFields['ySizeSteps'][0].text())
+                xSize = xStep * xSteps
+                ySize = yStep * ySteps
+                s.inputFields['xSizeSteps'][0].setText('{:.0f}'.format(xSize))
+                s.inputFields['ySizeSteps'][0].setText('{:.0f}'.format(ySize))
+            else:
+                s.sizeOrSteps = 'steps'
+                s.buttons['ScanSizeSteps'][0].setText('Scan steps')
+                xStep = int(s.inputFields['xStep'][0].text())
+                yStep = int(s.inputFields['yStep'][0].text())
+                xSize = int(s.inputFields['xSizeSteps'][0].text())
+                ySize = int(s.inputFields['ySizeSteps'][0].text())
+                xSteps = int(xSize / xStep)
+                ySteps = int(ySize / yStep)
+                s.inputFields['xSizeSteps'][0].setText('{:.0f}'.format(xSteps))
+                s.inputFields['ySizeSteps'][0].setText('{:.0f}'.format(ySteps))

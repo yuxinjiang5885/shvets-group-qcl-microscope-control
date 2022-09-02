@@ -173,20 +173,34 @@ class mainWindow(QMainWindow):
     def construct_pattern(self, scanDir = 0,
                                 xOrig = defaults.IMAG_SCAN_ORIGIN_X_UM,
                                 yOrig = defaults.IMAG_SCAN_ORIGIN_Y_UM,
-                                xSizeN = defaults.IMAG_SCAN_SIZE_X_UM,
-                                ySizeN = defaults.IMAG_SCAN_SIZE_Y_UM,
+                                xSizeSteps = defaults.IMAG_SCAN_SIZE_X_UM,
+                                ySizeSteps = defaults.IMAG_SCAN_SIZE_Y_UM,
                                 xStep = defaults.IMAG_SCAN_STEP_X_UM,
                                 yStep = defaults.IMAG_SCAN_STEP_Y_UM,
+                                sizeOrSteps = 'steps',
                                 invert = 'even'):
         '''Construct raster pattern for scanning imaging'''
+        ### Check whether steps or sizes are used, calculate the other quantity
+        if sizeOrSteps in ['Steps', 'steps']:
+            xSteps = xSizeSteps
+            ySteps = ySizeSteps
+            xSize = xStep * xSteps
+            ySize = yStep * ySteps
+        else:
+            xSize = xSizeSteps
+            ySize = ySizeSteps
+            xSteps = int(xSize / xStep)
+            ySteps = int(ySize / yStep)
+        ### Prepare variables to be returned
         patternx = []
         indexx = []
         patterny = []
         indexy = []
+        ### Check scan direction
         match scanDir:
             ### Scan along longest side
             case 0:
-                if ySizeN * yStep > xSizeN * xStep:
+                if ySize > xSize:
                     scanPatternDir = 'y'
                 else:
                     scanPatternDir = 'x'
@@ -195,15 +209,16 @@ class mainWindow(QMainWindow):
                 scanPatternDir = 'x'
             case 2:
                 scanPatternDir = 'y'
+        ### Write pattern according to scan direction
         match scanPatternDir:
             ### Scan along x, turn along y
             case 'x':
-                for ys in range(0, ySizeN):
+                for ys in range(0, ySteps):
                     if (invert in ['even', 'Even'] and (ys % 2 == 0)) or \
                        (invert in ['odd', 'Odd'] and (ys % 2 == 0)):
-                        xRange = range(0, xSizeN)
+                        xRange = range(0, xSteps)
                     else:
-                        xRange = range(xSizeN - 1, -1, -1)
+                        xRange = range(xSteps - 1, -1, -1)
                     for xs in xRange:
                         y = ys * yStep + yOrig
                         x = xs * xStep + xOrig
@@ -213,12 +228,12 @@ class mainWindow(QMainWindow):
                         indexy.append(ys)
             ### Scan along y, turn along x
             case 'y':
-                for xs in range(0, xSizeN):
+                for xs in range(0, xSteps):
                     if (invert in ['even', 'Even'] and (xs % 2 == 0)) or \
                        (invert in ['odd', 'Odd'] and (xs % 2 == 0)):
-                        yRange = range(ySizeN - 1, -1, -1)
+                        yRange = range(ySteps - 1, -1, -1)
                     else:
-                        yRange = range(0, ySizeN)
+                        yRange = range(0, ySteps)
                     for ys in yRange:
                         x = xs * xStep + xOrig
                         y = ys * yStep + yOrig
@@ -1165,17 +1180,20 @@ class mainWindow(QMainWindow):
             yOrig = int(s.inputFields['yOrig'][0].text())
             xStep = int(s.inputFields['xStep'][0].text())
             yStep = int(s.inputFields['yStep'][0].text())
-            xSizeN = int(s.inputFields['xSizeN'][0].text())
-            ySizeN = int(s.inputFields['ySizeN'][0].text())
+            xSizeSteps = int(s.inputFields['xSizeSteps'][0].text())
+            ySizeSteps = int(s.inputFields['ySizeSteps'][0].text())
+            sizeOrSteps = s.sizeOrSteps
             scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
             pattern, indices = self.construct_pattern(scanDir,
                 xOrig = xOrig,
                 yOrig = yOrig,
-                xSizeN = xSizeN,
-                ySizeN = ySizeN,
+                xSizeSteps = xSizeSteps,
+                ySizeSteps = ySizeSteps,
                 xStep = xStep,
-                yStep = yStep)
+                yStep = yStep,
+                sizeOrSteps = sizeOrSteps)
+            print(pattern)
             samplesPerWl = int(s.inputFields['samplesPerWl'][0].text())
             samplingRate = int(s.inputFields['samplingRate'][0].text())
             speed = float(s.inputFields['speed'][0].text())
@@ -1296,17 +1314,19 @@ class mainWindow(QMainWindow):
             yOrig = int(s.inputFields['yOrig'][0].text())
             xStep = int(s.inputFields['xStep'][0].text())
             yStep = int(s.inputFields['yStep'][0].text())
-            xSizeN = int(s.inputFields['xSizeN'][0].text())
-            ySizeN = int(s.inputFields['ySizeN'][0].text())
+            xSizeSteps = int(s.inputFields['xSizeSteps'][0].text())
+            ySizeSteps = int(s.inputFields['ySizeSteps'][0].text())
+            sizeOrSteps = s.sizeOrSteps
             scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
             pattern, _ = self.construct_pattern(scanDir,
                 xOrig = xOrig,
                 yOrig = yOrig,
-                xSizeN = xSizeN,
-                ySizeN = ySizeN,
+                xSizeSteps = xSizeSteps,
+                ySizeSteps = ySizeSteps,
                 xStep = xStep,
-                yStep = yStep)
+                yStep = yStep,
+                sizeOrSteps = sizeOrSteps)
             ### Display pattern on plot
             patternPlot = self.stagePlotCanvas.axes.scatter(pattern[:,0],
                                                       pattern[:,1],

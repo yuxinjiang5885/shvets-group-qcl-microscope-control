@@ -587,7 +587,7 @@ class imagingScan(QObject):
                                     self.parameters.stage.goto(x, y)
                                     ### Wait for stage to stop moving
                                     while int(self.parameters.stage.busy()) > 0:
-                                        time.sleep(0.1)
+                                        time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
                                     (stgx, stgy) = self.parameters.stage.get_position()
                                     # print('{}/{} patterns, '.format(), end ='')
                                     # print('{}/{} wavelengths, '.format(), end ='')

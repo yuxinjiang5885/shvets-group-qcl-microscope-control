@@ -198,6 +198,7 @@ DEF_SAMPLERATE = 100000 # Hz
 # DEF_SAMPLES = 100
 # DEF_SAMPLES = 320
 DEF_SAMPLES = 32
+DEF_SAMPLES_IMAGING = 2
 
 ### Default scan/sweep parameters
 DEF_WL_START_UM = 5.2 # Default scan/sweep start wavelength, um
@@ -207,7 +208,6 @@ DEF_WL_STEP_UM = 0.1 # Default scan/sweep wavelength step, um
 ### Default sweep parameters
 MAX_SWEEP_SPEED_UM = 0.5
 MAX_SWEEP_SPEED_INVCM = 100
-
 
 ### Multiwell holder and scan parameters
 DEF_WELLS_X = 8 # Default number of wells along x
@@ -234,6 +234,7 @@ IMAG_SCAN_STEP_Y_UM = 4000
 IMAG_SCAN_SIZE_X_UM = 4
 IMAG_SCAN_SIZE_Y_UM = 4
 IMAG_SCAN_WL_LIST = '6.7'
+IMAG_SCAN_STEP_BUSY_WAIT = 0.01 # Stage busy query wait time, s
 
 '''Gamepad parameters'''
 
