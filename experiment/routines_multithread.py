@@ -709,8 +709,8 @@ class imagingScan(QObject):
                                     ### Emit line start position
                                     (xStg, yStg) = self.parameters.stage.get_position()
                                     self.stageMoved.emit(xStg, yStg)
-                                    print('Scanning line {:.0f}/{:.0f} starting x {:.0f} μm, y {:.0f} μm'.format(
-                                        i, len(starting), xStg, yStg))
+                                    print('Scanning line {:.0f}/{:.0f} starting at x {:.0f} μm, y {:.0f} μm'.format(
+                                        i + 1, len(starting), xStg, yStg))
                                     ### Assign scan line end points
                                     xEnd = target[i, 0]
                                     yEnd = target[i, 1]
