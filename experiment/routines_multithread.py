@@ -710,7 +710,7 @@ class imagingScan(QObject):
                                     (xStg, yStg) = self.parameters.stage.get_position()
                                     self.stageMoved.emit(xStg, yStg)
                                     print('Scanning line {:.0f}/{:.0f} starting x {:.0f} μm, y {:.0f} μm'.format(
-                                        int(i/2) + 1, len(fp[:, 0])/2, xStg, yStg))
+                                        i, len(starting), xStg, yStg))
                                     ### Assign scan line end points
                                     xEnd = target[i, 0]
                                     yEnd = target[i, 1]
@@ -744,6 +744,9 @@ class imagingScan(QObject):
                                     self.parameters.stage.stop_smoothly()
                                     while int(self.parameters.stage.busy()) > 0:
                                         time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+                                ### Emit ending position
+                                (xStg, yStg) = self.parameters.stage.get_position()
+                                self.stageMoved.emit(xStg, yStg)
                         except Exception as exc:
                             print('Scan did not complete:\n{}'.format(exc))
                             print('Partial data may still be usable.')

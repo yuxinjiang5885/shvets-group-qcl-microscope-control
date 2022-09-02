@@ -1181,10 +1181,8 @@ class mainWindow(QMainWindow):
                 self.stageMotionWindow.workerG.stop = True
                 self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
         print('All stage joysticks disabled')
-        ### Show patterns on plot
-        self.update_scanning_imaging_plot_patterns()
-        self.scanImagParameters = scanningImagingParameters()
         ### Read and compile general experiment parameters
+        self.scanImagParameters = scanningImagingParameters()
         self.scanImagParameters.laser = self.laser
         self.scanImagParameters.stage = self.stage
         # self.scanImagParameters.notes = self.notes.toPlainText()
@@ -1268,6 +1266,8 @@ class mainWindow(QMainWindow):
         ### Lock GUI controls
         self.lock_controls()
         self.statusbar.showMessage('Busy')
+        ### Show patterns on plot
+        self.update_scanning_imaging_plot_patterns()
         ### Run acquisition in separate thread
         self.threadRun = QThread()
         self.worker = imagingScan()
@@ -1362,6 +1362,9 @@ class mainWindow(QMainWindow):
                 xStep = xStep,
                 yStep = yStep,
                 sizeOrSteps = sizeOrSteps)
+            ### Use "fast" pattern if fast scanning was utilized
+            if self.scanImagParameters.scanMode in ['continuous_one', 'continuous_sweep']:
+                pattern = fastPattern
             ### Display pattern on plot
             patternPlot = self.stagePlotCanvas.axes.scatter(pattern[:,0],
                                                       pattern[:,1],
