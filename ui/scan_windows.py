@@ -78,7 +78,6 @@ class scanBrowser(QTabWidget):
             self.setTabText(si, scanLabel)
 
 
-
 class scanUI(QWidget):
     '''Widget with scan controls'''
 

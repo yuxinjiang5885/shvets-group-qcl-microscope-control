@@ -271,9 +271,10 @@ class mainWindow(QMainWindow):
                         y = ys * yStep + yOrig
                         fastPatternx.append(x)
                         fastPatterny.append(y)
-        return(np.transpose(np.array((patternx, patterny))),
-               np.transpose(np.array((indexx, indexy))),
-               np.transpose(np.array((fastPatternx, fastPatterny))))
+        return(scanPatternDir,
+            np.transpose(np.array((patternx, patterny))),
+            np.transpose(np.array((indexx, indexy))),
+            np.transpose(np.array((fastPatternx, fastPatterny))))
 
     def emission(self):
         '''Enable or disable laser emission.'''
@@ -963,21 +964,21 @@ class mainWindow(QMainWindow):
            By default, plot index 0 scan and wavelength/wavenumber'''
         ### Clear previous plot
         self.imagePlotCanvas.clear_plots()
-        ### Make list of available scans
-        self.imagePlotScanSelector.clear()
-        for iv, _ in enumerate(data.V):
-            self.imagePlotScanSelector.addItem('{:.0f}'.format(iv))
-        self.imagePlotScanSelector.setCurrentRow(0)
-        ### Make list of wavelengths/wavenumbers for indexed scan
-        self.imagePlotWSelector.clear()
-        for w in data.W[scanIndex]:
-            self.imagePlotWSelector.addItem('{:.3f}'.format(w))
-        self.imagePlotWSelector.setCurrentRow(0)
-        ### Display indexed scan and wavelength/wavenumber in title
-        titleStr = 'Scan {:.0f} {:.3f} μm'.format(scanIndex,
-            data.W[scanIndex][wIndex])
-        self.imagePlotCanvas.axes.set_title(titleStr)
         try:
+            ### Make list of available scans
+            self.imagePlotScanSelector.clear()
+            for iv, _ in enumerate(data.V):
+                self.imagePlotScanSelector.addItem('{:.0f}'.format(iv))
+            self.imagePlotScanSelector.setCurrentRow(0)
+            ### Make list of wavelengths/wavenumbers for indexed scan
+            self.imagePlotWSelector.clear()
+            for w in data.W[scanIndex]:
+                self.imagePlotWSelector.addItem('{:.3f}'.format(w))
+            self.imagePlotWSelector.setCurrentRow(0)
+            ### Display indexed scan and wavelength/wavenumber in title
+            titleStr = 'Scan {:.0f} {:.3f} μm'.format(scanIndex,
+                data.W[scanIndex][wIndex])
+            self.imagePlotCanvas.axes.set_title(titleStr)
             self.imagePlotScanSelector.setCurrentRow(scanIndex)
             self.imagePlotWSelector.setCurrentRow(wIndex)
             xMin = np.min(data.X[scanIndex])
@@ -1216,7 +1217,8 @@ class mainWindow(QMainWindow):
             sizeOrSteps = s.sizeOrSteps
             scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
-            pattern, indices, fastPattern = self.construct_pattern(scanDir,
+            scanDir, pattern, indices, fastPattern = self.construct_pattern(
+                scanDir,
                 xOrig = xOrig,
                 yOrig = yOrig,
                 xSizeSteps = xSizeSteps,
@@ -1241,6 +1243,8 @@ class mainWindow(QMainWindow):
                 self.tabImagButtons['Start'][0].setChecked(False)
                 return
             wlwnList.sort()
+            self.scanImagParameters.scanDir.append(scanDir)
+            self.scanImagParameters.fastPatterns.append(fastPattern)
             self.scanImagParameters.patterns.append(pattern)
             # self.scanImagParameters.patternSize.append(indices[:, 0].size)
             self.scanImagParameters.patternIndices.append(indices)
@@ -1349,7 +1353,8 @@ class mainWindow(QMainWindow):
             sizeOrSteps = s.sizeOrSteps
             scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
-            pattern, _, fastPattern = self.construct_pattern(scanDir,
+            _, pattern, _, fastPattern = self.construct_pattern(
+                scanDir,
                 xOrig = xOrig,
                 yOrig = yOrig,
                 xSizeSteps = xSizeSteps,

@@ -143,13 +143,13 @@ class stage():
 
     def get_position(self):
         '''Get current stage position'''
-        count = 0
-        while self.busy() not in ['0']:
-            time.sleep(0.1)
-            count += 1
-            if count > 50:
-                print('Failed to get position: stage is still busy.')
-                return(0, 0)
+        # count = 0
+        # while self.busy() not in ['0']:
+        #     time.sleep(0.1)
+        #     count += 1
+        #     if count > 50:
+        #         print('Failed to get position: stage is still busy.')
+        #         return(0, 0)
         position = self.message('controller.stage.position.get')
         (x,y) = position[1].split(',')
         return(float(x), float(y))
@@ -223,6 +223,11 @@ class stage():
             a = self.defaultAcc
             print('Switched to default acceleration')
         self.message('controller.stage.acc.set {:.0f}'.format(a))
+
+    def set_position(self, x=0, y=0):
+        '''Set stage position.
+           Does not move the stage. Use for zeroing.'''
+        self.message('controller.stage.position.set {:.0f} {:.0f}'.format(x, y))
 
     def set_speed(self, v = 0):
         '''Set the maximum speed during a point to point move'''

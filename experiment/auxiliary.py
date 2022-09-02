@@ -106,6 +106,7 @@ class scanningImagingParameters():
         # self.reference = np.zeros((1, 2)) # Placeholder value
         self.sampleNumbers = [] # Sample numbers, placeholder value
         self.sampleRates = [] # Sample rates, placeholder value
+        self.scanDir = [] # List of scan direction (each 'x' or 'y')
         self.scanMode = 'step_one'
         self.speeds = [] # Sweeping speeds, placeholder value
         self.stage = [] # Stage instance, laceholder value

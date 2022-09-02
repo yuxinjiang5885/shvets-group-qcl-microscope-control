@@ -552,10 +552,10 @@ class imagingScan(QObject):
         startRun = timer()
         match self.parameters.scanMode:
             case 'step_one':
-                '''Scan: one wavelenght per position'''
+                '''Step scan: one wavelength per (x,y) position'''
                 posx, posy, indx, indy, voltages, wavelengths = [], [], [], [], [], []
                 dataIndexPattern = 0
-                ### Iterate over scans
+                ### Iterate over scan patterns
                 for p, sn, sr, sp, w, qcl, r, ind in zip(self.parameters.patterns,
                                                         self.parameters.sampleNumbers,
                                                         self.parameters.sampleRates,
@@ -571,9 +571,7 @@ class imagingScan(QObject):
                     numRanges = len(r)
                     for i, rw in enumerate(r):
                         print('Range {}/{}, using QCL module {}...'.format(
-                                                                    i+1, numRanges, qcl[i]))
-                        ### Failure here likely due to timeout
-                        ### because of skipped points
+                            i+1, numRanges, qcl[i]))
                         try:
                             ### Iterate over wavelengths
                             for wl in rw:
@@ -588,12 +586,12 @@ class imagingScan(QObject):
                                     ### Wait for stage to stop moving
                                     while int(self.parameters.stage.busy()) > 0:
                                         time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
-                                    (stgx, stgy) = self.parameters.stage.get_position()
+                                    (xStg, yStg) = self.parameters.stage.get_position()
                                     # print('{}/{} patterns, '.format(), end ='')
                                     # print('{}/{} wavelengths, '.format(), end ='')
+                                    self.stageMoved.emit(xStg, yStg)
                                     print('Scanning: x {:.0f} μm, y {:.0f} μm'.format(
-                                        stgx, stgy), end='\r')
-                                    self.stageMoved.emit(stgx, stgy)
+                                        xStg, yStg), end='\r')
                                     ### Acquire
                                     measurements = multipleAI.acquire(sn)
                                     ### Append data
@@ -605,7 +603,7 @@ class imagingScan(QObject):
                     multipleAI.clear_task()
                     ### Increment pattern-counting index
                     dataIndexPattern += 1
-                    ### Format data
+                ### Format data
                 try:
                     for iv, v in enumerate(self.parameters.data.Vtemp):
                         ### Save X, Y positions for this pattern
@@ -643,77 +641,144 @@ class imagingScan(QObject):
                     # print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
                     #                                             len(wavelengths)))
             case 'step_all':
-                '''Scan: all wavelenghts at each position'''
-                '''NOT FUNCTIONAL: restructure as one-wl-per-step case'''
+                '''Step scan: all wavelengths at each (x,y) position'''
                 print('Not implemented.')
                 return []
-                scanData = []
-                for p, sn, sr, sp, w, qcl, r in zip(self.parameters.patterns,
-                                                    self.parameters.sampleNumbers,
-                                                    self.parameters.sampleRates,
-                                                    self.parameters.speeds,
-                                                    self.parameters.wlwnList,
-                                                    self.parameters.qcl,
-                                                    self.parameters.ranges):
-                    posData = []
-                    for x, y in zip(p[:, 0], p[:, 1]):
-                        '''Setup acquisition'''
-                        multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
-                        multipleAI.configure(sn, sr)
-                        '''Move'''
-                        self.parameters.stage.goto(x, y)
-                        while int(self.parameters.stage.busy()) > 0:
-                            time.sleep(0.1)
-                        '''Take measurements'''
-                        numRanges = len(r)
-                        steps = 0
-                        voltages, wavelengths = [], []
-                        for i, rw in enumerate(r):
-                            steps += len(rw)
-                            wavelengths += rw
-                            print('Range {}/{}, using QCL module {}...'.format(
-                                                                        i+1, numRanges, qcl[i]))
-                            ### Acquisition
-                            rangeVoltages = []
-                            try: # Failure here likely due to timeout because of skipped points
-                                for wl in rw:
-                                    ### Tune
-                                    self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
-                                    ### Acquire
-                                    rangeVoltages.append(multipleAI.acquire(sn))
-                            except Exception as exc:
-                                print('Scan did not complete:\n{}'.format(exc))
-                                print('Partial data may still be usable.')
-                            voltages += rangeVoltages
-                        ### Clear triggered acquisition task
-                        multipleAI.clear_task()
-                        '''Format data'''
-                        data = np.zeros((steps, 4)) # wl, X, Y, R
-                        try:
-                            for x, v in enumerate(voltages):
-                                data[x, 0] = wavelengths[x]
-                                data[x, 1] = np.sum(v[0])/sn # Lock-in X
-                                data[x, 2] = np.sum(v[1])/sn # Lock-in Y
-                                data[x, 3] = (np.sqrt(np.power(data[x, 1], 2) +
-                                                    np.power(data[x, 2], 2))) # Lock-in R
-                        except Exception as exc:
-                            print('Data formatting did not complete:\n{}'.format(exc))
-                            print('Data was not saved.')
-                        data = data[data[:, 0] != 0] # Remove zero-wavelength values
-                        print('Acquired {} of {} requested points.'.format(len(data[:, 0]),
-                                                                    len(wavelengths)))
-                        ### Flip data order if it was reversed by repeat
-                        # if (self.parameters.units == 'um' and data[0, 0] > data[-1, 0]
-                        #     or self.parameters.units == 'invcm' and data[0, 0] < data[-1, 0]):
-                        #     data = np.flip(data, 0)
-                        posData.append(data)
-                    scanData.append(posData)
             case 'step_sweep':
+                '''Step scan: QCL sweep at each (x,y) position'''
                 print('Not implemented.')
                 return []
             case 'continuous_one':
-                print('Not implemented.')
-                return []
+                '''Continuous scan: one wavelength per (x,y) position'''
+                posx, posy, indx, indy, voltages, wavelengths = [], [], [], [], [], []
+                dataIndexPattern = 0
+                ### Iterate over scan patterns
+                for fp, sn, sr, w, qcl, r, ind, sd in zip(self.parameters.fastPatterns,
+                                                        self.parameters.sampleNumbers,
+                                                        self.parameters.sampleRates,
+                                                        self.parameters.wlwnList,
+                                                        self.parameters.qcl,
+                                                        self.parameters.ranges,
+                                                        self.parameters.patternIndices,
+                                                        self.parameters.scanDir):
+                    ### Assign stage speeds for scan lines
+                    if sd in ['x', 'X']:
+                        vx = self.parameters.stage.get_speed()
+                        vy = 0
+                    elif sd in ['y', 'Y']: # default to scanning along x
+                        vx = 0
+                        vy = self.parameters.stage.get_speed()
+                    else: # default to scanning along x
+                        vx = self.parameters.stage.get_speed()
+                        vy = 0
+                    ### Setup acquisition
+                    multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
+                    multipleAI.configure(sn, sr)
+                    ### Iterate over QCL ranges
+                    numRanges = len(r)
+                    for i, rw in enumerate(r):
+                        print('Range {}/{}, using QCL module {}...'.format(
+                             i+1, numRanges, qcl[i]))
+                        try:
+                            ### Iterate over wavelengths
+                            for wl in rw:
+                                ### Get corresponding index in data variable
+                                dataIndexWl = self.parameters.data.W[dataIndexPattern].index(wl)
+                                ### Tune
+                                self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
+                                ### Iterate over positions
+                                for i, (x, y) in enumerate(zip(fp[:, 0], fp[:, 1])):
+                                    ### Only use even indices for scan lines
+                                    if not i % 2 == 0:
+                                        continue
+                                    ### Position stage for scan line
+                                    self.parameters.stage.goto(x, y)
+                                    ### Wait for stage to stop moving
+                                    while int(self.parameters.stage.busy()) > 0:
+                                        time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+                                    ### Emit line start position
+                                    (xStg, yStg) = self.parameters.stage.get_position()
+                                    self.stageMoved.emit(xStg, yStg)
+                                    print('Scanning line {:.0f}/{:.0f} starting x {:.0f} μm, y {:.0f} μm'.format(
+                                        int(i/2) + 1, len(fp[:, 0])/2, xStg, yStg))
+                                    ### Assign scan line start and end points
+                                    try:
+                                        xEnd = fp[i + 1, 0]
+                                        yEnd = fp[i + 1, 1]
+                                    except Exception as exc:
+                                        print('No more points in pattern')
+                                        continue
+                                    ### Set conditions for stage stop
+                                    ### Account for scans in negative direction
+                                    if vx == 0:
+                                        if yEnd > y:
+                                            vy = np.abs(vy)
+                                            continueCondition = lambda xStg, yStg: yStg < yEnd
+                                        else:
+                                            vy = -1 * np.abs(vy)
+                                            continueCondition = lambda xStg, yStg: yStg > yEnd
+                                    if vy == 0:
+                                        if xEnd > x:
+                                            vx = np.abs(vx)
+                                            continueCondition = lambda xStg, yStg: xStg < xEnd
+                                        else:
+                                            vx = -1 * np.abs(vx)
+                                            continueCondition = lambda xStg, yStg: xStg > xEnd
+                                    ### Move stage
+                                    self.parameters.stage.move_at_velocity(vx, vy)
+                                    ### Acquire until endpoint is reached
+                                    while continueCondition(xStg, yStg):
+                                        (xStg, yStg) = self.parameters.stage.get_position()
+                                        ### Acquire
+                                        measurements = multipleAI.acquire(sn)
+                                        ### Append data
+                                        self.parameters.data.Vtemp[dataIndexPattern][dataIndexWl].append(measurements)
+                                    ### Stop stage at end of line
+                                    # self.parameters.stage.move_at_velocity(0, 0)
+                                    self.parameters.stage.stop_smoothly()
+                                    while int(self.parameters.stage.busy()) > 0:
+                                        time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+                        except Exception as exc:
+                            print('Scan did not complete:\n{}'.format(exc))
+                            print('Partial data may still be usable.')
+                    ### Clear acquisition task
+                    multipleAI.clear_task()
+                    ### Increment pattern-counting index
+                    dataIndexPattern += 1
+                ### Format data
+                try:
+                    for iv, v in enumerate(self.parameters.data.Vtemp):
+                        ### Save X, Y positions for this pattern
+                        np.savetxt('scan{:03.0f}{}'.format(
+                            iv + 1,
+                            defaults.DEF_FILENAME_SCAN_IMAG_X),
+                            self.parameters.data.X[iv])
+                        np.savetxt('scan{:03.0f}{}'.format(
+                            iv + 1,
+                            defaults.DEF_FILENAME_SCAN_IMAG_Y),
+                            self.parameters.data.Y[iv])
+                        for iw, w in enumerate(self.parameters.data.W[iv]):
+                            vpos = 0
+                            for ix, iy in zip(self.parameters.data.indices[iv][:, 0],
+                                self.parameters.data.indices[iv][:, 1]):
+                                    liX = np.sum(v[iw][vpos][0])/sn # Lock-in X
+                                    liY = np.sum(v[iw][vpos][1])/sn # Lock-in Y
+                                    liR = (np.sqrt(np.power(liX, 2) +
+                                            np.power(liY, 2))) # Lock-in R
+                                    self.parameters.data.V[iv][iw][ix][iy] = liR
+                                    vpos += 1
+                            if self.parameters.units in ['invcm']:
+                                wStr = 'wm-{:05.0f}invcm'.format(w)
+                            else:
+                                wStr = 'wl-{:02.3f}um'.format(w)
+                            np.savetxt('scan{:03.0f}_{}{}'.format(
+                                iv + 1,
+                                wStr,
+                                defaults.DEF_FILENAME_SCAN_IMAG_V),
+                                self.parameters.data.V[iv][iw])
+                except Exception as exc:
+                    print('Data formatting did not complete:\n{}'.format(exc))
+                    print('Data was not saved.')
             case 'continuous_sweep':
                 print('Not implemented.')
                 return []
