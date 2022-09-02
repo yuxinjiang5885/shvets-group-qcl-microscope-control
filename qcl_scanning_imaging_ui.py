@@ -192,10 +192,7 @@ class mainWindow(QMainWindow):
             xSteps = int(xSize / xStep)
             ySteps = int(ySize / yStep)
         ### Prepare variables to be returned
-        patternx = []
-        indexx = []
-        patterny = []
-        indexy = []
+        patternx, indexx, patterny, indexy = [], [], [], []
         ### Check scan direction
         match scanDir:
             ### Scan along longest side
@@ -241,8 +238,42 @@ class mainWindow(QMainWindow):
                         indexx.append(xs)
                         patterny.append(y)
                         indexy.append(ys)
+        ### Prepare patterns for fast scanning: two points per line, at ends
+        fastPatternx, fastPatterny = [], []
+        match scanPatternDir:
+            ### Scan along x, turn along y
+            case 'x':
+                xSteps = 2
+                xStep = xSize
+                for ys in range(0, ySteps):
+                    if (invert in ['even', 'Even'] and (ys % 2 == 0)) or \
+                       (invert in ['odd', 'Odd'] and (ys % 2 == 0)):
+                        xRange = range(0, xSteps)
+                    else:
+                        xRange = range(xSteps - 1, -1, -1)
+                    for xs in xRange:
+                        y = ys * yStep + yOrig
+                        x = xs * xStep + xOrig
+                        fastPatternx.append(x)
+                        fastPatterny.append(y)
+            ### Scan along y, turn along x
+            case 'y':
+                ySteps = 2
+                yStep = ySize
+                for xs in range(0, xSteps):
+                    if (invert in ['even', 'Even'] and (xs % 2 == 0)) or \
+                       (invert in ['odd', 'Odd'] and (xs % 2 == 0)):
+                        yRange = range(ySteps - 1, -1, -1)
+                    else:
+                        yRange = range(0, ySteps)
+                    for ys in yRange:
+                        x = xs * xStep + xOrig
+                        y = ys * yStep + yOrig
+                        fastPatternx.append(x)
+                        fastPatterny.append(y)
         return(np.transpose(np.array((patternx, patterny))),
-               np.transpose(np.array((indexx, indexy))))
+               np.transpose(np.array((indexx, indexy))),
+               np.transpose(np.array((fastPatternx, fastPatterny))))
 
     def emission(self):
         '''Enable or disable laser emission.'''
@@ -1185,7 +1216,7 @@ class mainWindow(QMainWindow):
             sizeOrSteps = s.sizeOrSteps
             scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
-            pattern, indices = self.construct_pattern(scanDir,
+            pattern, indices, fastPattern = self.construct_pattern(scanDir,
                 xOrig = xOrig,
                 yOrig = yOrig,
                 xSizeSteps = xSizeSteps,
@@ -1194,6 +1225,7 @@ class mainWindow(QMainWindow):
                 yStep = yStep,
                 sizeOrSteps = sizeOrSteps)
             print(pattern)
+            print(fastPattern)
             samplesPerWl = int(s.inputFields['samplesPerWl'][0].text())
             samplingRate = int(s.inputFields['samplingRate'][0].text())
             speed = float(s.inputFields['speed'][0].text())
@@ -1319,7 +1351,7 @@ class mainWindow(QMainWindow):
             sizeOrSteps = s.sizeOrSteps
             scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
-            pattern, _ = self.construct_pattern(scanDir,
+            pattern, _, fastPattern = self.construct_pattern(scanDir,
                 xOrig = xOrig,
                 yOrig = yOrig,
                 xSizeSteps = xSizeSteps,

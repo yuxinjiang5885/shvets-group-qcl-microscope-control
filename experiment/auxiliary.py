@@ -94,6 +94,7 @@ class scanningImagingParameters():
         # self.acq_time_interval_s = 300 # Interval between acquisitions, s
         self.data = scanningImagingData() # Holds acquired data
         # self.end = 100 # Placeholder value, no unit
+        self.fastPatterns = [] # Fast scanning imaging patters, placeholder value
         self.laser = [] # Laser instance, laceholder value
         self.latestDir = 0 # Latest experiment directory, placeholder value
         # self.notes = [] # Placeholder value\
