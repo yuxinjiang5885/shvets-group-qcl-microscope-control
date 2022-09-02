@@ -68,6 +68,15 @@ class scanBrowser(QTabWidget):
                 # print(self.scans)
         self.removeTab(ti)
         self.scans = [s for s in self.scans if s]
+        self.rename_scans()
+
+    def rename_scans(self):
+        '''Rename all scans after one has been closed'''
+        for si, s in enumerate(self.scans):
+            s.scanID = si
+            scanLabel = 'Scan{}{:.0f}'.format(self.tabTitleSeparator, si)
+            self.setTabText(si, scanLabel)
+
 
 
 class scanUI(QWidget):

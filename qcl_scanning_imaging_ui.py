@@ -1224,8 +1224,6 @@ class mainWindow(QMainWindow):
                 xStep = xStep,
                 yStep = yStep,
                 sizeOrSteps = sizeOrSteps)
-            print(pattern)
-            print(fastPattern)
             samplesPerWl = int(s.inputFields['samplesPerWl'][0].text())
             samplingRate = int(s.inputFields['samplingRate'][0].text())
             speed = float(s.inputFields['speed'][0].text())
