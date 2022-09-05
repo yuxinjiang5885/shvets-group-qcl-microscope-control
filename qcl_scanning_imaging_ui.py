@@ -981,10 +981,16 @@ class mainWindow(QMainWindow):
             self.imagePlotCanvas.axes.set_title(titleStr)
             self.imagePlotScanSelector.setCurrentRow(scanIndex)
             self.imagePlotWSelector.setCurrentRow(wIndex)
-            xMin = np.min(data.X[scanIndex])
-            xMax = np.max(data.X[scanIndex])
-            yMin = np.min(data.Y[scanIndex])
-            yMax = np.max(data.Y[scanIndex])
+            if self.scanImagParameters.scanMode in ['continuous_one', 'continuous_sweep']:
+                xMin = np.min(data.Xcont[scanIndex][wIndex])
+                xMax = np.max(data.Xcont[scanIndex][wIndex])
+                yMin = np.min(data.Ycont[scanIndex][wIndex])
+                yMax = np.max(data.Ycont[scanIndex][wIndex])
+            else:
+                xMin = np.min(data.X[scanIndex])
+                xMax = np.max(data.X[scanIndex])
+                yMin = np.min(data.Y[scanIndex])
+                yMax = np.max(data.Y[scanIndex])
             self.imagePlotCanvas.axes.set_xlim(xMin, xMax)
             self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
             if self.imageViewAbove.isChecked():
@@ -1259,6 +1265,8 @@ class mainWindow(QMainWindow):
             self.scanImagParameters.data.Y.append(yVector)
             self.scanImagParameters.data.add_V()
             self.scanImagParameters.data.add_Vtemp()
+            self.scanImagParameters.data.add_XYcont()
+            self.scanImagParameters.data.add_XYtemp()
         if self.wlUnits == 'invcm':
             self.scanImagParameters.units = 'invcm'
         else: # Default to micrometers
@@ -1274,7 +1282,7 @@ class mainWindow(QMainWindow):
         self.worker.parameters = self.scanImagParameters
         self.worker.moveToThread(self.threadRun)
         self.threadRun.started.connect(self.worker.run)
-        # self.worker.stageMoved.connect(self.update_scanning_imaging_plot_position)
+        self.worker.stageMoved.connect(self.update_scanning_imaging_plot_position)
         self.worker.finished.connect(self.threadRun.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.threadRun.finished.connect(self.threadRun.deleteLater)

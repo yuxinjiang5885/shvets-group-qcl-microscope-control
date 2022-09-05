@@ -198,7 +198,7 @@ DEF_SAMPLERATE = 100000 # Hz
 # DEF_SAMPLES = 100
 # DEF_SAMPLES = 320
 DEF_SAMPLES = 32
-DEF_SAMPLES_IMAGING = 1
+DEF_SAMPLES_IMAGING = 2
 
 ### Default scan/sweep parameters
 DEF_WL_START_UM = 5.2 # Default scan/sweep start wavelength, um

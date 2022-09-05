@@ -412,7 +412,7 @@ class imagingScan(QObject):
     # outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
     outData = pyqtSignal(object) # Return data to UI for plotting
     outParams = pyqtSignal(object) # Return parameters for re-use with "re"
-    # stageMoved = pyqtSignal(float, float)
+    stageMoved = pyqtSignal(float, float)
     # startedOne = pyqtSignal(int)
     # stopped = False
 
@@ -590,8 +590,10 @@ class imagingScan(QObject):
                                     # print('{}/{} patterns, '.format(), end ='')
                                     # print('{}/{} wavelengths, '.format(), end ='')
                                     # self.stageMoved.emit(xStg, yStg)
+                                    # print('Scanning: x {:.0f} μm, y {:.0f} μm'.format(
+                                    #     xStg, yStg), end='\r')
                                     print('Scanning: x {:.0f} μm, y {:.0f} μm'.format(
-                                        xStg, yStg), end='\r')
+                                        xStg, yStg))
                                     ### Acquire
                                     measurements = multipleAI.acquire(sn)
                                     ### Append data
@@ -658,7 +660,6 @@ class imagingScan(QObject):
                 return []
             case 'continuous_one':
                 '''Continuous scan: one wavelength per (x,y) position'''
-                posx, posy, indx, indy, voltages, wavelengths = [], [], [], [], [], []
                 dataIndexPattern = 0
                 ### Iterate over scan patterns
                 for fp, sn, sr, w, qcl, r, ind, sd in zip(self.parameters.fastPatterns,
@@ -731,31 +732,64 @@ class imagingScan(QObject):
                                         else:
                                             vy = -1 * np.abs(vy)
                                             continueCondition = lambda xStg, yStg: yStg > yEnd
-                                    if vy == 0:
+                                    else: # Default to scanning along x
                                         if xEnd > x:
                                             vx = np.abs(vx)
                                             continueCondition = lambda xStg, yStg: xStg < xEnd
                                         else:
                                             vx = -1 * np.abs(vx)
                                             continueCondition = lambda xStg, yStg: xStg > xEnd
+                                    ### Set position acquisition according to scan direction
+                                    positions = []
+                                    if vx == 0:
+                                        appendPosition = lambda  xStg, yStg: positions.append(yStg)
+                                    else:  # Default to scanning along x
+                                        appendPosition = lambda  xStg, yStg: positions.append(xStg)
                                     ### Move stage
                                     self.parameters.stage.move_at_velocity(vx, vy)
                                     ### Acquire until endpoint is reached
+                                    voltages = []
                                     while continueCondition(xStg, yStg):
                                         (xStg, yStg) = self.parameters.stage.get_position()
                                         ### Acquire
                                         measurements = multipleAI.acquire(sn)
                                         ### Append data
-                                        self.parameters.data.Vtemp[dataIndexPattern][dataIndexWl].append(measurements)
+                                        voltages.append(measurements)
+                                        appendPosition(xStg, yStg)
                                     ### Stop stage at end of line
                                     # self.parameters.stage.move_at_velocity(0, 0)
                                     self.parameters.stage.stop_smoothly()
                                     while int(self.parameters.stage.busy()) > 0:
                                         time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+                                    ### Format scan line voltages
+                                    avgVoltages = []
+                                    for m in voltages:
+                                        if sn > 1:
+                                            liR = 0
+                                            for liX, liY in zip(m[0], m[1]):
+                                                liR += np.sqrt(np.power(liX, 2) +
+                                                    np.power(liY, 2))
+                                            liR = liR/sn
+                                        else:
+                                            liX = m[0]
+                                            liY = m[1]
+                                            liR = np.sqrt(np.power(liX, 2) +
+                                                np.power(liY, 2))
+                                        avgVoltages.append(liR)
+                                    ### Append scan line voltages
+                                    self.parameters.data.Vtemp[dataIndexPattern][dataIndexWl].append(np.array(avgVoltages))
+                                    ### Append scan line positions according to scan direction
+                                    if vx == 0:
+                                        self.parameters.data.Xtemp[dataIndexPattern][dataIndexWl].append(self.parameters.data.X[dataIndexPattern])
+                                        self.parameters.data.Ytemp[dataIndexPattern][dataIndexWl].append(np.array(positions))
+                                    else:
+                                        self.parameters.data.Xtemp[dataIndexPattern][dataIndexWl].append(np.array(positions))
+                                        self.parameters.data.Ytemp[dataIndexPattern][dataIndexWl].append(self.parameters.data.Y[dataIndexPattern])
                                 ### Emit ending position
                                 (xStg, yStg) = self.parameters.stage.get_position()
-                                # self.stageMoved.emit(xStg, yStg)
+                                self.stageMoved.emit(xStg, yStg)
                         except Exception as exc:
+                            self.parameters.stage.stop_smoothly()
                             print('Scan did not complete:\n{}'.format(exc))
                             print('Partial data may still be usable.')
                     ### Clear acquisition task
@@ -764,38 +798,51 @@ class imagingScan(QObject):
                     dataIndexPattern += 1
                 ### Format data
                 try:
-                    for iv, v in enumerate(self.parameters.data.Vtemp):
-                        ### Save X, Y positions for this pattern
-                        np.savetxt('scan{:03.0f}{}'.format(
-                            iv + 1,
-                            defaults.DEF_FILENAME_SCAN_IMAG_X),
-                            self.parameters.data.X[iv])
-                        np.savetxt('scan{:03.0f}{}'.format(
-                            iv + 1,
-                            defaults.DEF_FILENAME_SCAN_IMAG_Y),
-                            self.parameters.data.Y[iv])
+                    for iv, (v, sd) in enumerate(zip(self.parameters.data.Vtemp,
+                    self.parameters.scanDir)):
                         for iw, w in enumerate(self.parameters.data.W[iv]):
-                            vpos = 0
-                            for ix, iy in zip(self.parameters.data.indices[iv][:, 0],
-                                self.parameters.data.indices[iv][:, 1]):
-                                    ### Calculate each voltage sample R
-                                    ### from voltage sample X & Y
-                                    liR = 0
-                                    for liX, liY in zip(v[iw][vpos][0], v[iw][vpos][1]):
-                                        liR += np.sqrt(np.power(liX, 2) +
-                                            np.power(liY, 2))
-                                    liR = liR/sn
-                                    ### Old method
-                                    # liX = np.sum(v[iw][vpos][0])/sn # Lock-in X
-                                    # liY = np.sum(v[iw][vpos][1])/sn # Lock-in Y
-                                    # liR = (np.sqrt(np.power(liX, 2) +
-                                    #         np.power(liY, 2))) # Lock-in R
-                                    self.parameters.data.V[iv][iw][ix][iy] = liR
-                                    vpos += 1
+                            ### Determine maximum number of rows for voltage matrix
+                            lineLengths = []
+                            for vr in v[iw]:
+                                lineLengths.append(len(vr))
+                            scanLineLength = max(lineLengths)
+                            scanLineNumber = len(v[iw])
+                            if sd in ['y']:
+                                self.parameters.data.Xcont[iv][iw] = np.transpose(self.parameters.data.X)
+                                Y = np.zeros((scanLineLength, 1))
+                                for iy, y in enumerate(self.parameters.data.Ytemp[iv][iw][0]):
+                                    Y[iy] = y
+                                self.parameters.data.Ycont[iv][iw] = Y
+                                V = np.zeros((scanLineNumber, scanLineLength))
+                                for ix, vr in enumerate(v[iw]):
+                                    for iy, v in enumerate(vr):
+                                        V[ix][iy] = v
+                            else:
+                                X = np.zeros((scanLineLength, 1))
+                                for ix, x in enumerate(self.parameters.data.Xtemp[iv][iw][0]):
+                                    X[ix] = x
+                                self.parameters.data.Xcont[iv][iw] = X
+                                self.parameters.data.Ycont[iv][iw] = np.transpose(self.parameters.data.Y)
+                                V = np.zeros((scanLineLength, scanLineNumber))
+                                for iy, vr in enumerate(v[iw]):
+                                    for ix, v in enumerate(vr):
+                                        V[ix][iy] = v
+                            self.parameters.data.V[iv][iw] = V
                             if self.parameters.units in ['invcm']:
                                 wStr = 'wm-{:05.0f}invcm'.format(w)
                             else:
                                 wStr = 'wl-{:02.3f}um'.format(w)
+                            ### Save X, Y positions for this pattern and wavelength
+                            np.savetxt('scan{:03.0f}_{}{}'.format(
+                                iv + 1,
+                                wStr,
+                                defaults.DEF_FILENAME_SCAN_IMAG_X),
+                                self.parameters.data.Xcont[iv][iw])
+                            np.savetxt('scan{:03.0f}_{}{}'.format(
+                                iv + 1,
+                                wStr,
+                                defaults.DEF_FILENAME_SCAN_IMAG_Y),
+                                self.parameters.data.Ycont[iv][iw])
                             np.savetxt('scan{:03.0f}_{}{}'.format(
                                 iv + 1,
                                 wStr,

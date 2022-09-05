@@ -56,17 +56,23 @@ class scanningImagingData():
            XY SCANNING PATTERN (one element of each of the list variables)
                 + ------ indices               (list)
                 + ------ V VOLTAGES            (list of matrices, one per wl/wn)
-                + ------ V_temp VOLTAGES       (list of lists, one per wl/wn)
+                + ------ Vtemp VOLTAGES        (list of lists, one per wl/wn)
                 + ------ W WAVELENGTHS/NUMBERS (list)
                 + ------ X POSITIONS           (vector)
+                + ------ Xcont POSITIONS       (list of lists, one per wl/wn)
                 + ------ Y POSITIONS           (vector)
+                + ------ Ycont POSITIONS       (list of lists, one per wl/wn)
         '''
         self.indices = [] # YX indices for temporary voltage list
         self.V = []       # Voltage averages matrix: X columns, Y rows
-        self.Vtemp = []  # Voltage non-averaged list, used during acquisition
+        self.Vtemp = []   # Voltage non-averaged list, used during acquisition
         self.W = []       # Wavelengths or wavenumbers
         self.X = []       # X positions vector
+        self.Xcont = []   # X positions matrix for continuous scanning
+        self.Xtemp = []   # X positions for continuous scanning, unformatted
         self.Y = []       # Y positions vector
+        self.Ycont = []   # Y positions matrix for continuous scanning
+        self.Ytemp = []   # Y positions for continuous scanning, unformatted
 
     def add_V(self, index = -1):
         '''Make zero matrices to hold voltages, one per wl/wn.
@@ -81,9 +87,28 @@ class scanningImagingData():
         '''Make lists to hold voltages during acquisition, one per wl/wn.
            Use immediately after "add_W", "add_X" and "add_Y" to match index.'''
         self.Vtemp.append([])
-        for wi, _ in enumerate(self.W[index]):
+        for _, _ in enumerate(self.W[index]):
             self.Vtemp[-1].append([])
-            # self.Vtemp[-1][wi].append([])
+
+    def add_XYcont(self, index = -1):
+        '''Make lists to hold x/y positions for continuous scanning.
+           One per X/Y per wl/wn.
+           Use immediately after "add_W", "add_X" and "add_Y" to match index.'''
+        self.Xcont.append([])
+        self.Ycont.append([])
+        for _, _ in enumerate(self.W[index]):
+            self.Xcont[-1].append([])
+            self.Ycont[-1].append([])
+
+    def add_XYtemp(self, index = -1):
+        '''Make lists to hold x/y positions during continuous scanning.
+           One per X/Y per wl/wn.
+           Use immediately after "add_W", "add_X" and "add_Y" to match index.'''
+        self.Xtemp.append([])
+        self.Ytemp.append([])
+        for _, _ in enumerate(self.W[index]):
+            self.Xtemp[-1].append([])
+            self.Ytemp[-1].append([])
 
 
 class scanningImagingParameters():
