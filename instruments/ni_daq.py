@@ -7,8 +7,10 @@ Python 3.6 on Windows 10 64-bit
 Created 2017-Sep-08
 '''
 
+from random import sample
 import numpy as np
 from PyDAQmx.DAQmxConstants import (DAQmx_Val_Cfg_Default,
+                                    DAQmx_Val_ContSamps,
                                     DAQmx_Val_CountUp,
                                     DAQmx_Val_FiniteSamps,
                                     DAQmx_Val_GroupByChannel,
@@ -98,12 +100,20 @@ class MultiChannelAnalogInput():
                                      self.limit[name][1],
                                      DAQmx_Val_Volts,
                                      None)
-        DAQmxCfgSampClkTiming(self.taskHandle,
-                              '',
-                              sampleRate,
-                              DAQmx_Val_Rising,
-                              DAQmx_Val_FiniteSamps,
-                              sampleNumber)
+        if sampleNumber > 1:
+            DAQmxCfgSampClkTiming(self.taskHandle,
+                                '',
+                                sampleRate,
+                                DAQmx_Val_Rising,
+                                DAQmx_Val_FiniteSamps,
+                                sampleNumber)
+        else: ### Workaround for when a single sample is requested
+            DAQmxCfgSampClkTiming(self.taskHandle,
+                                '',
+                                sampleRate,
+                                DAQmx_Val_Rising,
+                                DAQmx_Val_ContSamps,
+                                sampleNumber)
 
     def configure_triggered(self, triggerChannel, sampleNumber, sampleRate):
         '''Configure triggered acquisition.'''
