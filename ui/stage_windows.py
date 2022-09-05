@@ -234,10 +234,10 @@ class stageMotion(QObject):
         self.parameters = [] # Parameters from caller, placeholder value
         self.mainGUI = mainGUI
 
-    def goto_and_wait(self, targetx, targety):
+    def goto_and_wait(self, xTarget, yTarget):
         '''Move to set x and y. Wait for stage to finish moving.'''
         try:
-            self.parameters.stage.goto(targetx, targety)
+            self.parameters.stage.goto(xTarget, yTarget)
             while int(self.parameters.stage.busy()) > 0:
                 time.sleep(0.1)
         except Exception as exc:
@@ -372,16 +372,17 @@ class stageMotionWindow(QMainWindow):
         '''View gamepad bindings'''
         self.gamepadBindingsWindow.show()
 
-    def goto(self, targetx=-1, targety=-1):
-        '''Move to set x and y.
-           Note: there is no wait at the end for the stage to finish moving.'''
-        if targetx == -1:
-            targetx = float(self.inputField['xSet'][0].text())
-        if targety == -1:
-            targety = float(self.inputField['ySet'][0].text())
-        print('Moving stage to ({:.0f} μm, {:.0f} μm)'.format(targetx, targety))
+    def goto(self, xTarget=-1, yTarget=-1):
+        '''Move to set x and y. Wait for the stage to finish moving.'''
+        if xTarget == -1:
+            xTarget = float(self.inputField['xSet'][0].text())
+        if yTarget == -1:
+            yTarget = float(self.inputField['ySet'][0].text())
+        print('Moving stage to ({:.0f} μm, {:.0f} μm)'.format(xTarget, yTarget))
         try:
-            self.stage.goto(targetx, targety)
+            self.stage.goto(xTarget, yTarget)
+            while int(self.stage.busy()) > 0:
+                time.sleep(0.1)
             self.update_readings()
         except Exception as exc:
             print('Could not move stage:\n{}'.format(exc))
