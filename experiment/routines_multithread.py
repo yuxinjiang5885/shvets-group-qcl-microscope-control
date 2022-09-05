@@ -594,7 +594,6 @@ class imagingScan(QObject):
                                         xStg, yStg), end='\r')
                                     ### Acquire
                                     measurements = multipleAI.acquire(sn)
-                                    print(measurements)
                                     ### Append data
                                     self.parameters.data.Vtemp[dataIndexPattern][dataIndexWl].append(measurements)
                         except Exception as exc:
@@ -620,10 +619,18 @@ class imagingScan(QObject):
                             vpos = 0
                             for ix, iy in zip(self.parameters.data.indices[iv][:, 0],
                                 self.parameters.data.indices[iv][:, 1]):
-                                    liX = np.sum(v[iw][vpos][0])/sn # Lock-in X
-                                    liY = np.sum(v[iw][vpos][1])/sn # Lock-in Y
-                                    liR = (np.sqrt(np.power(liX, 2) +
-                                            np.power(liY, 2))) # Lock-in R
+                                    ### Calculate each voltage sample R
+                                    ### from voltage sample X & Y
+                                    liR = 0
+                                    for liX, liY in zip(v[iw][vpos][0], v[iw][vpos][1]):
+                                        liR += np.sqrt(np.power(liX, 2) +
+                                            np.power(liY, 2))
+                                    liR = liR/sn
+                                    ### Old method
+                                    # liX = np.sum(v[iw][vpos][0])/sn # Lock-in X
+                                    # liY = np.sum(v[iw][vpos][1])/sn # Lock-in Y
+                                    # liR = (np.sqrt(np.power(liX, 2) +
+                                    #         np.power(liY, 2))) # Lock-in R
                                     self.parameters.data.V[iv][iw][ix][iy] = liR
                                     vpos += 1
                             if self.parameters.units in ['invcm']:
@@ -771,10 +778,18 @@ class imagingScan(QObject):
                             vpos = 0
                             for ix, iy in zip(self.parameters.data.indices[iv][:, 0],
                                 self.parameters.data.indices[iv][:, 1]):
-                                    liX = np.sum(v[iw][vpos][0])/sn # Lock-in X
-                                    liY = np.sum(v[iw][vpos][1])/sn # Lock-in Y
-                                    liR = (np.sqrt(np.power(liX, 2) +
-                                            np.power(liY, 2))) # Lock-in R
+                                    ### Calculate each voltage sample R
+                                    ### from voltage sample X & Y
+                                    liR = 0
+                                    for liX, liY in zip(v[iw][vpos][0], v[iw][vpos][1]):
+                                        liR += np.sqrt(np.power(liX, 2) +
+                                            np.power(liY, 2))
+                                    liR = liR/sn
+                                    ### Old method
+                                    # liX = np.sum(v[iw][vpos][0])/sn # Lock-in X
+                                    # liY = np.sum(v[iw][vpos][1])/sn # Lock-in Y
+                                    # liR = (np.sqrt(np.power(liX, 2) +
+                                    #         np.power(liY, 2))) # Lock-in R
                                     self.parameters.data.V[iv][iw][ix][iy] = liR
                                     vpos += 1
                             if self.parameters.units in ['invcm']:
