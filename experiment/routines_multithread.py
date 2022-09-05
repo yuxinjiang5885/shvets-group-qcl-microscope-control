@@ -412,7 +412,7 @@ class imagingScan(QObject):
     # outData = pyqtSignal(np.ndarray) # Return data to UI for plotting
     outData = pyqtSignal(object) # Return data to UI for plotting
     outParams = pyqtSignal(object) # Return parameters for re-use with "re"
-    stageMoved = pyqtSignal(float, float)
+    # stageMoved = pyqtSignal(float, float)
     # startedOne = pyqtSignal(int)
     # stopped = False
 
@@ -589,11 +589,12 @@ class imagingScan(QObject):
                                     (xStg, yStg) = self.parameters.stage.get_position()
                                     # print('{}/{} patterns, '.format(), end ='')
                                     # print('{}/{} wavelengths, '.format(), end ='')
-                                    self.stageMoved.emit(xStg, yStg)
+                                    # self.stageMoved.emit(xStg, yStg)
                                     print('Scanning: x {:.0f} μm, y {:.0f} μm'.format(
                                         xStg, yStg), end='\r')
                                     ### Acquire
                                     measurements = multipleAI.acquire(sn)
+                                    print(measurements)
                                     ### Append data
                                     self.parameters.data.Vtemp[dataIndexPattern][dataIndexWl].append(measurements)
                         except Exception as exc:
@@ -708,7 +709,7 @@ class imagingScan(QObject):
                                         time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
                                     ### Emit line start position
                                     (xStg, yStg) = self.parameters.stage.get_position()
-                                    self.stageMoved.emit(xStg, yStg)
+                                    # self.stageMoved.emit(xStg, yStg)
                                     print('Scanning line {:.0f}/{:.0f} starting at x {:.0f} μm, y {:.0f} μm'.format(
                                         i + 1, len(starting), xStg, yStg))
                                     ### Assign scan line end points
@@ -746,7 +747,7 @@ class imagingScan(QObject):
                                         time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
                                 ### Emit ending position
                                 (xStg, yStg) = self.parameters.stage.get_position()
-                                self.stageMoved.emit(xStg, yStg)
+                                # self.stageMoved.emit(xStg, yStg)
                         except Exception as exc:
                             print('Scan did not complete:\n{}'.format(exc))
                             print('Partial data may still be usable.')
