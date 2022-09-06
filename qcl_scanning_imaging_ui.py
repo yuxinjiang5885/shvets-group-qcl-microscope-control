@@ -271,7 +271,7 @@ class mainWindow(QMainWindow):
                         y = ys * yStep + yOrig
                         fastPatternx.append(x)
                         fastPatterny.append(y)
-        return(scanPatternDir,
+        return(scanPatternDir, xSize, ySize,
             np.transpose(np.array((patternx, patterny))),
             np.transpose(np.array((indexx, indexy))),
             np.transpose(np.array((fastPatternx, fastPatterny))))
@@ -1221,7 +1221,7 @@ class mainWindow(QMainWindow):
             sizeOrSteps = s.sizeOrSteps
             scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
-            scanDir, pattern, indices, fastPattern = self.construct_pattern(
+            scanDir, xSize, ySize, pattern, indices, fastPattern = self.construct_pattern(
                 scanDir,
                 xOrig = xOrig,
                 yOrig = yOrig,
@@ -1256,6 +1256,8 @@ class mainWindow(QMainWindow):
             self.scanImagParameters.sampleRates.append(samplingRate)
             self.scanImagParameters.speeds.append(speed)
             self.scanImagParameters.wlwnList.append(wlwnList)
+            self.scanImagParameters.xParameters.append([xOrig, xStep, xSize])
+            self.scanImagParameters.yParameters.append([yOrig, yStep, ySize])
             ### Prepare data variables.
             self.scanImagParameters.data.indices.append(indices)
             self.scanImagParameters.data.W.append(wlwnList)
@@ -1361,7 +1363,7 @@ class mainWindow(QMainWindow):
             sizeOrSteps = s.sizeOrSteps
             scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
             ### Construct pattern
-            _, pattern, _, fastPattern = self.construct_pattern(
+            _, _, _, pattern, _, fastPattern = self.construct_pattern(
                 scanDir,
                 xOrig = xOrig,
                 yOrig = yOrig,

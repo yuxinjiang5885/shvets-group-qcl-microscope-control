@@ -142,3 +142,5 @@ class scanningImagingParameters():
         self.units = 'um' # By default, wavelengths in micrometers
         # self.useRef = False # By default, do not use reference
         self.wlwnList = [] # List of wavelengths (um) or wavenumbers (cm^-1)
+        self.xParameters = [] # Axis x scan parameters
+        self.yParameters = [] # Axis y scan parameters

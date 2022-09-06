@@ -503,19 +503,32 @@ class imagingScan(QObject):
         timeStr = time.strftime('%Y-%m-%d %H:%M:%S\n')
         logFile.write('{}'.format(timeStr))
         logFile.write('No. {:.0f}\n'.format(newExpNo))
+        logFile.write('Type: {}\n'.format(self.parameters.scanMode))
         logFile.write('\n')
         for ip, _ in enumerate(self.parameters.patterns):
             logFile.write('Pattern {:.0f}\n'.format(ip))
             logFile.write('\n')
+            logFile.write('- QCL modules in use:\n')
             for qclNo in self.parameters.qcl[ip]:
                 qclCurr = self.parameters.laser.get_current(qclNo)
                 qclRate = self.parameters.laser.get_pulse_rate(qclNo)
                 qclWidth = self.parameters.laser.get_pulse_width(qclNo)
-                logFile.write('QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
+                logFile.write('  QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
                                                 qclNo, qclCurr, qclRate, qclWidth))
-            logFile.write('Type: {}\n'.format(self.parameters.scanMode))
-            logFile.write('Target wavelengths/wavenumbers:\n')
-            logFile.write('{}\n'.format(self.parameters.ranges[ip]))
+            logFile.write('- Target wavelengths/wavenumbers:\n')
+            logFile.write('  {}\n'.format(self.parameters.ranges[ip]))
+            logFile.write('- Scan parameters:\n')
+            logFile.write('  x start/step/size (um): {}/{}/{}\n'.format(
+                self.parameters.xParameters[ip][0],
+                self.parameters.xParameters[ip][1],
+                self.parameters.xParameters[ip][2]))
+            logFile.write('  y start/step/size (um): {}/{}/{}\n'.format(
+                self.parameters.yParameters[ip][0],
+                self.parameters.yParameters[ip][1],
+                self.parameters.yParameters[ip][2]))
+            logFile.write('- Scan direction: {}\n'.format(self.parameters.scanDir[ip]))
+            logFile.write('- Sample rate: {}\n'.format(self.parameters.sampleRates[ip]))
+            logFile.write('- Samples: {}\n'.format(self.parameters.sampleNumbers[ip]))
             logFile.write('\n')
         # logFile.write('Sweep limits:\n')
         # logFile.write('{}\n'.format(self.parameters.sweepLimits))
