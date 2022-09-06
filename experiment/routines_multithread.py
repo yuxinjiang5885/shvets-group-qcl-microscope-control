@@ -498,31 +498,29 @@ class imagingScan(QObject):
         #     noteFile.write(self.parameters.notes)
         #     noteFile.close()
         ### Write parameters to log
-        logFile = open('experiment.log', 'w')
-        logFile.write('QCL/Microscope scanning imaging experiment log\n')
+        logFile = open(defaults.LOG_FILENAME, 'w')
+        logFile.write('QCL Microscope scanning imaging experiment log\n')
         timeStr = time.strftime('%Y-%m-%d %H:%M:%S\n')
         logFile.write('{}'.format(timeStr))
         logFile.write('No. {:.0f}\n'.format(newExpNo))
         logFile.write('\n')
-        # for qclNo in self.parameters.qcl:
-        #     qclCurr = self.parameters.laser.get_current(qclNo)
-        #     qclRate = self.parameters.laser.get_pulse_rate(qclNo)
-        #     qclWidth = self.parameters.laser.get_pulse_width(qclNo)
-        #     logFile.write('QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
-        #                                     qclNo, qclCurr, qclRate, qclWidth))
-        logFile.write('\n')
-        # if self.parameters.sweeping:
-        #     logFile.write('Type: sweep\n')
-        # else:
-        #     logFile.write('Type: step-and-measure\n')
-        # logFile.write('\n')
-        # logFile.write('Target wavelengths/wavenumbers:\n')
-        # logFile.write('{}\n'.format(self.parameters.ranges))
-        # logFile.write('\n')
+        for ip, _ in enumerate(self.parameters.patterns):
+            logFile.write('Pattern {:.0f}\n'.format(ip))
+            logFile.write('\n')
+            for qclNo in self.parameters.qcl[ip]:
+                qclCurr = self.parameters.laser.get_current(qclNo)
+                qclRate = self.parameters.laser.get_pulse_rate(qclNo)
+                qclWidth = self.parameters.laser.get_pulse_width(qclNo)
+                logFile.write('QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
+                                                qclNo, qclCurr, qclRate, qclWidth))
+            logFile.write('Type: {}\n'.format(self.parameters.scanMode))
+            logFile.write('Target wavelengths/wavenumbers:\n')
+            logFile.write('{}\n'.format(self.parameters.ranges[ip]))
+            logFile.write('\n')
         # logFile.write('Sweep limits:\n')
         # logFile.write('{}\n'.format(self.parameters.sweepLimits))
         # logFile.write('\n')
-        # logFile.close()
+        logFile.close()
         ### Run a sweep or a step-and-measure scan
         data = []
         # if self.parameters.sweeping:
@@ -687,31 +685,31 @@ class imagingScan(QObject):
                     multipleAI.configure(sn, sr)
                     ### Iterate over QCL ranges
                     numRanges = len(r)
-                    for i, rw in enumerate(r):
+                    for irw, rw in enumerate(r):
                         print('Range {}/{}, using QCL module {}...'.format(
-                             i+1, numRanges, qcl[i]))
+                             irw+1, numRanges, qcl[irw]))
                         try:
                             ### Iterate over wavelengths
                             for wl in rw:
                                 ### Get corresponding index in data variable
                                 dataIndexWl = self.parameters.data.W[dataIndexPattern].index(wl)
                                 ### Tune
-                                self.parameters.laser.tune(qcl[i], wl, self.parameters.units)
+                                self.parameters.laser.tune(qcl[irw], wl, self.parameters.units)
                                 ### Split pattern in starting and target positions
                                 targetSize0 = int(np.shape(fp)[0]/2)
                                 targetSize1 = np.shape(fp)[1]
                                 starting = np.zeros((targetSize0, targetSize1))
                                 target = np.zeros((targetSize0, targetSize1))
-                                for i, (x, y) in enumerate(zip(fp[:, 0], fp[:, 1])):
-                                    j = int(np.floor(i/2))
-                                    if i % 2 == 0:
+                                for ixy, (x, y) in enumerate(zip(fp[:, 0], fp[:, 1])):
+                                    j = int(np.floor(ixy/2))
+                                    if ixy % 2 == 0:
                                         starting[j, 0] = x
                                         starting[j, 1] = y
                                     else:
                                         target[j, 0] = x
                                         target[j, 1] = y
                                 ### Iterate over positions
-                                for i, (x, y) in enumerate(zip(starting[:, 0], starting[:, 1])):
+                                for ixy, (x, y) in enumerate(zip(starting[:, 0], starting[:, 1])):
                                     ### Position stage for scan line
                                     self.parameters.stage.goto(x, y)
                                     ### Wait for stage to stop moving
@@ -721,10 +719,10 @@ class imagingScan(QObject):
                                     (xStg, yStg) = self.parameters.stage.get_position()
                                     # self.stageMoved.emit(xStg, yStg)
                                     print('Scanning line {:.0f}/{:.0f} starting at x {:.0f} μm, y {:.0f} μm'.format(
-                                        i + 1, len(starting), xStg, yStg))
+                                        ixy + 1, len(starting), xStg, yStg))
                                     ### Assign scan line end points
-                                    xEnd = target[i, 0]
-                                    yEnd = target[i, 1]
+                                    xEnd = target[ixy, 0]
+                                    yEnd = target[ixy, 1]
                                     ### Set conditions for stage stop
                                     ### Account for scans in negative direction
                                     if vx == 0:
@@ -820,14 +818,14 @@ class imagingScan(QObject):
                                 for ix, vr in enumerate(v[iw]):
                                     ### Calculate line length difference from max
                                     lengthOffset = scanLineLength - len(vr)
-                                    for iy, v in enumerate(vr):
+                                    for iy, vPoint in enumerate(vr):
                                         ### Pattern changes direction every line
                                         ### Invert for odd indices
                                         if ix % 2 == 0:
-                                            V[ix][iy] = v
+                                            V[ix][iy] = vPoint
                                         else:
                                             iyInv = scanLineLength - iy - 1 - lengthOffset
-                                            V[ix][iyInv] = v
+                                            V[ix][iyInv] = vPoint
                             else:
                                 X = np.zeros((scanLineLength, 1))
                                 for ix, x in enumerate(self.parameters.data.Xtemp[iv][iw][0]):
@@ -838,14 +836,14 @@ class imagingScan(QObject):
                                 for iy, vr in enumerate(v[iw]):
                                     ### Calculate line length difference from max
                                     lengthOffset = scanLineLength - len(vr)
-                                    for ix, v in enumerate(vr):
+                                    for ix, vPoint in enumerate(vr):
                                         ### Pattern changes direction every line
                                         ### Invert for odd indices
                                         if iy % 2 == 0:
-                                            V[ix][iy] = v
+                                            V[ix][iy] = vPoint
                                         else:
                                             ixInv = scanLineLength - ix - 1 - lengthOffset
-                                            V[ixInv][iy] = v
+                                            V[ixInv][iy] = vPoint
                             self.parameters.data.V[iv][iw] = V
                             if self.parameters.units in ['invcm']:
                                 wStr = 'wm-{:05.0f}invcm'.format(w)
@@ -877,10 +875,14 @@ class imagingScan(QObject):
                 print('Invalid scan mode selected.')
                 return []
         endRun = timer()
-        print('Scan complete (%.3f s).' % (endRun-startRun))
-        # '''Save data as text file'''
         ### Return to experiment folder
         os.chdir(currentDir)
+        print('Scan complete (%.3f s).' % (endRun-startRun))
+        logFile = open(defaults.LOG_FILENAME, 'a')
+        logFile.write('Acquisition time: {:.1f} s.\n'.format(endRun-startRun))
+        logFile.write('\n')
+        logFile.close()
+        # '''Save data as text file'''
         # currentDir = os.getcwd()
         # if platform.system() == 'Windows':
         #     currentDirSplit = currentDir.split('\\')

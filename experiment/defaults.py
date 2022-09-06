@@ -109,7 +109,7 @@ PLOT_COLOR_T_DARK = '#FF0000'
 
 # DEFAULT_COLORMAP = plt.cm.Spectral
 
-'''Directories'''
+'''Directories and file names'''
 
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
 DEF_SCAN_IMAG_SUBFOLDER = 'scanningimaging'
@@ -118,6 +118,7 @@ DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
 DEF_FILENAME_SCAN_IMAG_X = '_X-um.txt' # For scanning imaging experiments
 DEF_FILENAME_SCAN_IMAG_Y = '_Y-um.txt' # For scanning imaging experiments
 DEF_FILENAME_SCAN_IMAG_V = '_V-V.txt' # For scanning imaging experiments
+LOG_FILENAME = 'experiment.log'
 
 '''MIRcat QCL parameters'''
 
