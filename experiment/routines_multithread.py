@@ -590,10 +590,10 @@ class imagingScan(QObject):
                                     # print('{}/{} patterns, '.format(), end ='')
                                     # print('{}/{} wavelengths, '.format(), end ='')
                                     # self.stageMoved.emit(xStg, yStg)
-                                    # print('Scanning: x {:.0f} μm, y {:.0f} μm'.format(
-                                    #     xStg, yStg), end='\r')
                                     print('Scanning: x {:.0f} μm, y {:.0f} μm'.format(
-                                        xStg, yStg))
+                                        xStg, yStg), end='\r')
+                                    # print('Scanning: x {:.0f} μm, y {:.0f} μm'.format(
+                                    #     xStg, yStg))
                                     ### Acquire
                                     measurements = multipleAI.acquire(sn)
                                     ### Append data
@@ -753,6 +753,7 @@ class imagingScan(QObject):
                                         (xStg, yStg) = self.parameters.stage.get_position()
                                         ### Acquire
                                         measurements = multipleAI.acquire(sn)
+                                        print(measurements)
                                         ### Append data
                                         voltages.append(measurements)
                                         appendPosition(xStg, yStg)
