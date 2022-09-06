@@ -599,6 +599,7 @@ class imagingScan(QObject):
                                     ### Append data
                                     self.parameters.data.Vtemp[dataIndexPattern][dataIndexWl].append(measurements)
                         except Exception as exc:
+                            print('')
                             print('Scan did not complete:\n{}'.format(exc))
                             print('Partial data may still be usable.')
                     ### Clear acquisition task
@@ -645,6 +646,7 @@ class imagingScan(QObject):
                                 defaults.DEF_FILENAME_SCAN_IMAG_V),
                                 self.parameters.data.V[iv][iw])
                 except Exception as exc:
+                    print('')
                     print('Data formatting did not complete:\n{}'.format(exc))
                     print('Data was not saved.')
                     # data = data[data[:, 0] != 0] # Remove zero-wavelength values
@@ -753,7 +755,7 @@ class imagingScan(QObject):
                                         (xStg, yStg) = self.parameters.stage.get_position()
                                         ### Acquire
                                         measurements = multipleAI.acquire(sn)
-                                        print(measurements)
+                                        # print(measurements)
                                         ### Append data
                                         voltages.append(measurements)
                                         appendPosition(xStg, yStg)
@@ -816,8 +818,16 @@ class imagingScan(QObject):
                                 self.parameters.data.Ycont[iv][iw] = Y
                                 V = np.zeros((scanLineNumber, scanLineLength))
                                 for ix, vr in enumerate(v[iw]):
+                                    ### Calculate line length difference from max
+                                    lengthOffset = scanLineLength - len(vr)
                                     for iy, v in enumerate(vr):
-                                        V[ix][iy] = v
+                                        ### Pattern changes direction every line
+                                        ### Invert for odd indices
+                                        if ix % 2 == 0:
+                                            V[ix][iy] = v
+                                        else:
+                                            iyInv = scanLineLength - iy - 1 - lengthOffset
+                                            V[ix][iyInv] = v
                             else:
                                 X = np.zeros((scanLineLength, 1))
                                 for ix, x in enumerate(self.parameters.data.Xtemp[iv][iw][0]):
@@ -826,8 +836,16 @@ class imagingScan(QObject):
                                 self.parameters.data.Ycont[iv][iw] = np.transpose(self.parameters.data.Y)
                                 V = np.zeros((scanLineLength, scanLineNumber))
                                 for iy, vr in enumerate(v[iw]):
+                                    ### Calculate line length difference from max
+                                    lengthOffset = scanLineLength - len(vr)
                                     for ix, v in enumerate(vr):
-                                        V[ix][iy] = v
+                                        ### Pattern changes direction every line
+                                        ### Invert for odd indices
+                                        if iy % 2 == 0:
+                                            V[ix][iy] = v
+                                        else:
+                                            ixInv = scanLineLength - ix - 1 - lengthOffset
+                                            V[ixInv][iy] = v
                             self.parameters.data.V[iv][iw] = V
                             if self.parameters.units in ['invcm']:
                                 wStr = 'wm-{:05.0f}invcm'.format(w)
