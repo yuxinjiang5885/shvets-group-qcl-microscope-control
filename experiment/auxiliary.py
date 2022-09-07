@@ -115,10 +115,7 @@ class scanningImagingParameters():
     '''Holds experiment parameters for scanning imaging.'''
 
     def __init__(self):
-        # self.acquisitions = 0 # Number of acquisitions
-        # self.acq_time_interval_s = 300 # Interval between acquisitions, s
         self.data = scanningImagingData() # Holds acquired data
-        # self.end = 100 # Placeholder value, no unit
         self.fastPatterns = [] # Fast scanning imaging patters, placeholder value
         self.laser = [] # Laser instance, laceholder value
         self.latestDir = 0 # Latest experiment directory, placeholder value
@@ -126,19 +123,13 @@ class scanningImagingParameters():
         self.patterns = [] # Scanning imaging patters, placeholder value
         self.patternIndices = [] # Indices of pattern positions, placeholder value
         self.ranges = [] # Wavelength/wavenumber ranges, placeholder value
-        # self.reference = np.zeros((1, 2)) # Placeholder value
         self.sampleNumbers = [] # Sample numbers, placeholder value
         self.sampleRates = [] # Sample rates, placeholder value
         self.scanDir = [] # List of scan direction (each 'x' or 'y')
         self.scanMode = 'step_one'
         self.speeds = [] # Sweeping speeds, placeholder value
         self.stage = [] # Stage instance, laceholder value
-        # self.start = 0 # Placeholder value, no unit
-        # self.step = 1 # Placeholder value, no unit
-        # self.sweeping = True # By default, use the sweep routine
-        # self.sweepLimits = [] # Placeholder value
         self.units = 'um' # By default, wavelengths in micrometers
-        # self.useRef = False # By default, do not use reference
         self.wlwnList = [] # List of wavelengths (um) or wavenumbers (cm^-1)
         self.xParameters = [] # Axis x scan parameters
         self.yParameters = [] # Axis y scan parameters

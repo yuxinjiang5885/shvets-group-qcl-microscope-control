@@ -18,7 +18,7 @@ import time
 from timeit import default_timer as timer, timeit
 # from experiment.defaults import *
 import experiment.defaults as defaults
-from experiment.routines_multithread import experiment
+from experiment.routines import experiment
 from ui.laser_windows import (laserInitializer,
                               laserSettingWindow,
                               laserStartupDialog)

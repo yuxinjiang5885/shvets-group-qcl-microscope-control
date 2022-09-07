@@ -18,7 +18,7 @@ import numpy as np
 from experiment.auxiliary import (experimentParameters,
                                   scanningImagingParameters)
 import experiment.defaults as defaults
-from experiment.routines_multithread import experiment, imagingScan
+from experiment.routines import experiment, imagingScan
 from ui.laser_windows import (laserInitializer,
                               laserSettingWindow,
                               laserStartupDialog)
