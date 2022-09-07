@@ -4,7 +4,7 @@ Giovanni Sartorello (srtgnn@gmail.com)
 UI for QCL scanning spectroscopy experiments
 Multi-threaded version of "qcl_spectral_scan_ui"
 Python 3.9.6 on Windows 10
-Created 2021-Mar-03
+Created 2021-Mar-03eplotcan
 '''
 
 import os
@@ -32,18 +32,14 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QThread
 from PyQt6.QtGui import QAction, QIcon, QFont
 from PyQt6.QtWidgets import (QApplication,
-                             QComboBox,
-                             QDesktopWidget,
                              QGridLayout,
                              QLabel,
                              QLineEdit,
-                             QListWidget,
                              QMainWindow,
                              QMessageBox,
                              QPushButton,
                              QWidget,
                              QSizePolicy,
-                             QTabWidget,
                              QTextEdit)
 rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
 
@@ -98,9 +94,9 @@ class mainWindow(QMainWindow):
         ### Initialize stage
         self.stage = []
         self.threadStg = QThread()
-        self.stageWorker = stageInitializer()
+        self.stageWorker = stageInitializer(MODEL = STAGE_MODEL, COM_PORT = STAGE_COM_PORT)
         self.stageWorker.moveToThread(self.threadStg)
-        self.threadStg.started.connect(self.stageWorker.stage_initialize(COM_PORT = STAGE_COM_PORT))
+        self.threadStg.started.connect(self.stageWorker.stage_initialize)
         self.stageWorker.stageInitialized.connect(self.threadStg.quit)
         self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)
         self.stageWorker.stageInstance.connect(self.stage_set)
@@ -170,10 +166,10 @@ class mainWindow(QMainWindow):
 
     def center_window(self):
         '''Center main application window on screen.'''
-        qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
@@ -328,22 +324,21 @@ class mainWindow(QMainWindow):
                 self.grid.setColumnStretch(col, 20)
         ### Plot: latest spectrum
         self.plotCanvas = mplCanvas(width=5, height=4)
-        self.plotCanvas.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.plotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvas.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvas.axes.set_ylabel('Lock-in Mag. (V)')
         self.plotCanvas.axes.set_title('Latest Spectrum')
         self.grid.addWidget(self.plotCanvas, 0, 0, 1, 5)
         ### Plot: current reference
         self.plotCanvasRef = mplCanvas(width=5, height=4)
-        self.plotCanvasRef.setSizePolicy(QSizePolicy.Fixed,
-                                                              QSizePolicy.Fixed)
+        self.plotCanvasRef.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvasRef.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvasRef.axes.set_ylabel('Lock-in Mag. (V)')
         self.plotCanvasRef.axes.set_title('Current Reference')
         self.grid.addWidget(self.plotCanvasRef, 0, 5, 1, 3)
         ### Plot: transmittance
         self.plotCanvasT = mplCanvas(width=5, height=4)
-        self.plotCanvasT.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.plotCanvasT.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.plotCanvasT.axes.set_xlabel('Wavelength (μm)')
         self.plotCanvasT.axes.set_ylabel('Transmittance')
         self.plotCanvasT.axes.set_title('Transmittance (Latest/Reference)')
@@ -388,9 +383,8 @@ class mainWindow(QMainWindow):
         # self.btn['Stop'][0].setToolTip('Stop scan or sweep in progress')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
-            k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             if x in ['QCL1', 'QCL2', 'QCL3', 'QCL4']:
                 k[0].setStyleSheet(defaults.STYLE_BUTTON)
             elif x in ['WlUnits']:
@@ -1005,17 +999,17 @@ class multipleAcquisitionsWindow(QMainWindow):
     '''GUI for multiple acquisitions'''
 
     def __init__(self, mainGUI):
-        super().__init__(None, Qt.WindowStaysOnTopHint)
+        super().__init__()
         # self.latestExperiment = [] # Placeholder for latest experiment instance
         self.make_gui()
         self.acquisitions = 0 # Controls acuisition counter only
 
     def center_window(self):
         '''Center main application window on screen'''
-        qtRectangle = self.frameGeometry()
-        centerPoint = QDesktopWidget().availableGeometry().center()
-        qtRectangle.moveCenter(centerPoint)
-        self.move(qtRectangle.topLeft())
+        qr = self.frameGeometry()
+        cp = self.screen().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
@@ -1059,9 +1053,8 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.btn['Stop'][0].setToolTip('Stop multiple acquisitions')
         for x, k in self.btn.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
-            k[0].setFocusPolicy(Qt.NoFocus)
             k[0].setFont(font)
-            k[0].setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             k[0].setStyleSheet(defaults.STYLE_ARMED)
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         # Input fields
