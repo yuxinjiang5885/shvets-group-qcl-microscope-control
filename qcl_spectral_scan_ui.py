@@ -28,24 +28,23 @@ from ui.stage_windows import (stageInitializer,
 from ui.plot_widgets import mplCanvas
 # from instruments.mircat import laser
 from instruments.ni_daq import MultiChannelAnalogInput as MultiAI
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QObject, QThread, pyqtSignal
-from PyQt5.QtGui import QIntValidator, QIcon, QFont, QWindow
-from PyQt5.QtWidgets import (QAction,
-                             QApplication,
+from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QThread
+from PyQt6.QtGui import QAction, QIcon, QFont
+from PyQt6.QtWidgets import (QApplication,
+                             QComboBox,
                              QDesktopWidget,
-                             QDialog,
-                             QFileDialog,
                              QGridLayout,
                              QLabel,
                              QLineEdit,
+                             QListWidget,
                              QMainWindow,
                              QMessageBox,
                              QPushButton,
                              QWidget,
                              QSizePolicy,
-                             QTextEdit,
-                             QVBoxLayout)
+                             QTabWidget,
+                             QTextEdit)
 rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
 
 STAGE_COM_PORT = defaults.HLD117_COM_PORT
