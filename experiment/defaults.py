@@ -118,6 +118,10 @@ DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
 DEF_FILENAME_SCAN_IMAG_X = '_X-um.txt' # For scanning imaging experiments
 DEF_FILENAME_SCAN_IMAG_Y = '_Y-um.txt' # For scanning imaging experiments
 DEF_FILENAME_SCAN_IMAG_V = '_V-V.txt' # For scanning imaging experiments
+DEF_FILENAME_SCAN_IMAG_X_RAW = '_X-um_raw.txt' # For scanning imaging experiments
+DEF_FILENAME_SCAN_IMAG_Y_RAW = '_Y-um_raw.txt' # For scanning imaging experiments
+DEF_FILENAME_SCAN_IMAG_V_X_RAW = '_V-V_x_raw.txt' # For scanning imaging experiments
+DEF_FILENAME_SCAN_IMAG_V_Y_RAW = '_V-V_y_raw.txt' # For scanning imaging experiments
 LOG_FILENAME = 'experiment.log'
 
 '''MIRcat QCL parameters'''

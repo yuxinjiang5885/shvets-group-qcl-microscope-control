@@ -510,7 +510,7 @@ class imagingScan(QObject):
                 qclWidth = self.parameters.laser.get_pulse_width(qclNo)
                 logFile.write('  QCL {:.0f}: {:.0f} mA, {:.0f} Hz, {:.0f} ns.\n'.format(
                                                 qclNo, qclCurr, qclRate, qclWidth))
-            logFile.write('- Target wavelengths/wavenumbers:\n')
+            logFile.write('- Target wavelengths/wavenumbers (um or cm^-1):\n')
             logFile.write('  {}\n'.format(self.parameters.ranges[ip]))
             logFile.write('- Scan parameters:\n')
             logFile.write('  x start/step/size (um): {}/{}/{}\n'.format(
@@ -521,9 +521,9 @@ class imagingScan(QObject):
                 self.parameters.yParameters[ip][0],
                 self.parameters.yParameters[ip][1],
                 self.parameters.yParameters[ip][2]))
-            logFile.write('- Scan direction: {}\n'.format(self.parameters.scanDir[ip]))
-            logFile.write('- Sample rate: {}\n'.format(self.parameters.sampleRates[ip]))
-            logFile.write('- Samples: {}\n'.format(self.parameters.sampleNumbers[ip]))
+            logFile.write('- Scan direction (stage axis): {}\n'.format(self.parameters.scanDir[ip]))
+            logFile.write('- NI DAQ sample rate (Hz): {}\n'.format(self.parameters.sampleRates[ip]))
+            logFile.write('- NI DAQ samples per voltage point: {}\n'.format(self.parameters.sampleNumbers[ip]))
             logFile.write('\n')
         logFile.close()
         ### Run scan
@@ -808,7 +808,26 @@ class imagingScan(QObject):
                                 lineLengths.append(len(vr))
                             scanLineLength = max(lineLengths)
                             scanLineNumber = len(v[iw])
+                            ### Write wavelength or wavenumber string for file names
+                            if self.parameters.units in ['invcm']:
+                                wStr = 'wm-{:05.0f}invcm'.format(w)
+                            else:
+                                wStr = 'wl-{:02.3f}um'.format(w)
+                            ### Save raw and formatted voltages, according to scan direction
                             if sd in ['y']:
+                                ### Open file for raw positions in binary mode
+                                rawPositionsFileName = 'scan{:03.0f}_{}{}'.format(
+                                    iv + 1,
+                                    wStr,
+                                    defaults.DEF_FILENAME_SCAN_IMAG_Y_RAW)
+                                rawPositionsFile = open(rawPositionsFileName,'ab')
+                                ### Open file for raw voltage data in binary mode
+                                rawVoltageFileName = 'scan{:03.0f}_{}{}'.format(
+                                    iv + 1,
+                                    wStr,
+                                    defaults.DEF_FILENAME_SCAN_IMAG_V_Y_RAW)
+                                rawVoltageFile = open(rawVoltageFileName,'ab')
+                                ### Format and save data
                                 self.parameters.data.Xcont[iv][iw] = np.transpose(self.parameters.data.X)
                                 Y = np.zeros((scanLineLength, 1))
                                 for iy, y in enumerate(self.parameters.data.Ytemp[iv][iw][0]):
@@ -816,6 +835,12 @@ class imagingScan(QObject):
                                 self.parameters.data.Ycont[iv][iw] = Y
                                 V = np.zeros((scanLineNumber, scanLineLength))
                                 for ix, vr in enumerate(v[iw]):
+                                    ### Save this line of raw voltage data
+                                    positionLine = self.parameters.data.Ytemp[iv][iw][ix]
+                                    positionLine = np.transpose(positionLine[:,None])
+                                    np.savetxt(rawPositionsFile, positionLine)
+                                    ### Save this line of raw voltage data
+                                    np.savetxt(rawVoltageFile, np.transpose(vr))
                                     ### Calculate line length difference from max
                                     lengthOffset = scanLineLength - len(vr)
                                     for iy, vPoint in enumerate(vr):
@@ -826,7 +851,21 @@ class imagingScan(QObject):
                                         else:
                                             iyInv = scanLineLength - iy - 1 - lengthOffset
                                             V[ix][iyInv] = vPoint
+                                rawVoltageFile.close()
+                                rawPositionsFile.close()
                             else:
+                                ### Open file for raw positions in binary mode
+                                rawPositionsFileName = 'scan{:03.0f}_{}{}'.format(
+                                    iv + 1,
+                                    wStr,
+                                    defaults.DEF_FILENAME_SCAN_IMAG_X_RAW)
+                                rawPositionsFile = open(rawPositionsFileName,'ab')
+                                ### Open file for raw voltage data in binary mode
+                                rawVoltageFileName = 'scan{:03.0f}_{}{}'.format(
+                                    iv + 1,
+                                    wStr,
+                                    defaults.DEF_FILENAME_SCAN_IMAG_V_X_RAW)
+                                rawVoltageFile = open(rawVoltageFileName,'ab')
                                 X = np.zeros((scanLineLength, 1))
                                 for ix, x in enumerate(self.parameters.data.Xtemp[iv][iw][0]):
                                     X[ix] = x
@@ -834,6 +873,12 @@ class imagingScan(QObject):
                                 self.parameters.data.Ycont[iv][iw] = np.transpose(self.parameters.data.Y)
                                 V = np.zeros((scanLineLength, scanLineNumber))
                                 for iy, vr in enumerate(v[iw]):
+                                    ### Save this line of raw voltage data
+                                    positionLine = self.parameters.data.Xtemp[iv][iw][iy]
+                                    positionLine = np.transpose(positionLine[:,None])
+                                    np.savetxt(rawPositionsFile, positionLine)
+                                    ### Save this line of raw voltage data
+                                    np.savetxt(rawVoltageFile, np.transpose(vr))
                                     ### Calculate line length difference from max
                                     lengthOffset = scanLineLength - len(vr)
                                     for ix, vPoint in enumerate(vr):
@@ -844,12 +889,11 @@ class imagingScan(QObject):
                                         else:
                                             ixInv = scanLineLength - ix - 1 - lengthOffset
                                             V[ixInv][iy] = vPoint
+                                rawVoltageFile.close()
+                                rawPositionsFile.close()
                             self.parameters.data.V[iv][iw] = V
-                            if self.parameters.units in ['invcm']:
-                                wStr = 'wm-{:05.0f}invcm'.format(w)
-                            else:
-                                wStr = 'wl-{:02.3f}um'.format(w)
-                            ### Save X, Y positions for this pattern and wavelength
+                            ### Save data for this pattern and wavelength
+                            ### Save x/y position vectors
                             np.savetxt('scan{:03.0f}_{}{}'.format(
                                 iv + 1,
                                 wStr,
@@ -860,11 +904,14 @@ class imagingScan(QObject):
                                 wStr,
                                 defaults.DEF_FILENAME_SCAN_IMAG_Y),
                                 self.parameters.data.Ycont[iv][iw])
+                            ### Save voltage matrix
                             np.savetxt('scan{:03.0f}_{}{}'.format(
                                 iv + 1,
                                 wStr,
                                 defaults.DEF_FILENAME_SCAN_IMAG_V),
                                 self.parameters.data.V[iv][iw])
+                            ### Save raw positions for scanning axis
+
                 except Exception as exc:
                     print('Data formatting did not complete:\n{}'.format(exc))
                     print('Data was not saved.')
