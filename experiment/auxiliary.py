@@ -122,12 +122,10 @@ class scanningImagingParameters():
         self.fastPatterns = [] # Fast scanning imaging patters, placeholder value
         self.laser = [] # Laser instance, laceholder value
         self.latestDir = 0 # Latest experiment directory, placeholder value
-        # self.notes = [] # Placeholder value\
         self.qcl = [] # QCL modules to be used, placeholder value
         self.patterns = [] # Scanning imaging patters, placeholder value
         self.patternIndices = [] # Indices of pattern positions, placeholder value
         self.ranges = [] # Wavelength/wavenumber ranges, placeholder value
-        self.refDir = '' # Reference experiment directory
         # self.reference = np.zeros((1, 2)) # Placeholder value
         self.sampleNumbers = [] # Sample numbers, placeholder value
         self.sampleRates = [] # Sample rates, placeholder value

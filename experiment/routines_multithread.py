@@ -492,11 +492,6 @@ class imagingScan(QObject):
         os.mkdir(expDir)
         os.chdir(expDir)
         self.parameters.latestDir = expDir
-        ### Save experiment notes to file
-        # if not len(self.parameters.notes) == 0:
-        #     noteFile = open('notes.txt', 'w')
-        #     noteFile.write(self.parameters.notes)
-        #     noteFile.close()
         ### Write parameters to log
         logFile = open(defaults.LOG_FILENAME, 'w')
         logFile.write('QCL Microscope scanning imaging experiment log\n')
@@ -530,16 +525,8 @@ class imagingScan(QObject):
             logFile.write('- Sample rate: {}\n'.format(self.parameters.sampleRates[ip]))
             logFile.write('- Samples: {}\n'.format(self.parameters.sampleNumbers[ip]))
             logFile.write('\n')
-        # logFile.write('Sweep limits:\n')
-        # logFile.write('{}\n'.format(self.parameters.sweepLimits))
-        # logFile.write('\n')
         logFile.close()
-        ### Run a sweep or a step-and-measure scan
-        data = []
-        # if self.parameters.sweeping:
-        #     data = self.sweep()
-        # else: # Default to step-and-measure
-        #     data = self.scan()
+        ### Run scan
         self.parameters.data = self.scan()
         self.outData.emit(self.parameters.data)
         self.outParams.emit(self.parameters)
