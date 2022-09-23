@@ -750,7 +750,9 @@ class imagingScan(QObject):
                                     ### Acquire until endpoint is reached
                                     voltages = []
                                     while continueCondition(xStg, yStg):
+                                        # startPos = timer()
                                         (xStg, yStg) = self.parameters.stage.get_position()
+                                        # print(timer()-startPos)
                                         ### Acquire
                                         measurements = multipleAI.acquire(sn)
                                         # print(measurements)
