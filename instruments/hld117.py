@@ -34,7 +34,7 @@ H117_DEFAULT_SPEED = defaults.H117_MAX_SPEED # Default stage speed, um/s
 H117_DEFAULT_ACC = defaults.H117_MAX_ACC # Default stage acceleration, um/s^2
 H117_SPEEDS = [10, 100, 1000, 10000, defaults.H117_MAX_SPEED] # Select stage speeds, um/s
 H117_ACCS = [defaults.H117_MAX_ACC] # Select stage accelerations, um/s^2
-
+H117_TRIG_RES = 20 # Trigger resoution: 20 encoder counts per um
 ### Common
 STEPS = [10, 100, 1000, 10000] # Select stage steps, um
 
@@ -239,3 +239,69 @@ class stage():
     def stop_smoothly(self):
         '''Stop stage smoothly, maintaining positional accuracy.'''
         self.message('controller.stop.smoothly')
+
+    '''
+    New methods inmplemented by Po-Ting Shen
+    March 13, 2023
+    '''
+    def encoder_res(self):
+        '''Get the encoder resolution (encoder counts per micron)'''
+        xRes = self.message('controller.trigger.resolution.get X')
+        yRes = self.message('controller.trigger.resolution.get Y')
+
+        return int(xRes[1]), int(yRes[1])
+
+    def arm_trigger(self, F: int, D: int, A: str, N: int, P: str , W: int):
+        '''Arm the trigger
+        <F>	First trigger position in encoder counts	int
+        <D>	Distance between triggers in encoder counts	int
+        <A>	Axis to trigger from ‘X’, ‘Y’ or ‘Z’	char
+        <N>	Number of triggers in chord	int
+        <P>	trigger pulse polarity ‘P’ or ‘N’	char
+        <W>	trigger pulse in microseconds	int
+        '''
+        class myMap(dict): # inheriting the dict class
+            def __missing__(self,key):
+                return key
+
+        self.message('controller.trigger.arm {F} {D} {A} {N} {P} {W}'
+                     .format_map(myMap(F = F, D = D, A = A, N = N, P = P, W = W)))
+
+    def make_snakes(self, X0: float, Y0: float, xIndent: float, dX: float, dY: float, M: int, N: int, returnDrift: float):
+        '''
+        Helper. Does not require stage connection.
+        Make a snake scan path. Returns a list of N dictionaries.
+        <X0> starting x position (top left, in microns)                     float
+        <Y0> starting y position (top left, in microns)                     float
+        <xIndent> starting trigger position (in microns)                    float
+        <dX> x step resolution                                              float
+        <dY> y step resolution                                              float
+        <M> The number of steps in x direction                              int
+        <N> The number of repetition (round trip) in y direction            int
+        <returnDrift> to calibrate the backward scan drift (in microns)     float
+
+        Each dictionary holds
+        i:  i (block number)    int
+        X0: X0                  float
+        Y0: Y0 - i*dY           float
+        X1: X0 + xIndent+ M*dX  float
+        Y1: Y0 - (i+1)*dY       float
+        M:  M                   int
+        dX: dX                  float
+        dY: dY                  float
+        '''
+        paths = []
+        for i in range(N):
+            d = {}
+            d['i']  = i
+            d['X0'] = X0
+            d['Y0'] = Y0 - 2*i*dY #This is correct
+            d['X1'] = X0 + xIndent + M*dX #This needs fixing
+            d['Y1'] = Y0 - (2*i+1)*dY #This is correct
+            d['M']  = M
+            d['dX'] = dX
+            d['dY'] = dY
+            d['drift'] = returnDrift
+            paths.append(d)
+
+        return paths

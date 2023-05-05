@@ -12,6 +12,11 @@ Created 2020-Oct-20
 PCI_CH_X = b'Dev1/ai0'
 PCI_CH_Y = b'Dev1/ai1'
 PCI_TRIG = b'/Dev1/PFI12'
+'''
+For implementing snakeScan, add a new channel.
+Po-Ting 03/07/23
+'''
+PCI_SNAKE_TRIG = b'/Dev1/PFI0'
 
 '''Stage ports and parameters
    One set for the HLD117 in 147, one for the H117 in BE13.'''
@@ -22,6 +27,11 @@ HLD117_MAX_SPEED = 30000 # Maximum stage speed, um/s, found in Prior demo app
 HLD117_MAX_ACC = 142750 # Maximum stage acceleration, um/s^2, found in Prior demo app
 HLD117_X_TRAVEL_UM = 120000 # um
 HLD117_Y_TRAVEL_UM = 80000 # um
+'''
+For implementing snakeScan, default stage drift during the return scan.
+Po-Ting 04/04/23
+'''
+HLD117_X_RETURN_DRIFT_UM = -2 # um, for stage speed 30,000um/s
 
 ### H117 parameters (stepper motors, BE13)
 H117_COM_PORT = 7
@@ -199,11 +209,18 @@ WL_MINIMUMS_UM = [MIN_WL_QCL1_UM,
 ### Default NI PCIe card sampling parameters
 # DEF_SAMPLERATE = 1000 # Hz
 # DEF_SAMPLERATE = 1000000 # Hz
-DEF_SAMPLERATE = 100000 # Hz
+DEF_SAMPLERATE = 100000 # Hz Default
+#DEF_SAMPLERATE = 10000 # Hz
+#DEF_SAMPLERATE = 1000 # Hz
 # DEF_SAMPLES = 100
 # DEF_SAMPLES = 320
 DEF_SAMPLES = 32
 DEF_SAMPLES_IMAGING = 1
+'''
+Added by Po-Ting Shen
+03/16/2023
+'''
+DEF_SAMPLES_SNAKESCAN = 2 # x sampling time per trigger
 
 ### Default scan/sweep parameters
 DEF_WL_START_UM = 5.2 # Default scan/sweep start wavelength, um

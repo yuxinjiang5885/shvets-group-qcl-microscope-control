@@ -914,10 +914,14 @@ class imagingScan(QObject):
                                 self.parameters.data.V[iv][iw])
                             ### Save raw positions for scanning axis
 
+
                 except Exception as exc:
                     print('Data formatting did not complete:\n{}'.format(exc))
                     print('Data was not saved.')
-            case 'continuous_sweep':
+            case 'snakeScan':
+                '''
+                The followings are new functions implemented by Po-Ting Shen
+                '''
                 print('Not implemented.')
                 return []
             case _:

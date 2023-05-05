@@ -995,6 +995,7 @@ class mainWindow(QMainWindow):
             self.imagePlotCanvas.axes.set_ylim(yMin, yMax)
             if self.imageViewAbove.isChecked():
                 self.imagePlotCanvas.axes.invert_xaxis()
+                self.imagePlotCanvas.axes.invert_yaxis()
                 Z = np.flip(np.transpose(data.V[scanIndex][wIndex]), axis = 0)
             else:
                 Z = np.transpose(data.V[scanIndex][wIndex])
