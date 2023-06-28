@@ -31,7 +31,8 @@ HLD117_Y_TRAVEL_UM = 80000 # um
 For implementing snakeScan, default stage drift during the return scan.
 Po-Ting 04/04/23
 '''
-HLD117_X_RETURN_DRIFT_UM = -2 # um, for stage speed 30,000um/s
+HLD117_X_RETURN_DRIFT_UM = -6 # um, for stage speed 2,000um/s. -2 for stage speed 30,000um/s
+HLD117_REC_SPEED = 2000 # Recommended maximum stage speed for cells
 
 ### H117 parameters (stepper motors, BE13)
 H117_COM_PORT = 7
@@ -122,7 +123,9 @@ PLOT_COLOR_T_DARK = '#FF0000'
 '''Directories and file names'''
 
 DEF_DATA_DIRECTORY = 'C:\\Data\\_experiment_data'
+DEF_TEST_FOLDER = 'C:\\Users\\Discovery\\Desktop\\Today tests'
 DEF_SCAN_IMAG_SUBFOLDER = 'scanningimaging'
+DEF_SNAKE_SCAN_SUBFOLDER = 'stacks'
 DEF_FILENAME = '_wl-um_x-v_y-v_r-v.txt' # Append to data files
 # DEF_FILENAME_XY = '_stg-x-um_stg-y-um_wl-um_lia-x-v_lia-y-v_lia-r-v.txt' # Append to data files
 DEF_FILENAME_SCAN_IMAG_X = '_X-um.txt' # For scanning imaging experiments
@@ -144,8 +147,8 @@ MIN_PULSEWIDTH_NS = 20
 ### MIRcat default wavelength parameters
 ### Limits changed to have maximum power in overlap regions
 MIN_WL_QCL1_UM = 5.12 # um
-# MIN_WL_QCL2_UM = 5.85 # um # Actual limit
-MIN_WL_QCL2_UM = 5.95 # um # Restricted limit
+MIN_WL_QCL2_UM = 5.85 # um # Actual limit
+#MIN_WL_QCL2_UM = 5.95 # um # Restricted limit
 # MIN_WL_QCL3_UM = 6.83 # um # Actual limit
 # MIN_WL_QCL3_UM = 7.1 # um # Restricted limit
 MIN_WL_QCL3_UM = 7.05 # um # Revised restricted limit
@@ -255,8 +258,21 @@ IMAG_SCAN_STEP_X_UM = 4000
 IMAG_SCAN_STEP_Y_UM = 4000
 IMAG_SCAN_SIZE_X_UM = 4
 IMAG_SCAN_SIZE_Y_UM = 4
-IMAG_SCAN_WL_LIST = '6.7'
+IMAG_SCAN_WL_LIST = '6.45'
 IMAG_SCAN_STEP_BUSY_WAIT = 0.01 # Stage busy query wait time, s
+'''
+Default snake scan parameters
+'''
+SNAKE_TRIG_INDENT = 1
+
+SNAKE_SCAN_X_PIXEL = 200
+SNAKE_SCAN_Y_PIXEL = 200
+
+SNAKE_SCAN_RES_X_UM = 2
+SNAKE_SCAN_RES_Y_UM = 2
+
+SNAKE_SCAN_START_WL = 6 #um
+SNAKE_SCAN_WL_STEPS = 1
 
 '''Gamepad parameters'''
 
@@ -278,6 +294,14 @@ NUMBER_OF_ROWS = 14 # UI grid template rows
 NUMBER_OF_COLS = 12 # UI grid template columns
 MSG_TIMEOUT = 1000 # ms
 ROW_HEIGHT = 20
+
+'''
+For UI convenience
+Po-Ting Shen
+05/11/23
+'''
+DEF_WL_UNIT = 'um'
+SEC_WL_UNIT = 'invcm'
 
 ### Style sheets
 STYLE_ARMED = '''QPushButton {{

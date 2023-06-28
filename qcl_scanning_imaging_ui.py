@@ -16,16 +16,17 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import rcParams
 import numpy as np
 from experiment.auxiliary import (experimentParameters,
-                                  scanningImagingParameters)
+                                  scanningImagingParameters,
+                                  snakeScanParameters)
 import experiment.defaults as defaults
-from experiment.routines import experiment, imagingScan
+from experiment.routines import (experiment, imagingScan, snakeScan)
 from ui.laser_windows import (laserInitializer,
                               laserSettingWindow,
                               laserStartupDialog)
 from ui.stage_windows import (stageInitializer,
                               stageMotionWindow,
                               stageStartupDialog)
-from ui.scan_windows import scanBrowser
+from ui.scan_windows import (scanBrowser, snakeBrowser)
 from ui.plot_widgets import mplCanvas
 from PyQt6.QtCore import QThread
 from PyQt6.QtGui import QAction, QIcon, QFont
@@ -74,20 +75,48 @@ class mainWindow(QMainWindow):
         else:
             self.xTravel = defaults.HLD117_X_TRAVEL_UM
             self.yTravel = defaults.HLD117_Y_TRAVEL_UM
+
+        #self.stage = stageInitializer(MODEL = STAGE_MODEL, COM_PORT = STAGE_COM_PORT).stage_initialize
+
         self.stage = []
+
+        '''
+        Used for coordinate system.
+        '''
+        # A placeholder to the current stage position
+        self.displayed_coordinates = []
+        # A placeholder to the stage position received from stageMotionWindow
+        self.received_stageMotionWindow_poisiton = []
+
+
+        '''
+        End of coordinate system.
+        '''
         self.threadStg = QThread()
         self.stageWorker = stageInitializer(MODEL = STAGE_MODEL, COM_PORT = STAGE_COM_PORT)
         self.stageWorker.moveToThread(self.threadStg)
         self.threadStg.started.connect(self.stageWorker.stage_initialize)
         self.stageWorker.stageInitialized.connect(self.threadStg.quit)
         self.stageWorker.stageInitialized.connect(self.stageWorker.deleteLater)
+        '''
+        self.stage is initialized after this.
+        '''
         self.stageWorker.stageInstance.connect(self.stage_set)
+        '''
+        End of comments.
+        '''
         self.threadStg.finished.connect(self.threadStg.deleteLater)
         self.threadStg.start()
         ### Show stage startup dialog
         startupDialog2 = stageStartupDialog(COM_PORT = STAGE_COM_PORT) # Closes when startup finishes
         self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
         startupDialog2.exec()
+
+        self.displayed_coordinates = self.get_displayed_coordinates()
+        self.isSnakeBrowserInit = False
+
+
+
         ### Prepare text for "about" dialog
         try:
             self.aboutText = ''
@@ -100,7 +129,7 @@ class mainWindow(QMainWindow):
         self.parameters = experimentParameters()
         self.scanImagParameters = scanningImagingParameters()
         # self.useRef = False # By default, do not use reference
-        self.wlUnits = 'um' # Wavelength/number units
+        self.wlUnits = defaults.DEF_WL_UNIT # Wavelength/number units
         ### Thread and worker placeholders
         # self.thread = [] # Placeholder for last-used thread
         # self.worker = [] # Placeholder for last-used worker
@@ -111,11 +140,49 @@ class mainWindow(QMainWindow):
         self.multiMenu = multipleAcquisitionsWindow(self)
         self.multiMenu.btn['Start'][0].clicked.connect(lambda: self.multiple())
         self.stageMotionWindow = stageMotionWindow(mainGUI = self, model = STAGE_MODEL)
-        self.statusbar.showMessage('Ready')
+        self.statusbar.showMessage('Ready! ' + 'Stage initial position is at ' + str(self.displayed_coordinates)+'.')
 
     def about(self):
         '''Show dialog when "about" is clicked.'''
         QMessageBox.about(self, 'About', self.aboutText)
+    '''
+    Coordinate system
+    '''
+    '''
+    Helper: Get displayed coordinates
+    Prerequesite: Used after the stage is set.
+    '''
+    def get_displayed_coordinates(self):
+        return self.stage.get_position()
+    '''
+    Helper: Receive coordinates from stageMotionWindow
+    '''
+    def update_coordinates_from_stageMotionWindow(self, stage_position):
+        '''
+        '''
+        self.received_stageMotionWindow_poisiton = stage_position
+        self.statusbar.showMessage('Current stage position is at ' + str(self.received_stageMotionWindow_poisiton)+'.')
+        #print(f'Received stageMotionWindow coordinates (mainGUI): {stage_position}')
+    '''
+    Helper: Update scan progress to status bar from routines (snakeScan Obj)
+    '''
+    def update_scan_progress_from_snakeScan(self, msg):
+        self.statusbar.showMessage(msg)
+    '''
+    Helper: Validate snakescan inputs.
+    '''
+    def validate_snakeScan_inputs(self):
+        '''
+        Placeholder!
+        '''
+
+
+
+
+
+    '''
+    End of implementation.
+    '''
 
     def arm(self):
         '''Arm or disarm laser laser'''
@@ -157,6 +224,8 @@ class mainWindow(QMainWindow):
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
         self.stage.disconnect()
+        self.laser.disable()
+        self.laser.disarm()
         event.accept()
         # reply = QMessageBox.question(self, 'Quit confirmation',
         #                              "Are you sure you want to quit?",
@@ -169,6 +238,29 @@ class mainWindow(QMainWindow):
         #     self.laser.disconnect()
         # else:
         #     event.ignore()
+    def construct_snakescan_pattern(self,
+                                    X0 = defaults.IMAG_SCAN_ORIGIN_X_UM,
+                                    Y0 = defaults.IMAG_SCAN_ORIGIN_Y_UM,
+                                    xPixelNums = defaults.SNAKE_SCAN_X_PIXEL,
+                                    yPixelNums = defaults.SNAKE_SCAN_Y_PIXEL,
+                                    xPixelRes = defaults.SNAKE_SCAN_RES_X_UM,
+                                    yPixelRes = defaults.SNAKE_SCAN_RES_Y_UM,
+                                    returnXDrift = defaults.HLD117_X_RETURN_DRIFT_UM,
+                                    scanDir = 0,
+                                    xIndent = defaults.SNAKE_TRIG_INDENT,
+                                    ):
+        '''
+        This is to construct snake scan pattern for .patterns from
+        the snake scan tabs.
+        '''
+        pattern = self.stage.make_snakes(X0 = X0, Y0 = Y0, xIndent = xIndent,
+                                        dX = xPixelRes, dY = yPixelRes,
+                                        M = xPixelNums, N = yPixelNums//2,
+                                        returnDrift =  returnXDrift)
+
+        print('How many round trips are there in paths: ' +str(len(pattern)))
+        return pattern
+
 
     def construct_pattern(self, scanDir = 0,
                                 xOrig = defaults.IMAG_SCAN_ORIGIN_X_UM,
@@ -384,8 +476,8 @@ class mainWindow(QMainWindow):
         self.repeatShow.setStatusTip('Update plots when using "Repeat"')
         optionsMenu.addAction(self.repeatShow)
         self.imageViewAbove = QAction(QIcon(None),
-                          'Show image from above', self, checkable=True)
-        self.imageViewAbove.setChecked(True) # Checked by default
+                          'Show image from above', self, checkable=False)
+        self.imageViewAbove.setChecked(False) # Unchecked by default
         self.imageViewAbove.setStatusTip('Show image as if from above the stage')
         optionsMenu.addAction(self.imageViewAbove)
         self.darkMode = QAction(QIcon(None), 'Dark mode', self, checkable=True, checked=True)
@@ -639,10 +731,100 @@ class mainWindow(QMainWindow):
         # self.tabMultiple = QWidget()
         # self.tabMultiple.setStyleSheet(defaults.STYLE_CONTAINER)
         # self.tabs.addTab(self.tabMultiple, 'Multiple')
+        '''
+        A new tab is added for the newly implemented snake scan.
+        Po-Ting Shen
+        05/11/23
+        '''
+        ### Snake scan tab - Base layout
+        self.tabSnake = QWidget()
+        self.tabSnake.setStyleSheet(defaults.STYLE_CONTAINER)
+        self.tabs.addTab(self.tabSnake, 'Snake scan')
+        ### Snake scan tab - Grid layout
+        self.tabSnakeGrid = QGridLayout()
+        self.tabSnake.setLayout(self.tabSnakeGrid)
+        self.tabSnakeGrid.setSpacing(10)
+        ### Snake scan tab - Plot: Snake scan
+        self.snakePlotCanvas = mplCanvas(width=5, height=4)
+        self.snakePlotCanvas.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.snakePlotCanvas.axes.set_aspect('equal')
+        self.snakePlotCanvas.axes.set_xlabel('x (μm)')
+        xTravel = self.xTravel
+        xMax = 1.1 * xTravel / 2
+        xMin = -1 * xMax
+        self.snakePlotCanvas.axes.set_xlim(xMin, xMax)
+        self.snakePlotCanvas.axes.set_ylabel('y (μm)')
+        yTravel = self.yTravel
+        yMax = 1.1 * yTravel / 2
+        yMin = -1 * yMax
+        self.snakePlotCanvas.axes.set_ylim(yMin, yMax)
+        self.snakePlotCanvas.axes.invert_yaxis() # Positive y is towards user
+        self.snakePlotCanvas.axes.set_title('Image')
+        xMax = 1. * xTravel / 2
+        xMin = -1 * xMax
+        yMax = 1. * yTravel / 2
+        yMin = -1 * yMax
+        self.snakePlotCanvas.axes.set_axisbelow(True)
+        self.snakePlotCanvas.axes.grid(color='gray', linestyle='dashed')
+        darkAxes = defaults.DARK_PLOT_AXES
+        darkBackground = defaults.DARK_PLOT_BACKGROUND
+        darkColor = defaults.PLOT_COLOR_DARK
+        self.snakePlotCanvas.recolor(darkAxes, darkBackground, darkColor)
+        self.tabSnakeGrid.addWidget(self.snakePlotCanvas, 0, 3, 6, 6)
+
+        ### Scanning imaging tab - Image wavelength/number and scan selector
+        self.snakePlotScanSelectorLabel = QLabel('Scan')
+        self.snakePlotScanSelectorLabel.setFont(font)
+        self.snakePlotScanSelectorLabel.setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        self.tabSnakeGrid.addWidget(self.snakePlotScanSelectorLabel, 0, 10, 1, 2)
+        self.snakePlotScanSelector = QListWidget()
+        self.snakePlotScanSelector.setFont(fontSmall)
+        self.snakePlotScanSelector.setStyleSheet(defaults.STYLE_LIST_WIDGET)
+        self.snakePlotScanSelector.itemClicked.connect(lambda: self.update_snakescans_plot())
+        self.tabSnakeGrid.addWidget(self.snakePlotScanSelector, 1, 10, 2, 2)
+        self.snakePlotWSelectorLabel = QLabel('Wavelength')
+        self.snakePlotWSelectorLabel.setStyleSheet(defaults.STYLE_LABEL_EMPH)
+        self.snakePlotWSelectorLabel.setFont(font)
+        self.tabSnakeGrid.addWidget(self.snakePlotWSelectorLabel, 3, 10, 1, 2)
+        self.snakePlotWSelector = QListWidget()
+        self.snakePlotWSelector.setFont(fontSmall)
+        self.snakePlotWSelector.setStyleSheet(defaults.STYLE_LIST_WIDGET)
+        self.snakePlotWSelector.itemClicked.connect(lambda: self.update_snakescans_plot())
+        self.tabSnakeGrid.addWidget(self.snakePlotWSelector, 4, 10, 2, 2)
+
+
+        ### Snake scan tab - Scan browser
+        self.snakeBrowser = snakeBrowser(self)
+        self.tabSnakeGrid.addWidget(self.snakeBrowser, 7, 0, 6, 6)
+
+        ### Snake scan tab - Buttons
+        self.tabSnakeButtons = dict()
+        self.tabSnakeButtons['Start'] = [QPushButton('Start'), 12, 9, 2, 3]
+        self.tabSnakeButtons['Start'][0].setToolTip('Start scan')
+        #self.tabSnakeButtons['Stop'] = [QPushButton('Stop'), 12, 9, 2, 3]
+        #self.tabSnakeButtons['Stop'][0].setToolTip('Stop scan')
+        for x, k in self.tabSnakeButtons.items(): # Arrange buttons in grid
+            k[0].setCheckable(True)
+            # k[0].setFocusPolicy(Qt.NoFocus)
+            k[0].setFont(font)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            if x in ['Start', 'Stop']:
+                k[0].setStyleSheet(defaults.STYLE_ARMED)
+            else:
+                k[0].setStyleSheet(defaults.STYLE_BUTTON)
+            self.tabSnakeGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Connect buttons to actions
+        self.tabSnakeButtons['Start'][0].clicked.connect(lambda: self.run_snake_scan())
+
+
+
+        '''
+        End of the new tab.
+        '''
         ### Scanning imaging tab - Base layout
         self.tabImag = QWidget()
         self.tabImag.setStyleSheet(defaults.STYLE_CONTAINER)
-        self.tabs.addTab(self.tabImag, 'Scanning imaging')
+        self.tabs.addTab(self.tabImag, 'Scanning imaging (Legacy)')
         ### Scanning imaging tab - Grid layout
         self.tabImagGrid = QGridLayout()
         self.tabImag.setLayout(self.tabImagGrid)
@@ -828,10 +1010,10 @@ class mainWindow(QMainWindow):
         self.parameters.sampleNumber = int(self.inputField['SamplesPerWl'][0].text())
         self.parameters.sampleRate = int(self.inputField['SamplingRate'][0].text())
         self.parameters.speed = float(self.inputField['Speed'][0].text())
-        if self.wlUnits == 'invcm':
-            self.parameters.units = 'invcm'
+        if self.wlUnits == defaults.SEC_WL_UNIT:
+            self.parameters.units = defaults.SEC_WL_UNIT
         else: # Default to micrometers
-            self.parameters.units = 'um'
+            self.parameters.units = defaults.DEF_WL_UNIT
         ### Parameter checks
         if self.parameters.start == self.parameters.end: # Requested limits are equal
             print('Limits cannot be equal.')
@@ -959,6 +1141,58 @@ class mainWindow(QMainWindow):
             self.plotCanvasRef.recolor(plotColor = defaults.PLOT_COLOR_REF)
             self.plotCanvasT.recolor(plotColor = defaults.PLOT_COLOR_T)
 
+    def plot_snakescans(self, data, pattern_idx = 0, wlwn_idx = 0):
+        '''Plot the snakescans on snakeTab'''
+                ### Clear previous plot
+        self.snakePlotCanvas.clear_plots()
+        displayed_units = self.wlUnits
+        try:
+            ### Make list of available scans
+            self.snakePlotScanSelector.clear()
+            for iv, _ in enumerate(data.V):
+                self.snakePlotScanSelector.addItem('{:.0f}'.format(iv))
+            self.snakePlotScanSelector.setCurrentRow(0)
+            ### Make list of wavelengths/wavenumbers for indexed scan
+            self.snakePlotWSelector.clear()
+            for w in data.W[pattern_idx]:
+                self.snakePlotWSelector.addItem('{:.3f}'.format(w))
+            self.snakePlotWSelector.setCurrentRow(0)
+            ### Display indexed scan and wavelength/wavenumber in title
+            titleStr = 'Scan {:.0f} {:.3f} {}'.format(pattern_idx,
+                data.W[pattern_idx][wlwn_idx], displayed_units)
+            self.snakePlotCanvas.axes.set_title(titleStr)
+            self.snakePlotScanSelector.setCurrentRow(pattern_idx)
+            self.snakePlotWSelector.setCurrentRow(wlwn_idx)
+            if self.scanImagParameters.scanMode in ['continuous_one', 'continuous_sweep','snake_scan']:
+                xMin = np.min(data.Xcont[pattern_idx][wlwn_idx])
+                xMax = np.max(data.Xcont[pattern_idx][wlwn_idx])
+                yMin = np.min(data.Ycont[pattern_idx][wlwn_idx])
+                yMax = np.max(data.Ycont[pattern_idx][wlwn_idx])
+            else:
+                xMin = np.min(data.X[pattern_idx])
+                xMax = np.max(data.X[pattern_idx])
+                yMin = np.min(data.Y[pattern_idx])
+                yMax = np.max(data.Y[pattern_idx])
+            self.snakePlotCanvas.axes.set_xlim(xMin, xMax)
+            self.snakePlotCanvas.axes.set_ylim(yMin, yMax)
+            if self.imageViewAbove.isChecked():
+                self.snakePlotCanvas.axes.invert_xaxis()
+                self.snakePlotCanvas.axes.invert_yaxis()
+                Z = np.flip(np.transpose(data.V[pattern_idx][wlwn_idx]), axis = 0)
+            else:
+                Z = data.V[pattern_idx][wlwn_idx]
+                #Z = np.flip(data.V[pattern_idx][wlwn_idx], axis = 1)
+            img = self.snakePlotCanvas.axes.imshow(Z,
+                cmap = mpl.cm.inferno,
+                alpha = 1.,
+                interpolation = 'none',
+                extent = (xMin, xMax, yMin, yMax),
+                zorder = 80)
+            self.snakePlotCanvas.plots.append(img)
+            self.snakePlotCanvas.figure.canvas.draw()
+        except Exception as exc:
+            print('Failed to plot data:\n{}'.format(exc))
+
     def plot_scanning_imaging(self, data, scanIndex = 0, wIndex = 0):
         '''Plot scanning imaging result.
            By default, plot index 0 scan and wavelength/wavenumber'''
@@ -981,7 +1215,7 @@ class mainWindow(QMainWindow):
             self.imagePlotCanvas.axes.set_title(titleStr)
             self.imagePlotScanSelector.setCurrentRow(scanIndex)
             self.imagePlotWSelector.setCurrentRow(wIndex)
-            if self.scanImagParameters.scanMode in ['continuous_one', 'continuous_sweep']:
+            if self.scanImagParameters.scanMode in ['continuous_one', 'continuous_sweep','snake_scan']:
                 xMin = np.min(data.Xcont[scanIndex][wIndex])
                 xMax = np.max(data.Xcont[scanIndex][wIndex])
                 yMin = np.min(data.Ycont[scanIndex][wIndex])
@@ -1171,8 +1405,158 @@ class mainWindow(QMainWindow):
         ### Save UI screenshot
         self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
 
+    def run_snake_scan(self):
+        '''Run snake scans. Modern version.'''
+        ### Initial checks
+        if not self.btn['Arm'][0].isChecked():
+            self.statusbar.showMessage('Laser is not armed.')
+            self.tabSnakeButtons['Start'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
+            # self.btn['Sweep'][0].setChecked(False)
+            return
+        if not self.btn['Emission'][0].isChecked():
+            self.statusbar.showMessage('Laser is not emitted.')
+            self.tabSnakeButtons['Start'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
+            # self.btn['Sweep'][0].setChecked(False)
+            return
+
+
+
+        ### Disable stage joystick(s)
+        self.stageMotionWindow.stage.joystick(enable=False)
+        self.stageMotionWindow.inputMethods['hw'][0].setChecked(False)
+        if self.stageMotionWindow.threadG not in [[]]:
+            if self.stageMotionWindow.threadG.isRunning:
+                self.stageMotionWindow.workerG.stop = True
+                self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
+        print('All stage joysticks disabled')
+        ### Read and compile general experiment parameters
+        self.scanImagParameters = snakeScanParameters()
+        #Use a child class to store our required parameters while multiplexing the old GUI
+        self.scanImagParameters.laser = self.laser
+        self.scanImagParameters.stage = self.stage
+
+        ### Read and compile scanning patterns (for experiment log)
+        self.scanImagParameters.patterns = []
+        for s in self.snakeBrowser.scans:
+            try:
+                ###Taking inputs, dangerous!
+                ### Get pattern parameters for this scan
+                xOrig = int(float(s.inputFields['xOrig'][0].text()))
+                yOrig = int(float(s.inputFields['yOrig'][0].text()))
+                ### Need to check input validity of these 4 (not implemented yet)
+                xPixelNums = int(s.inputFields['xPixelNums'][0].text())
+                yPixelNums = int(s.inputFields['yPixelNums'][0].text())
+                xPixelRes = int(s.inputFields['xPixelRes'][0].text())
+                yPixelRes = int(s.inputFields['yPixelRes'][0].text())
+                ###
+                maxStageSpeed  = int(s.inputFields['maxStageSpeed'][0].text())
+                returnXDrift = int(s.inputFields['returnXDrift'][0].text())
+                sizeOrSteps = s.sizeOrSteps
+                scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
+                if scanDir == 0:
+                    scanDir = 'x'
+                elif scanDir == 1:
+                    scanDir = 'y'
+            except:
+                self.statusbar.showMessage('Incorrect scan parameters input!')
+                ### Unlock GUI controls
+                self.lock_controls(lock=False)
+                self.tabSnakeButtons['Start'][0].setChecked(False)
+                return
+            ### Construct pattern
+            '''
+            Use the modern way to construct patterns
+            <paths>: stage.make_snakes for snake scan.
+            '''
+            pattern = self.construct_snakescan_pattern(
+                                                  xPixelNums = xPixelNums,
+                                                  yPixelNums = yPixelNums,
+                                                  xPixelRes = xPixelRes,
+                                                  yPixelRes = yPixelRes,
+                                                  returnXDrift = returnXDrift
+                                                  )
+
+            wlwnStr = s.wlwnList.toPlainText()
+            #print(wlwnStr)
+            wlwnListStr = re.split('[ ,;\n]+', wlwnStr)
+            wlwnList = []
+            for s in wlwnListStr:
+                try:
+                    n = float(s)
+                    wlwnList.append(n)
+                except Exception as exc:
+                    print('String "{}" cannot be converted to wavelength/number.'.format(s))
+            if not len(wlwnList) > 0:
+                print('No wavelengths or wavenumbers in list.')
+                self.tabSnakeButtons['Start'][0].setChecked(False)
+                return
+            wlwnList.sort()
+
+            ### Append the scan parameters for exp. log
+
+            self.scanImagParameters.scanDir.append(scanDir)
+            self.scanImagParameters.patterns.append(pattern)
+            self.scanImagParameters.wlwnList.append(wlwnList)
+            # Repurpose speed to indicate max stage speed
+            self.scanImagParameters.speeds.append(maxStageSpeed)
+            self.scanImagParameters.sampleNumbers.append(defaults.DEF_SAMPLES_SNAKESCAN)
+            self.scanImagParameters.sampleRates.append(defaults.DEF_SAMPLERATE)
+            self.scanImagParameters.xParameters.append([xOrig, xPixelRes, xPixelNums])
+            self.scanImagParameters.yParameters.append([yOrig, yPixelRes, yPixelNums])
+
+            ### Prepare data variables.
+            self.scanImagParameters.data.W.append(wlwnList)
+            self.scanImagParameters.data.add_nested()
+
+
+        if self.wlUnits == 'invcm':
+            self.scanImagParameters.units = 'invcm'
+        else: # Default to micrometers
+            self.scanImagParameters.units = 'um'
+
+        '''
+        The rest are just GUI routines
+        '''
+        ### Lock GUI controls
+        self.lock_controls()
+        self.statusbar.showMessage('Busy')
+        ### Show patterns on plot
+        self.update_scanning_imaging_plot_patterns()
+        ### Run acquisition in separate thread
+        self.threadRun = QThread()
+        '''This needs to be modified to snakeScan'''
+        self.worker = snakeScan()
+        ''''''
+        self.worker.parameters = self.scanImagParameters
+        self.worker.moveToThread(self.threadRun)
+        self.threadRun.started.connect(self.worker.run)
+        ### Connect pyqt signals to mainGUI
+        self.worker.status_bar_msg.connect(self.update_scan_progress_from_snakeScan)
+        self.worker.finished.connect(self.threadRun.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.threadRun.finished.connect(self.threadRun.deleteLater)
+        self.threadRun.start()
+        ### Plot data
+        self.worker.outData.connect(self.plot_snakescans)
+        ### Save current QCLs, ranges and limits for use with "repeat" function
+        self.worker.outParams.connect(self.update_scanning_imaging_parameters)
+        ### Unlock GUI controls
+        self.worker.finished.connect(lambda: self.lock_controls(lock=False))
+        self.worker.finished.connect(lambda: self.statusbar.showMessage('Scans completed! Laser emission diabled.'))
+        ### Uncheck UI buttons
+        self.worker.finished.connect(lambda: self.tabSnakeButtons['Start'][0].setChecked(False))
+        self.worker.finished.connect(lambda: self.btn['Emission'][0].setChecked(False))
+        self.worker.finished.connect(lambda: self.btn['Emission'][0].setText('Enable'))
+        # self.worker.finished.connect(lambda: self.btn['Sweep'][0].setChecked(False))
+        ### Save UI screenshot
+        self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
+
+
+
     def run_scanning_imaging(self):
-        '''Run scanning imaging experiment.'''
+        '''Run scanning imaging experiment. (Legacy)'''
         ### Initial checks
         if not self.btn['Arm'][0].isChecked():
             print('Laser is not armed.')
@@ -1308,8 +1692,15 @@ class mainWindow(QMainWindow):
         self.stageMotionWindow.show()
 
     def stage_set(self, stageInstance):
-        '''Set laser instance'''
+        '''Set stage instance. Also a setter for self.init_stage_positions'''
         self.stage = stageInstance
+        '''
+        Return the initial stage postion to a helper variable to make life easier.
+        Po-Ting
+        05/12/2023
+        '''
+        #self.init_stage_positions = self.stage.get_position()
+
 
     def tune(self):
         '''Tune laser to input wavelength of currently selected QCL.'''
@@ -1339,6 +1730,14 @@ class mainWindow(QMainWindow):
         '''Update class instance experiment parameters with last used set, which
            may be re-used with "repeat".'''
         self.parameters = parameters
+
+    def update_snakescans_plot(self, pattern_idx = 0, wlwn_idx = 0):
+        '''Update snakescans image when scan or wavelength/wavenumbers
+           are selected from lists'''
+        data = self.scanImagParameters.data
+        pattern_idx = self.snakePlotScanSelector.currentRow()
+        wlwn_idx = self.snakePlotWSelector.currentRow()
+        self.plot_snakescans(data, pattern_idx = pattern_idx, wlwn_idx = wlwn_idx)
 
     def update_scanning_imaging_image(self, scanIndex = 0, wIndex = 0):
         '''Update scanning imaging image when scan or wavelength/wavenumbers

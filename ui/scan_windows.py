@@ -18,6 +18,11 @@ from PyQt6.QtWidgets import (QComboBox,
                              QSizePolicy,
                              QWidget)
 
+'''
+For helper methods
+'''
+import numpy as np
+
 class scanBrowser(QTabWidget):
     '''Multi-tab scan browser'''
 
@@ -88,7 +93,10 @@ class scanUI(QWidget):
         self.setLayout(self.grid)
         self.scanID = -1
         self.sizeOrSteps = 'steps' # Scan defined by size or number of steps
+        self.wlUnits = defaults.DEF_WL_UNIT # Default wavelength unit, edited 05/11/23 by Po-Ting Shen
+        self.received_snakeTab_index = 0
         self.make_ui()
+
 
     def make_ui(self):
         '''Create UI for scan parameters'''
@@ -178,6 +186,7 @@ class scanUI(QWidget):
         self.grid.addWidget(self.wlwnList, 7, 1, 2, 3)
         ### Connect buttons to actions
         self.buttons['ScanSizeSteps'][0].clicked.connect(lambda: self.switch_scan_size_steps())
+        #self.buttons['WlWn'][0].clicked.connect(lambda: self.switch_wavelength_unit())
 
     def switch_scan_size_steps(self):
         '''Switch between scan size and number of steps'''
@@ -204,3 +213,199 @@ class scanUI(QWidget):
                 ySteps = int(ySize / yStep)
                 s.inputFields['xSizeSteps'][0].setText('{:.0f}'.format(xSteps))
                 s.inputFields['ySizeSteps'][0].setText('{:.0f}'.format(ySteps))
+
+    def switch_wavelength_unit(self):
+        '''
+        Switching the unit of wavelength
+        '''
+        if self.wlUnits == defaults.DEF_WL_UNIT:
+            try:
+                wlString = self.wlwnList.toPlainText()
+                wlNumbers = [round(10000/float(w),1) for w in wlString.split(',')]
+                self.wlwnList.setText(', '.join(map(str, wlNumbers)))
+
+            except:
+                self.wlwnList.setText('Something went wrong during the conversion!\nInsert in the correct format again!')
+
+            self.buttons['WlWn'][0].setText('Wavenumber\n(1/cm)')
+            self.wlUnits = defaults.SEC_WL_UNIT
+            self.mainGUI.wl_units()
+        else:
+            try:
+                wlString = self.wlwnList.toPlainText()
+                wlNumbers = [round(10000/float(w),3) for w in wlString.split(',')]
+                self.wlwnList.setText(', '.join(map(str, wlNumbers)))
+            except:
+                self.wlwnList.setText('Something went wrong during the conversion!\nInsert in the correct format again!')
+
+            self.buttons['WlWn'][0].setText('Wls.\n(μm)')
+            self.wlUnits = defaults.DEF_WL_UNIT
+            self.mainGUI.wl_units()
+'''
+Create a child class 'snakeBrowser' to scanBrowser
+Po-Ting Shen
+05/11/23
+'''
+class snakeBrowser(scanBrowser):
+
+    def __init__(self, mainGUI):
+        super().__init__(mainGUI)
+
+
+
+
+    def add_scan_tab(self):
+        '''Add a new tab with scan parameters'''
+        scan = snakeUI(self.mainGUI) #Overwrite
+        scans = len(self.scans)
+        scan.scanID = scans
+
+        scanLabel = 'Scan{}{:.0f}'.format(self.tabTitleSeparator, scan.scanID)
+        self.scans.append(scan)
+        ti = self.addTab(scan, scanLabel)
+        self.setCurrentIndex(ti)
+
+
+
+    '''
+    Helper: Receive coordinates from stageMotionWindow
+    '''
+    def update_coordinates_from_stageMotionWindow(self, stage_position):
+        #print(f'Received stageMotionWindow coordinates (mainGUI.snakeBrowser): {stage_position}')
+        x = f'{stage_position[0]:.1f}'
+        y = f'{stage_position[1]:.1f}'
+        self.scans[-1].inputFields['xOrig'][0].setText(x)
+        self.scans[-1].inputFields['yOrig'][0].setText(y)
+
+
+
+'''
+Create a child class 'snakeUI' to scanUI
+Po-Ting Shen
+05/11/23
+'''
+class snakeUI(scanUI):
+    def __init__(self, mainGUI):
+        super().__init__(mainGUI)
+
+
+    def make_ui(self):
+        '''Create UI for scan parameters'''
+        font = QFont()
+        font.setFamily(defaults.FONT_FAMILY)
+        font.setPointSize(defaults.FONT_SIZE_MEDIUM)
+        ### Labels
+        self.labels = dict() # [label, row, col, rowSpan, colSpan]
+        self.labels['Origin'] = [QLabel('Origin'), 0, 1, 1, 1]
+        self.labels['PixelNums'] = [QLabel('Number of pixels'), 0, 2, 1, 1]
+        self.labels['PixelRes'] = [QLabel('μm per pixel'), 0, 3, 1, 1]
+        self.labels['maxStageSpeed'] = [QLabel('Max stage speed (µm/s)'), 0, 4, 1, 1]
+        self.labels['returnXDrift'] = [QLabel('Return Stage x drift (μm)'), 2, 4, 1, 1]
+        self.labels['x'] = [QLabel('x'), 1, 0, 1, 1]
+        self.labels['y'] = [QLabel('y'), 2, 0, 1, 1]
+        self.labels['RasterDir'] = [QLabel('Raster direction'), 3, 0, 1, 1]
+        self.labels['laserSetting'] = [QLabel('Generate or fill in wavelengths'),
+                                            4, 0, 1, 2]
+        self.labels['startingWL'] = [QLabel('Starting Wl.'),
+                                            5, 0, 1, 1]
+        self.labels['endingWl'] = [QLabel('Ending Wl.'),
+                                            5, 1, 1, 1]
+        self.labels['wlSteps'] = [QLabel('Wl. steps'), 5, 2, 1, 1]
+        for _, k in self.labels.items(): # Arrange labels in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_LABEL_EMPH)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Buttons
+        self.buttons = dict() # [button, row, col, rowSpan, colSpan]
+        self.buttons['generateWlSteps'] = [QPushButton('Generate'), 6, 3, 1, 1]
+
+        self.buttons['generateWlSteps'][0].setToolTip('Generate wavelength steps')
+
+
+        if not self.mainGUI.isSnakeBrowserInit:
+            self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 7, 0, 2, 1]
+            self.mainGUI.isSnakeBrowserInit = True
+        else:
+            self.buttons['WlWn'] = [QPushButton(''), 7, 0, 2, 1]
+            self.buttons['WlWn'][0].setEnabled(False)
+            self.buttons['WlWn'][0].setText('Units follow scan 0')
+
+
+        self.buttons['WlWn'][0].setToolTip('Toggle between wavelengths and wavenumbers')
+        for x, k in self.buttons.items(): # Arrange buttons in grid
+            k[0].setCheckable(True)
+            k[0].setFont(font)
+            k[0].setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            k[0].setStyleSheet(defaults.STYLE_BUTTON_UNIT)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Input fields
+        self.inputFields = dict()
+        self.inputFields['xOrig'] = [QLineEdit('{}'.format(
+                                    self.mainGUI.displayed_coordinates[0] )), 1, 1, 1, 1]
+        self.inputFields['xOrig'][0].setToolTip('Scan x origin')
+        self.inputFields['yOrig'] = [QLineEdit('{}'.format(
+                                    self.mainGUI.displayed_coordinates[1])), 2, 1, 1, 1]
+        self.inputFields['yOrig'][0].setToolTip('Scan y origin')
+        self.inputFields['xPixelNums'] = [QLineEdit('{}'.format(
+                                    defaults.SNAKE_SCAN_X_PIXEL )), 1, 2, 1, 1]
+        self.inputFields['xPixelNums'][0].setToolTip('Scan x pixels')
+        self.inputFields['yPixelNums'] = [QLineEdit('{}'.format(
+                                    defaults.SNAKE_SCAN_Y_PIXEL )), 2, 2, 1, 1]
+        self.inputFields['yPixelNums'][0].setToolTip('Scan y pixels (must be even number)')
+        self.inputFields['xPixelRes'] = [QLineEdit('{}'.format(
+                                    defaults.SNAKE_SCAN_RES_X_UM )), 1, 3, 1, 1]
+        self.inputFields['xPixelRes'][0].setToolTip('x pixel resolution')
+        self.inputFields['yPixelRes'] = [QLineEdit('{}'.format(
+                                    defaults.SNAKE_SCAN_RES_Y_UM )), 2, 3, 1, 1]
+        self.inputFields['yPixelRes'][0].setToolTip('y pixel resolution')
+        self.inputFields['maxStageSpeed'] = [QLineEdit('{}'.format(
+                                    defaults.HLD117_REC_SPEED )), 1, 4, 1, 1]
+        self.inputFields['returnXDrift'] = [QLineEdit('{}'.format(
+                                    defaults.HLD117_X_RETURN_DRIFT_UM )), 3, 4, 1, 1]
+        self.inputFields['startingWL'] = [QLineEdit('{}'.format(
+                                    defaults.SNAKE_SCAN_START_WL)), 6, 0, 1, 1]
+        self.inputFields['startingWL'][0].setToolTip(
+                                    'Starting wavelength')
+        self.inputFields['endingWL'] = [QLineEdit('{}'.format(
+                                    defaults.SNAKE_SCAN_START_WL)), 6, 1, 1, 1]
+        self.inputFields['endingWL'][0].setToolTip(
+                                    'Ending wavelength')
+        self.inputFields['wlSteps'] = [QLineEdit('{}'.format(
+                                    defaults.SNAKE_SCAN_WL_STEPS)), 6, 2, 1, 1]
+        self.inputFields['wlSteps'][0].setToolTip('Wavelength steps')
+
+        for _, k in self.inputFields.items(): # Arrange labels in grid
+            k[0].returnPressed.connect(lambda: self.mainGUI.update_scanning_imaging_plot_patterns())
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_INPUT)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Drop-down raster pattern direction selector
+        self.scanDropdowns = dict()
+        self.scanDropdowns['RasterDir'] = [QComboBox(), 3, 1, 1, 2]
+        #self.scanDropdowns['RasterDir'][0].addItem('Longest side', 0)
+        self.scanDropdowns['RasterDir'][0].addItem('Along x', 0)
+        self.scanDropdowns['RasterDir'][0].addItem('Along y (not implemented)', 1)
+        for x, k in self.scanDropdowns.items(): # Arrange buttons in grid
+            k[0].setFont(font)
+            k[0].setStyleSheet(defaults.STYLE_COMBOBOX)
+            self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
+        ### Text field for list of wavelengths or wavenumbers
+        self.wlwnList = QTextEdit(defaults.IMAG_SCAN_WL_LIST)
+        self.wlwnList.setFont(font)
+        self.wlwnList.setStyleSheet(defaults.STYLE_TEXT)
+        self.wlwnList.setToolTip('List of wavelengths (format: 1000, 1100:1200, ...)')
+        self.grid.addWidget(self.wlwnList, 7, 1, 2, 3)
+        ### Connect buttons to actions
+        self.buttons['WlWn'][0].clicked.connect(lambda: self.switch_wavelength_unit())
+        self.buttons['generateWlSteps'][0].clicked.connect(lambda: self.generate_wavelengths())
+
+    def generate_wavelengths(self):
+        '''
+        Generate equal spacing wavelength list from the start to the end.
+        '''
+        startingWL = float(self.inputFields['startingWL'][0].text())
+        endingWL = float(self.inputFields['endingWL'][0].text())
+        wlSteps = int(self.inputFields['wlSteps'][0].text())
+        wlList = np.linspace(start = startingWL, stop = endingWL, num = wlSteps).tolist()
+        wlList = [round(w,2) for w in wlList]
+        self.wlwnList.setText(', '.join(map(str, wlList)))

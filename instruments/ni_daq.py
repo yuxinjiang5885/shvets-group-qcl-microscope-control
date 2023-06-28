@@ -239,9 +239,8 @@ class MultiChannelAnalogInput():
                            lineSampleNumber*self.numberOfChannel,
                            byref(read),
                            None)
-        print('Acquired ' + str(data.size) +' samples from the buffer.')
-        #print(data[0])
-        #print(data[1])
+        #print('Acquired ' + str(data.size) +' samples from the buffer.')
+
         return data
 
 

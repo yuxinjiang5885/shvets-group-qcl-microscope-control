@@ -15,6 +15,13 @@ from ctypes import (byref, CDLL, c_bool, c_float, c_uint, c_uint8, c_uint16,
 from inspect import currentframe, getfile
 from os.path import abspath, join, split, realpath
 from timeit import default_timer as timer
+'''
+imports for helpers
+'''
+from experiment import defaults
+import numpy as np
+'''
+'''
 
 ### Look for modules in "instruments", https://stackoverflow.com/a/6098238
 mDir = realpath(abspath(split(getfile(currentframe()))[0]))
@@ -40,6 +47,8 @@ SDK = CDLL(sdkPath)
 ### These were found via MIRcatSDK_GetWlTrigParams and units are unknown.
 DEFAULT_DWELL_TIME = 100000
 DEFAULT_AFTER_OFF_TIME = 100000
+
+
 
 class laser():
     '''Control MIRcat QCL laser.'''
@@ -457,4 +466,62 @@ class laser():
         # print('Tuned QCL {} to {:.3f} {}.'.format(qclTune.value, wlRead, unitString))
         print('Tuned QCL {} to {:.3f} μm.'.format(qclTune.value, wlRead))
 
+'''
+Helper. 05/23/23
+'''
+def makeTuneList(startingWL: float, endingWL: float, wlSteps: int, wlUnits = 'um'):
+        tuneList = []
+        wlList = np.linspace(start = startingWL, stop = endingWL, num = wlSteps).tolist()
+        if wlUnits == 'um':
+            for wlwn in wlList:
+                qcl = whichQCL(wlwn, wlUnits)
+                wlwn = float(format(wlwn,".3g"))
+                tuneList.append((wlwn,qcl))
+        elif wlUnits == 'invcm':
+            '''
+            Not tested!
+            '''
+            for wlwn in wlList:
+                qcl = whichQCL(wlwn, wlUnits)
+                wlwn = float(format(wlwn,".6g"))
+                tuneList.append((wlwn,qcl))
+        else:
+            print('Invalid wavelength unit!')
+        return tuneList
+
+def whichQCL(wlwn: float, wlUnits: str):
+    '''
+    A lookup table to find the best QCL module for <wlwn>.
+    <wlwn>: wavelength or wavenumber
+    <wlUnits>: the units of <wlwn>
+    '''
+    if wlUnits == 'um':
+        qcl = 0
+        if wlwn < defaults.MIN_WL_QCL2_UM:
+            #QCL1 is bugged. Use QCL 2 as much as possible
+            qcl = 1
+        elif wlwn < defaults.MAX_WL_QCL2_UM:
+            qcl = 2
+        elif wlwn < defaults.MAX_WL_QCL3_UM:
+            qcl = 3
+        else:
+            qcl = 4
+
+    elif wlUnits == 'invcm':
+        '''
+        Not tested!
+        '''
+        qcl = 0
+        if wlwn > defaults.MAX_WN_QCL1_INVCM:
+            qcl = 1
+        elif wlwn > defaults.MAX_WN_QCL2_INVCM:
+            qcl = 2
+        elif wlwn > defaults.MAX_WN_QCL3_INVCM:
+            qcl = 3
+        else:
+            qcl = 4
+
+    else:
+        print('Invalid wavelength unit!')
+    return qcl
 

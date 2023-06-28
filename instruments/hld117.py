@@ -28,13 +28,14 @@ HLD117_DEFAULT_SPEED = defaults.HLD117_MAX_SPEED # Default stage speed, um/s
 HLD117_DEFAULT_ACC = defaults.HLD117_MAX_ACC # Default stage acceleration, um/s^2
 HLD117_SPEEDS = [10, 100, 1000, 10000, defaults.HLD117_MAX_SPEED] # Select stage speeds, um/s
 HLD117_ACCS = [defaults.HLD117_MAX_ACC] # Select stage accelerations, um/s^2
+HLD117_TRIG_RES = 20 # Trigger resoution: 20 encoder counts per um
 
 ### H117
 H117_DEFAULT_SPEED = defaults.H117_MAX_SPEED # Default stage speed, um/s
 H117_DEFAULT_ACC = defaults.H117_MAX_ACC # Default stage acceleration, um/s^2
 H117_SPEEDS = [10, 100, 1000, 10000, defaults.H117_MAX_SPEED] # Select stage speeds, um/s
 H117_ACCS = [defaults.H117_MAX_ACC] # Select stage accelerations, um/s^2
-H117_TRIG_RES = 20 # Trigger resoution: 20 encoder counts per um
+
 ### Common
 STEPS = [10, 100, 1000, 10000] # Select stage steps, um
 
@@ -84,6 +85,13 @@ class stage():
             self.speeds = HLD117_SPEEDS
             self.steps = STEPS
             self.accs = HLD117_ACCS
+    def close_session(self):
+        '''
+        Close the current session to prevent error (session maximum = 10)
+        After closing, need to reconstruct a new stage() to regain control of the stage.
+        '''
+        ret = self.SDK.PriorScientificSDK_CloseSession(self.session)
+        return ret
 
     def busy(self):
         '''Check whether stage is busy:
@@ -199,7 +207,7 @@ class stage():
         ret = self.SDK.PriorScientificSDK_cmd(
             self.session, create_string_buffer(message.encode()), self.rx)
         if ret:
-            print('Failure to communicate: API error {}'.format(ret))
+            print('Failure to communicate: PriorSDK API error {}'.format(ret))
         # else:
         #     print('Success: {}'.format(self.rx.value.decode()))
         return ret, self.rx.value.decode()

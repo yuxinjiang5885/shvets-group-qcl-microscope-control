@@ -7,6 +7,7 @@ Created 2022-Aug-05
 '''
 
 import numpy as np
+import csv
 import experiment.defaults as defaults
 
 class experimentParameters():
@@ -128,8 +129,150 @@ class scanningImagingParameters():
         self.scanDir = [] # List of scan direction (each 'x' or 'y')
         self.scanMode = 'step_one'
         self.speeds = [] # Sweeping speeds, placeholder value
-        self.stage = [] # Stage instance, laceholder value
+        self.stage = [] # Stage instance, placeholder value
         self.units = 'um' # By default, wavelengths in micrometers
         self.wlwnList = [] # List of wavelengths (um) or wavenumbers (cm^-1)
         self.xParameters = [] # Axis x scan parameters
         self.yParameters = [] # Axis y scan parameters
+
+'''
+class of snakeScanParameters and snakeScanData
+05/12/23
+Po-Ting Shen
+'''
+class snakeScanParameters(scanningImagingParameters):
+    '''Holds experiment parameters for snake scans.'''
+    def __init__(self):
+        super().__init__()
+        self.data = snakeScanData()
+        self.maxStageSpeed = defaults.HLD117_REC_SPEED
+        self.scanMode = 'snake_scan'
+
+
+class snakeScanData(scanningImagingData):
+    '''Holds only the parameters to recover spatial information.'''
+    def __init__(self):
+        super().__init__()
+        self.snakeScans = []
+        self.dataCh1 = []
+        self.dataCh2 = []
+        self.sampleNumber = defaults.DEF_SAMPLES_SNAKESCAN
+        self.savedStagePosition = (0, 0)
+        self.displacement = (0, 0)
+        self.xPixels = 0
+        self.yPixels = 0
+        self.xPixelRes = defaults.SNAKE_SCAN_RES_X_UM
+        self.yPixelRes = defaults.SNAKE_SCAN_RES_Y_UM
+        self.trigIndent = defaults.SNAKE_TRIG_INDENT
+        self.returnDrift = defaults.HLD117_X_RETURN_DRIFT_UM
+
+    def add_nested(self, index = -1):
+        '''
+        Setting up the nested lists of dataCh1, dataCh2, and SnakeScans
+        Follow the design pattern of Vtemp.
+        Each pattern
+                    \
+                    Each channel
+                                \
+                                Each wavelength (wavenumber)
+        '''
+        self.dataCh1.append([])
+        self.dataCh2.append([])
+        self.snakeScans.append([])
+        self.X.append([])
+        self.Y.append([])
+        for _, _ in enumerate(self.W[index]):
+            self.dataCh1[-1].append([])
+            self.dataCh2[-1].append([])
+            self.snakeScans[-1].append([])
+            self.X[-1].append([])
+            self.Y[-1].append([])
+
+    def finishSnakeScan(self, pattern_idx, wlwn_idx,
+                         wlUnits = 'um',
+                         filepath = defaults.DEF_TEST_FOLDER):
+        '''
+        Finish one snake scan per wlwn.
+        Prerequisite: After a snake scan is complete.
+        <dataCh1>: list of measured numpy array of channel 1
+        <dataCh2>: list of measured numpy array of channel 2
+        <sampleNumber>: How many readings per trigger
+        '''
+        idx = pattern_idx
+        jdx = wlwn_idx
+        voltageLines = []
+
+        for counter, (ch1, ch2) in enumerate(zip(self.dataCh1[idx][jdx], self.dataCh2[idx][jdx])):
+            #print(counter)
+            _ = np.sqrt(np.add(np.square(ch1), np.square(ch2)))
+            tmp_list = _.tolist()
+            #print(len(tmp_list))
+            if counter%2 == 1:
+                tmp_list.reverse()
+                #print('Backward scan line data reversed.')
+
+            voltageLine = []
+            for i in range(len(tmp_list)):
+                if i == 0:
+                    continue
+                if i%self.sampleNumber == self.sampleNumber-1:
+                    avg = sum(tmp_list[(i-self.sampleNumber+1):(i+1)])/self.sampleNumber
+                    voltageLine.append(avg)
+            voltageLines.append(voltageLine)
+        print('How many lines are there in a snake scan: ' + str(len(voltageLines)))
+        print('What is the length of each line: ' + str(len(voltageLines[0])))
+
+        #Append voltageLines to snakeScans[idx][jdx]
+        self.snakeScans[idx][jdx]= np.array(voltageLines)
+        self.writeSnakeScan(idx,jdx, wlUnits, filepath)
+
+
+
+
+
+
+    def writeSnakeScan(self, pattern_idx, wlwn_idx,
+                    wlUnits,
+                    filepath):
+        '''
+        Write one snake scan to csv.
+        Prerequisite: use within finishSnakeScan
+        Local variables:
+        <filepath>: where to save the files
+        <lineScan>: a list of lists. Each list is a scan line of voltageLines.
+        '''
+        idx = pattern_idx
+        jdx = wlwn_idx
+        filename = '\\lineScan_' + str(self.W[idx][jdx]).replace(".", "_") + wlUnits +'.csv'
+        filepath = filepath + filename
+
+        lineScan = self.snakeScans[idx][jdx]
+
+        with open(filepath, 'w', newline="") as f:
+            # using csv.writer method from CSV package
+            write = csv.writer(f)
+            for line in lineScan:
+                #Write item to outcsv
+                write.writerow(line)
+
+
+
+    def guiFormat(self):
+        '''
+        GUI's x and y convention is transposed.
+        Format snakescan data to its parent class's (scanningImagingData's) format for GUI to work
+        Prerequisite: After all the patterns are done
+        '''
+        self.V = self.snakeScans
+        self.Xcont = self.X
+        self.Ycont = self.Y
+
+
+
+
+
+
+
+
+
+

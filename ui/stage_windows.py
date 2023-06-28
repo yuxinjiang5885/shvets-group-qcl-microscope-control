@@ -220,6 +220,12 @@ class stageInitializer(QObject):
         stage0.identify()
         self.stageInstance.emit(stage0)
         self.stageInitialized.emit()
+        '''
+        How to return the stage position to make life easier?
+        Po-Ting Shen
+        05/12/2023
+        '''
+        #return stage0.get_position()
 
 
 class stageMotion(QObject):
@@ -334,7 +340,8 @@ class stageMotionParameters():
 
 class stageMotionWindow(QMainWindow):
     '''GUI for stage motion control'''
-
+    # Define a signal that accepts a tuple
+    current_stage_position = pyqtSignal(tuple)
     def __init__(self, mainGUI, model = 'HLD117'):
         super().__init__()
         self.paramNames = ['x_um', 'y_um', 'v_um_per_s', 'a_um_per_s2']
@@ -356,7 +363,8 @@ class stageMotionWindow(QMainWindow):
             self.xTravel = defaults.HLD117_X_TRAVEL_UM
             self.yTravel = defaults.HLD117_Y_TRAVEL_UM
         self.make_gui()
-
+    def get_stage(self):
+        return self.stage
     def center_window(self):
         '''Center main application window on screen'''
         qr = self.frameGeometry()
@@ -384,6 +392,7 @@ class stageMotionWindow(QMainWindow):
             while int(self.stage.busy()) > 0:
                 time.sleep(0.1)
             self.update_readings()
+
         except Exception as exc:
             print('Could not move stage:\n{}'.format(exc))
             return
@@ -398,6 +407,7 @@ class stageMotionWindow(QMainWindow):
         self.threadG.started.connect(self.workerG.read)
         self.threadG.finished.connect(self.threadG.deleteLater)
         self.threadG.start()
+
 
     def goto_joystick(self, joystickPosition):
         '''Move stage according to software joystick position'''
@@ -775,7 +785,13 @@ class stageMotionWindow(QMainWindow):
         self.inputMethods['hw'][0].clicked.connect(lambda: self.joystick(selected='hardware'))
         self.inputMethods['sw'][0].clicked.connect(lambda: self.joystick(selected='software'))
         self.inputMethods['gp'][0].clicked.connect(lambda: self.joystick(selected='gamepad'))
-
+        '''
+        Connecting to mainGUI to report stage positions.
+        Po-Ting
+        06/12/23
+        '''
+        self.current_stage_position.connect(self.mainGUI.update_coordinates_from_stageMotionWindow)
+        self.current_stage_position.connect(self.mainGUI.snakeBrowser.update_coordinates_from_stageMotionWindow)
     def run(self):
         '''Run stage scan'''
         if self.tabs.currentIndex() not in [1]:
@@ -979,6 +995,10 @@ class stageMotionWindow(QMainWindow):
         if self.mainGUI.stagePlotCanvas != []:
             ### If there is a full main UI with a stage plot, update that, too
             self.update_plot_external(x_um, y_um)
+            #Emit signals to the mainWindow
+            stage_position = (x_um, y_um)
+            self.current_stage_position.emit((stage_position[0], stage_position[1]))
+
 
 
 class stageStartupDialog(QDialog):
