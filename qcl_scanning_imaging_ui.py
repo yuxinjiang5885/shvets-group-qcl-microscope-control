@@ -17,9 +17,11 @@ from matplotlib import rcParams
 import numpy as np
 from experiment.auxiliary import (experimentParameters,
                                   scanningImagingParameters,
-                                  snakeScanParameters)
+                                  snakeScanParameters,
+                                  repeatSnakeScanParameters)
 import experiment.defaults as defaults
-from experiment.routines import (experiment, imagingScan, snakeScan)
+from experiment.routines import (experiment, imagingScan,
+                                  snakeScan, repeatSnakeScan)
 from ui.laser_windows import (laserInitializer,
                               laserSettingWindow,
                               laserStartupDialog)
@@ -43,6 +45,8 @@ from PyQt6.QtWidgets import (QApplication,
                              QSizePolicy,
                              QTabWidget,
                              QTextEdit)
+import warnings
+
 rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
 
 STAGE_COM_PORT = defaults.HLD117_COM_PORT
@@ -112,8 +116,10 @@ class mainWindow(QMainWindow):
         self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
         startupDialog2.exec()
 
+        ### Other initialization
         self.displayed_coordinates = self.get_displayed_coordinates()
         self.isSnakeBrowserInit = False
+        self.repeatCounter = 1
 
 
 
@@ -238,6 +244,13 @@ class mainWindow(QMainWindow):
         #     self.laser.disconnect()
         # else:
         #     event.ignore()
+
+    #called when mouse is clicked on QLineEdit
+    #def mouseClickedQLineEdit(self, event):
+    #    self.clear() #text is cleared
+    #    self.setText("") #this way we can also clear the text
+    #    print('mouse pressed')
+
     def construct_snakescan_pattern(self,
                                     X0 = defaults.IMAG_SCAN_ORIGIN_X_UM,
                                     Y0 = defaults.IMAG_SCAN_ORIGIN_Y_UM,
@@ -797,12 +810,21 @@ class mainWindow(QMainWindow):
         self.snakeBrowser = snakeBrowser(self)
         self.tabSnakeGrid.addWidget(self.snakeBrowser, 7, 0, 6, 6)
 
-        ### Snake scan tab - Buttons
+        ### Snake scan tab - text box
+        self.snakeScanRepeatTextbox = QLineEdit('Enter the repetition count...')
+        self.snakeScanRepeatTextbox.setStyleSheet(defaults.STYLE_INPUT)
+        self.snakeScanRepeatTextbox.setFont(font)
+        self.snakeScanRepeatTextbox.setToolTip('Enter positive integers.')
+        self.tabSnakeGrid.addWidget(self.snakeScanRepeatTextbox, 12, 10, 2, 3)
+        #self.snakeScanRepeatTextbox.mousePressEvent.connect(self.mouseClickedQLineEdit())
+        ### Snake scan tab - Buttonsmous
         self.tabSnakeButtons = dict()
-        self.tabSnakeButtons['Start'] = [QPushButton('Start'), 12, 9, 2, 3]
-        self.tabSnakeButtons['Start'][0].setToolTip('Start scan')
-        #self.tabSnakeButtons['Stop'] = [QPushButton('Stop'), 12, 9, 2, 3]
-        #self.tabSnakeButtons['Stop'][0].setToolTip('Stop scan')
+
+        self.tabSnakeButtons['Start'] = [QPushButton('Start'), 10, 7, 2, 6]
+        self.tabSnakeButtons['Start'][0].setToolTip('Start scan once.')
+        self.tabSnakeButtons['Repeat'] = [QPushButton('Repeat Scan 0'), 12, 7, 2, 3]
+        self.tabSnakeButtons['Repeat'][0].setToolTip('Scan repeatedly.')
+
         for x, k in self.tabSnakeButtons.items(): # Arrange buttons in grid
             k[0].setCheckable(True)
             # k[0].setFocusPolicy(Qt.NoFocus)
@@ -813,8 +835,13 @@ class mainWindow(QMainWindow):
             else:
                 k[0].setStyleSheet(defaults.STYLE_BUTTON)
             self.tabSnakeGrid.addWidget(k[0], k[1], k[2], k[3], k[4])
+
+        ### Connect text box to value-changed action
+        self.snakeScanRepeatTextbox.textChanged.connect(lambda: self.counter_changed(self.snakeScanRepeatTextbox.text()))
+
         ### Connect buttons to actions
         self.tabSnakeButtons['Start'][0].clicked.connect(lambda: self.run_snake_scan())
+        self.tabSnakeButtons['Repeat'][0].clicked.connect(lambda: self.repeat_snake_scan(count = self.repeatCounter))
 
 
 
@@ -1421,8 +1448,6 @@ class mainWindow(QMainWindow):
             # self.btn['Sweep'][0].setChecked(False)
             return
 
-
-
         ### Disable stage joystick(s)
         self.stageMotionWindow.stage.joystick(enable=False)
         self.stageMotionWindow.inputMethods['hw'][0].setChecked(False)
@@ -1450,8 +1475,12 @@ class mainWindow(QMainWindow):
                 yPixelNums = int(s.inputFields['yPixelNums'][0].text())
                 xPixelRes = int(s.inputFields['xPixelRes'][0].text())
                 yPixelRes = int(s.inputFields['yPixelRes'][0].text())
-                ###
                 maxStageSpeed  = int(s.inputFields['maxStageSpeed'][0].text())
+
+                if (xPixelNums <= 0 or yPixelNums <= 0 or xPixelRes <= 0 or yPixelRes <= 0
+                    or maxStageSpeed <= 0):
+                    raise NotPositiveError
+
                 returnXDrift = int(s.inputFields['returnXDrift'][0].text())
                 sizeOrSteps = s.sizeOrSteps
                 scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
@@ -1459,12 +1488,23 @@ class mainWindow(QMainWindow):
                     scanDir = 'x'
                 elif scanDir == 1:
                     scanDir = 'y'
+
+            except NotPositiveError:
+
+                self.statusbar.showMessage('Non-Positive PixelRes, PixelNums, maxStageSpeed!')
+                ### Unlock GUI controls
+                self.lock_controls(lock=False)
+                self.tabSnakeButtons['Start'][0].setChecked(False)
+                return
+
             except:
+
                 self.statusbar.showMessage('Incorrect scan parameters input!')
                 ### Unlock GUI controls
                 self.lock_controls(lock=False)
                 self.tabSnakeButtons['Start'][0].setChecked(False)
                 return
+
             ### Construct pattern
             '''
             Use the modern way to construct patterns
@@ -1488,17 +1528,24 @@ class mainWindow(QMainWindow):
                     wlwnList.append(n)
                 except Exception as exc:
                     print('String "{}" cannot be converted to wavelength/number.'.format(s))
+                    ### Unlock GUI controls
+                    self.lock_controls(lock=False)
+                    self.tabSnakeButtons['Start'][0].setChecked(False)
+                    return
             if not len(wlwnList) > 0:
                 print('No wavelengths or wavenumbers in list.')
+                ### Unlock GUI controls
+                self.lock_controls(lock=False)
                 self.tabSnakeButtons['Start'][0].setChecked(False)
                 return
+
             wlwnList.sort()
 
             ### Append the scan parameters for exp. log
-
             self.scanImagParameters.scanDir.append(scanDir)
             self.scanImagParameters.patterns.append(pattern)
             self.scanImagParameters.wlwnList.append(wlwnList)
+
             # Repurpose speed to indicate max stage speed
             self.scanImagParameters.speeds.append(maxStageSpeed)
             self.scanImagParameters.sampleNumbers.append(defaults.DEF_SAMPLES_SNAKESCAN)
@@ -1510,7 +1557,7 @@ class mainWindow(QMainWindow):
             self.scanImagParameters.data.W.append(wlwnList)
             self.scanImagParameters.data.add_nested()
 
-
+        ### Follow the global unit (laser control's)
         if self.wlUnits == 'invcm':
             self.scanImagParameters.units = 'invcm'
         else: # Default to micrometers
@@ -1553,7 +1600,208 @@ class mainWindow(QMainWindow):
         ### Save UI screenshot
         self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
 
+    def counter_changed(self, text):
+        '''Use this to change to repeat snake scan counter'''
+        #print(f'Text changed: {text}')
+        try:
+            counter = int(text)
+            if counter <= 0:
+                raise NotPositiveError
+            self.repeatCounter = counter
+            self.statusbar.showMessage('Repeat counter ready!')
+            #print(self.repeatCounter)
+        except NotPositiveError:
+            self.statusbar.showMessage('Non-Positive!')
+        except:
+            self.statusbar.showMessage('You must enter a positive integer!')
 
+    def repeat_snake_scan(self, count = 1):
+        '''Repeat snake scan 0. Modern version.'''
+        ### Initial checks
+        if not self.btn['Arm'][0].isChecked():
+            self.statusbar.showMessage('Laser is not armed.')
+            self.tabSnakeButtons['Repeat'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
+            # self.btn['Sweep'][0].setChecked(False)
+            return
+        if not self.btn['Emission'][0].isChecked():
+            self.statusbar.showMessage('Laser is not emitted.')
+            self.tabSnakeButtons['Repeat'][0].setChecked(False)
+            # GUIInstance.btn['Stop'][0].setChecked(False)
+            # self.btn['Sweep'][0].setChecked(False)
+            return
+
+        ### Disable stage joystick(s)
+        self.stageMotionWindow.stage.joystick(enable=False)
+        self.stageMotionWindow.inputMethods['hw'][0].setChecked(False)
+        if self.stageMotionWindow.threadG not in [[]]:
+            if self.stageMotionWindow.threadG.isRunning:
+                self.stageMotionWindow.workerG.stop = True
+                self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
+        print('All stage joysticks disabled')
+        ### Read and compile general experiment parameters
+        self.scanImagParameters = repeatSnakeScanParameters()
+        '''
+        Reuse pattern datastructure in snakeScanData to hold the
+        repetion of scan 0.
+        '''
+        #Use a child class to store our required parameters while multiplexing the old GUI
+        self.scanImagParameters.laser = self.laser
+        self.scanImagParameters.stage = self.stage
+
+        ### Read and compile scanning patterns (for experiment log)
+        self.scanImagParameters.patterns = []
+        s = self.snakeBrowser.scans[0]
+        try:
+            ###Taking inputs, dangerous!
+            ### Get pattern parameters for this scan
+            xOrig = int(float(s.inputFields['xOrig'][0].text()))
+            yOrig = int(float(s.inputFields['yOrig'][0].text()))
+            ### Need to check input validity of these 4 (not implemented yet)
+            xPixelNums = int(s.inputFields['xPixelNums'][0].text())
+            yPixelNums = int(s.inputFields['yPixelNums'][0].text())
+            xPixelRes = int(s.inputFields['xPixelRes'][0].text())
+            yPixelRes = int(s.inputFields['yPixelRes'][0].text())
+            maxStageSpeed  = int(s.inputFields['maxStageSpeed'][0].text())
+
+            if (xPixelNums <= 0 or yPixelNums <= 0 or xPixelRes <= 0 or yPixelRes <= 0
+                or maxStageSpeed <= 0):
+                raise NotPositiveError
+
+            returnXDrift = int(s.inputFields['returnXDrift'][0].text())
+            sizeOrSteps = s.sizeOrSteps
+            scanDir = s.scanDropdowns['RasterDir'][0].currentIndex()
+            if scanDir == 0:
+                scanDir = 'x'
+            elif scanDir == 1:
+                scanDir = 'y'
+
+        except NotPositiveError:
+
+            self.statusbar.showMessage('Non-Positive PixelRes, PixelNums, maxStageSpeed!')
+            ### Unlock GUI controls
+            self.lock_controls(lock=False)
+            self.tabSnakeButtons['Repeat'][0].setChecked(False)
+            return
+
+        except:
+
+            self.statusbar.showMessage('Incorrect scan parameters input!')
+            ### Unlock GUI controls
+            self.lock_controls(lock=False)
+            self.tabSnakeButtons['Repeat'][0].setChecked(False)
+            return
+
+        ### Construct pattern
+        pattern = self.construct_snakescan_pattern(
+                                            xPixelNums = xPixelNums,
+                                            yPixelNums = yPixelNums,
+                                            xPixelRes = xPixelRes,
+                                            yPixelRes = yPixelRes,
+                                            returnXDrift = returnXDrift
+                                            )
+
+        wlwnStr = s.wlwnList.toPlainText()
+        #print(wlwnStr)
+        wlwnListStr = re.split('[ ,;\n]+', wlwnStr)
+        wlwnList = []
+        for s in wlwnListStr:
+            try:
+                n = float(s)
+                wlwnList.append(n)
+            except Exception as exc:
+
+                print('String "{}" cannot be converted to wavelength/number.'.format(s))
+                ### Unlock GUI controls
+                self.lock_controls(lock=False)
+                self.tabSnakeButtons['Start'][0].setChecked(False)
+                return
+
+        if not len(wlwnList) > 0:
+            print('No wavelengths or wavenumbers in list.')
+            ### Unlock GUI controls
+            self.lock_controls(lock=False)
+            self.tabSnakeButtons['Start'][0].setChecked(False)
+            return
+
+        wlwnList.sort()
+
+        '''
+        Set up time stamps table for every wlwn
+        '''
+        for wlwn in wlwnList:
+            if self.scanImagParameters.units == defaults.SEC_WL_UNIT:
+                key = str(int(wlwn))
+            else:
+                key = '{}'.format(wlwn)
+
+            self.scanImagParameters.timeStamps[key] = []
+
+
+        '''
+        Reuse patterns/everything for repeated measurements
+        len(patterns) == count
+        '''
+        for i in range(count):
+
+            ### Append the scan parameters for exp. log
+            self.scanImagParameters.scanDir.append(scanDir)
+            self.scanImagParameters.patterns.append(pattern)
+            self.scanImagParameters.wlwnList.append(wlwnList)
+
+            # Repurpose speed to indicate max stage speed
+            self.scanImagParameters.speeds.append(maxStageSpeed)
+            self.scanImagParameters.sampleNumbers.append(defaults.DEF_SAMPLES_SNAKESCAN)
+            self.scanImagParameters.sampleRates.append(defaults.DEF_SAMPLERATE)
+            self.scanImagParameters.xParameters.append([xOrig, xPixelRes, xPixelNums])
+            self.scanImagParameters.yParameters.append([yOrig, yPixelRes, yPixelNums])
+
+            ### Prepare data variables.
+            self.scanImagParameters.data.W.append(wlwnList)
+            self.scanImagParameters.data.add_nested()
+
+        ### Follow the global unit (laser control's)
+        if self.wlUnits == 'invcm':
+            self.scanImagParameters.units = 'invcm'
+        else: # Default to micrometers
+            self.scanImagParameters.units = 'um'
+
+        '''
+        The rest are just GUI routines
+        '''
+        ### Lock GUI controls
+        self.lock_controls()
+        self.statusbar.showMessage('Busy')
+        ### Show patterns on plot
+        self.update_scanning_imaging_plot_patterns()
+        ### Run acquisition in separate thread
+        self.threadRun = QThread()
+        '''This needs to be modified to repeatSnakeScan'''
+        self.worker = repeatSnakeScan()
+        ''''''
+        self.worker.parameters = self.scanImagParameters
+        self.worker.moveToThread(self.threadRun)
+        self.threadRun.started.connect(self.worker.run)
+        ### Connect pyqt signals to mainGUI
+        self.worker.status_bar_msg.connect(self.update_scan_progress_from_snakeScan)
+        self.worker.finished.connect(self.threadRun.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.threadRun.finished.connect(self.threadRun.deleteLater)
+        self.threadRun.start()
+        ### Plot data
+        self.worker.outData.connect(self.plot_snakescans)
+        ### Save current QCLs, ranges and limits for use with "repeat" function
+        self.worker.outParams.connect(self.update_scanning_imaging_parameters)
+        ### Unlock GUI controls
+        self.worker.finished.connect(lambda: self.lock_controls(lock=False))
+        self.worker.finished.connect(lambda: self.statusbar.showMessage('Scans completed! Laser emission diabled.'))
+        ### Uncheck UI buttons
+        self.worker.finished.connect(lambda: self.tabSnakeButtons['Repeat'][0].setChecked(False))
+        self.worker.finished.connect(lambda: self.btn['Emission'][0].setChecked(False))
+        self.worker.finished.connect(lambda: self.btn['Emission'][0].setText('Enable'))
+        # self.worker.finished.connect(lambda: self.btn['Sweep'][0].setChecked(False))
+        ### Save UI screenshot
+        self.worker.finished.connect(lambda: self.grab().save('screenshot.png', 'png'))
 
     def run_scanning_imaging(self):
         '''Run scanning imaging experiment. (Legacy)'''
@@ -1970,6 +2218,53 @@ class mainWindow(QMainWindow):
             self.plotCanvasRef.axes.set_xlabel('Wavelength (μm)')
             self.plotCanvasT.axes.set_xlabel('Wavelength (μm)')
 
+        ### Change snakeBrowser's and legacy scanBrowser's units as well
+        for idx, s in enumerate(self.snakeBrowser.scans):
+            if s.wlUnits == defaults.DEF_WL_UNIT:
+                try:
+                    wlString = s.wlwnList.toPlainText()
+                    wlNumbers = [round(10000/float(w),1) for w in wlString.split(',')]
+                    s.wlwnList.setText(', '.join(map(str, wlNumbers)))
+
+                except:
+                    s.wlwnList.setText('Something went wrong during the conversion!\nInsert in the correct format again!')
+
+                s.buttons['WlWn'][0].setText('Wavenumber\n(1/cm)')
+                s.wlUnits = defaults.SEC_WL_UNIT
+            else:
+                try:
+                    wlString = s.wlwnList.toPlainText()
+                    wlNumbers = [round(10000/float(w),3) for w in wlString.split(',')]
+                    s.wlwnList.setText(', '.join(map(str, wlNumbers)))
+                except:
+                    s.wlwnList.setText('Something went wrong during the conversion!\nInsert in the correct format again!')
+
+                s.buttons['WlWn'][0].setText('Wls.\n(μm)')
+                s.wlUnits = defaults.DEF_WL_UNIT
+
+        for idx, s in enumerate(self.scanBrowser.scans):
+            if s.wlUnits == defaults.DEF_WL_UNIT:
+                try:
+                    wlString = s.wlwnList.toPlainText()
+                    wlNumbers = [round(10000/float(w),1) for w in wlString.split(',')]
+                    s.wlwnList.setText(', '.join(map(str, wlNumbers)))
+
+                except:
+                    s.wlwnList.setText('Something went wrong during the conversion!\nInsert in the correct format again!')
+
+                s.buttons['WlWn'][0].setText('Wavenumber\n(1/cm)')
+                s.wlUnits = defaults.SEC_WL_UNIT
+            else:
+                try:
+                    wlString = s.wlwnList.toPlainText()
+                    wlNumbers = [round(10000/float(w),3) for w in wlString.split(',')]
+                    s.wlwnList.setText(', '.join(map(str, wlNumbers)))
+                except:
+                    s.wlwnList.setText('Something went wrong during the conversion!\nInsert in the correct format again!')
+
+                s.buttons['WlWn'][0].setText('Wls.\n(μm)')
+                s.wlUnits = defaults.DEF_WL_UNIT
+
 
 class multipleAcquisitionsWindow(QMainWindow):
     '''GUI for multiple acquisitions'''
@@ -2088,6 +2383,8 @@ class multipleAcquisitionsWindow(QMainWindow):
         self.labelHead['timer'][0].setText(
             'Elapsed: {:02.0f} : {:02.0f} : {:02.0f}'.format(0, 0, 0))
 
+class NotPositiveError(UserWarning):
+	pass
 
 if __name__ == '__main__':
     # APP = QApplication(sys.argv)

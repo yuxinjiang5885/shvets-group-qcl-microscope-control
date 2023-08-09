@@ -30,6 +30,13 @@ from instruments.mircat import whichQCL
 import instruments.hld117 as hld117
 '''
 '''
+'''
+08/07/2023 Po-Ting Shen
+'''
+import csv
+'''
+'''
+
 
 ### Define narrow QCL ranges with unused wavelengths/numbers before and after.
 ### This leaves space to sweep a little before and after the requested range.
@@ -983,7 +990,6 @@ class snakeScan(imagingScan):
         Overwrite scan(). This is the snakescan routine that
         will be called in run().
         Run snakescan imaging experiment and output data.
-        Note to self: the coordinate system is not implemented yet. (06/02/23)
         '''
 
 
@@ -1013,6 +1019,14 @@ class snakeScan(imagingScan):
             os.mkdir(patternDir)
             os.chdir(patternDir)
 
+            ### Go to origin of each pattern, set the position to zero
+            self.parameters.stage.goto(self.parameters.xParameters[idx][0], self.parameters.yParameters[idx][0])
+            while int(self.parameters.stage.busy()) > 0:
+                time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+            ### This is to rezero the stage encoders.
+            self.parameters.stage.set_position(x = 0 , y = 0)
+            while int(self.parameters.stage.busy()) > 0:
+                time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
             ### Iterate over wavelength/wavenumber in wlwnList
             for jdx, wlwn in enumerate(self.parameters.wlwnList[idx]):
                 '''
@@ -1029,12 +1043,9 @@ class snakeScan(imagingScan):
                                            wl = wlwn,
                                            wlUnits = self.parameters.units)
                 ### Move the stage position to (xOrig,yOrig)
-                self.parameters.stage.goto(self.parameters.xParameters[idx][0], self.parameters.yParameters[idx][0])
-                while int(self.parameters.stage.busy()) > 0:
-                    time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+                ### Change this
                 ### Start snake scan!
-                self.parameters.stage.set_position(x = 0 , y = 0)
-                ### This is to rezero the stage encoders.
+
                 self.parameters.stage.goto(x = 0, y = 0)
                 while int(self.parameters.stage.busy()) > 0:
                     time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
@@ -1089,13 +1100,12 @@ class snakeScan(imagingScan):
                 multipleAI.stop_task() # Stop acquisition task
                 multipleAI.clear_task()
 
-                ### Reset the stage to the saved starting position
+                ### Go back to the origin of the pattern
                 self.parameters.stage.set_speed(defaults.HLD117_MAX_SPEED)
                 self.parameters.stage.goto(x = 0, y = 0)
                 while int(self.parameters.stage.busy()) > 0:
                     time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
-                self.parameters.stage.set_position(self.parameters.xParameters[idx][0],
-                                                   self.parameters.yParameters[idx][0])
+
                 ### Save csv for each <wlwn>
                 self.parameters.data.finishSnakeScan(pattern_idx = idx, wlwn_idx = jdx,
                                                      wlUnits = self.parameters.units,
@@ -1109,13 +1119,209 @@ class snakeScan(imagingScan):
                 yPixelNums = self.parameters.yParameters[idx][2]
                 self.parameters.data.X[idx][jdx] = list(np.linspace(xOrig + trigIndent, xOrig + trigIndent + xPixelNums*xPixelRes, xPixelNums))
                 self.parameters.data.Y[idx][jdx] = list(np.linspace(yOrig + trigIndent, yOrig + trigIndent - yPixelNums*yPixelRes, yPixelNums))
+
+            ### Reset the stage coordinates for each pattern
+            self.parameters.stage.set_position(self.parameters.xParameters[idx][0],
+                                                   self.parameters.yParameters[idx][0])
+            while int(self.parameters.stage.busy()) > 0:
+                time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+
         ### Format all the data for GUI plots
         self.parameters.data.guiFormat()
         ### Reset the directory for screenshot.png
         os.chdir(rootDir)
+        ### Save all the data in self.parameters.data.snakeScans[idx][jdx] in one .mat
+
+
         ### Disable laser for safety
         self.parameters.laser.disable()
         return self.parameters.data
+
+class repeatSnakeScan(imagingScan):
+
+    status_bar_msg = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+    '''
+    ***Inherit run(), no need to change it
+    '''
+    def writeTimeStamps(self):
+        '''
+        Helper: Save time stamps to .csv
+        '''
+        data = self.parameters.timeStamps
+        # extract keys and values from dictionary
+        keys = list(data.keys())
+        values = list(data.values())
+
+        # write to CSV file
+        with open('time_stamps.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(keys)  # write header
+            writer.writerows(zip(*values))  # write data rows
+
+    def scan(self):
+        '''
+        Overwrite scan(). This is the snakescan routine that
+        will be called in run().
+        Repeat snakescan imaging on scan 0 and output data.
+        Note to self: Copied from snakeScan. Not changed yet. (08/07/23)
+        '''
+
+        ### Prepare to save data
+        rootDir = os.getcwd()
+        # if platform.system() == 'Windows':
+        #     currentDirSplit = currentDir.split('\\')
+        # else:
+        #     currentDirSplit = currentDir.split('/')
+        scanImagDir = os.path.join(rootDir, defaults.DEF_SNAKE_SCAN_SUBFOLDER)
+        os.mkdir(scanImagDir)
+        os.chdir(scanImagDir)
+        ### Preamble
+        print('Scan started ...')
+
+        '''
+        Refer to prior_api_test.py for snake scan prototypes.
+        '''
+        ### Go to origin of scan 0, set the position to zero
+        self.parameters.stage.goto(self.parameters.xParameters[0][0], self.parameters.yParameters[0][0])
+        while int(self.parameters.stage.busy()) > 0:
+            time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+        ### This is to rezero the stage encoders.
+        self.parameters.stage.set_position(x = 0 , y = 0)
+        while int(self.parameters.stage.busy()) > 0:
+            time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+
+        ### Iterate over scan patterns (repetitions)
+        for idx, pattern in enumerate(self.parameters.patterns):
+            '''
+            The nested structures, each line is at the same tier:
+            pattern, wlwnList, data.W[idx], data.V[idx]...
+            '''
+            ### Make a folder for each pattern
+            patternDir = os.path.join(scanImagDir,'pattern'+str(idx))
+            os.mkdir(patternDir)
+            os.chdir(patternDir)
+
+
+            ### Iterate over wavelength/wavenumber in wlwnList
+            for jdx, wlwn in enumerate(self.parameters.wlwnList[idx]):
+                '''
+                Tune laser to <wlwn>.
+                '''
+                ### Setup, start triggered acquisition task
+                multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
+                multipleAI.configure_triggered(defaults.PCI_SNAKE_TRIG, self.parameters.sampleNumbers[idx], self.parameters.sampleRates[idx])
+                #multipleAI.stream_to_disk()
+                multipleAI.start_task()
+
+
+                self.parameters.laser.tune(qcl = whichQCL(wlwn,self.parameters.units),
+                                           wl = wlwn,
+                                           wlUnits = self.parameters.units)
+                ### Move the stage position to (xOrig,yOrig)
+                ### Change this
+                ### Start snake scan!
+
+                self.parameters.stage.goto(x = 0, y = 0)
+                while int(self.parameters.stage.busy()) > 0:
+                    time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+
+                self.parameters.stage.set_speed(self.parameters.speeds[idx])
+                startRun = timer()
+
+                ### Make some local variables to make the loop readable
+                paths = pattern
+                trigIndent = defaults.SNAKE_TRIG_INDENT
+                stepSize = paths[0]['dX']
+                xPixels = paths[0]['M']
+                sampleNumber = self.parameters.sampleNumbers[idx]
+                units = self.parameters.units
+
+                for path in paths:
+                    #print('Scanning line ' + str(2*path['i']+1) + ' (forward)', flush=True)
+                    self.status_bar_msg.emit('Scan #' + str(idx)+ ': Emitting ' + str(wlwn) + ' '+ units + '...'
+                                             + ' Scanning line ' + str(2*path['i']+1)
+                                             + '/' + str(2*len(paths)) + ' (forward)')
+                    self.parameters.stage.goto(int(path['X0']),int(path['Y0']))
+                    self.parameters.stage.arm_trigger(F = hld117.HLD117_TRIG_RES*trigIndent, D = hld117.HLD117_TRIG_RES*stepSize, A = 'X', N = xPixels, P = 'P' , W = 1)
+                    self.parameters.stage.goto(int(path['X1']),int(path['Y0']))
+                    while int(self.parameters.stage.busy()) > 0:
+                        time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+
+                    data_forward = multipleAI.read_line(xPixels*sampleNumber)
+                    self.parameters.data.dataCh1[idx][jdx].append(data_forward[0])
+                    self.parameters.data.dataCh2[idx][jdx].append(data_forward[1])
+
+
+                    self.parameters.stage.goto(int(path['X1']),int(path['Y1']))
+                    #print('Scanning line ' + str(2*path['i']+2) + ' (backward)', flush=True)
+                    self.status_bar_msg.emit('Scan #' + str(idx)+ ': Emitting ' + str(wlwn) + ' '+ units + '...'
+                                             + ' Scanning line ' + str(2*path['i']+2)
+                                             + '/' + str(2*len(paths)) +' (backward)')
+                    self.parameters.stage.arm_trigger(F = hld117.HLD117_TRIG_RES*(xPixels*stepSize + path['drift']), D = -hld117.HLD117_TRIG_RES*stepSize, A = 'X', N = xPixels, P = 'P' , W = 1)
+                    self.parameters.stage.goto(int(path['X0'] + path['drift']),int(path['Y1']))
+                    while int(self.parameters.stage.busy()) > 0:
+                        time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+
+                    data_backward = multipleAI.read_line(xPixels*sampleNumber)
+                    self.parameters.data.dataCh1[idx][jdx].append(data_backward[0])
+                    self.parameters.data.dataCh2[idx][jdx].append(data_backward[1])
+
+                endRun = timer()
+                print('Scan complete (%.3f s).' % (endRun-startRun))
+
+                ### Generate timestamp for self.parameters.timeStamps
+
+                timeStamp = int(time.time())
+                key = '{}'.format(wlwn)
+                self.parameters.timeStamps[key].append(timeStamp)
+
+                ### End Snake scan
+
+                ### Stop, clear triggered acquisition task
+                multipleAI.stop_task() # Stop acquisition task
+                multipleAI.clear_task()
+
+                ### Go back to the origin of the pattern
+                self.parameters.stage.set_speed(defaults.HLD117_MAX_SPEED)
+                self.parameters.stage.goto(x = 0, y = 0)
+                while int(self.parameters.stage.busy()) > 0:
+                    time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+
+                ### Save csv for each <wlwn>
+                self.parameters.data.finishSnakeScan(pattern_idx = idx, wlwn_idx = jdx,
+                                                     wlUnits = self.parameters.units,
+                                                     filepath = patternDir)
+                ### Save X, Y coordinates of the scan for GUI
+                xOrig = self.parameters.xParameters[idx][0]
+                yOrig = self.parameters.yParameters[idx][0]
+                xPixelRes = self.parameters.xParameters[idx][1]
+                yPixelRes = self.parameters.yParameters[idx][1]
+                xPixelNums = self.parameters.xParameters[idx][2]
+                yPixelNums = self.parameters.yParameters[idx][2]
+                self.parameters.data.X[idx][jdx] = list(np.linspace(xOrig + trigIndent, xOrig + trigIndent + xPixelNums*xPixelRes, xPixelNums))
+                self.parameters.data.Y[idx][jdx] = list(np.linspace(yOrig + trigIndent, yOrig + trigIndent - yPixelNums*yPixelRes, yPixelNums))
+
+        ### Reset the stage coordinates after the completion
+        self.parameters.stage.set_position(self.parameters.xParameters[0][0],
+                                                   self.parameters.yParameters[0][0])
+        while int(self.parameters.stage.busy()) > 0:
+            time.sleep(defaults.IMAG_SCAN_STEP_BUSY_WAIT)
+
+        ### Format all the data for GUI plots
+        self.parameters.data.guiFormat()
+        ### Reset the directory for screenshot.png, save all data to .mat
+        # and timeStamps to .csv
+        os.chdir(rootDir)
+        self.parameters.data.saveMat(wlUnits = self.parameters.units)
+        self.writeTimeStamps()
+
+        ### Disable laser for safety
+        self.parameters.laser.disable()
+        return self.parameters.data
+
 
 
 

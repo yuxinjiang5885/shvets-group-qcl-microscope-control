@@ -186,7 +186,7 @@ class scanUI(QWidget):
         self.grid.addWidget(self.wlwnList, 7, 1, 2, 3)
         ### Connect buttons to actions
         self.buttons['ScanSizeSteps'][0].clicked.connect(lambda: self.switch_scan_size_steps())
-        #self.buttons['WlWn'][0].clicked.connect(lambda: self.switch_wavelength_unit())
+        self.buttons['WlWn'][0].clicked.connect(lambda: self.switch_wavelength_unit())
 
     def switch_scan_size_steps(self):
         '''Switch between scan size and number of steps'''
@@ -218,29 +218,7 @@ class scanUI(QWidget):
         '''
         Switching the unit of wavelength
         '''
-        if self.wlUnits == defaults.DEF_WL_UNIT:
-            try:
-                wlString = self.wlwnList.toPlainText()
-                wlNumbers = [round(10000/float(w),1) for w in wlString.split(',')]
-                self.wlwnList.setText(', '.join(map(str, wlNumbers)))
-
-            except:
-                self.wlwnList.setText('Something went wrong during the conversion!\nInsert in the correct format again!')
-
-            self.buttons['WlWn'][0].setText('Wavenumber\n(1/cm)')
-            self.wlUnits = defaults.SEC_WL_UNIT
-            self.mainGUI.wl_units()
-        else:
-            try:
-                wlString = self.wlwnList.toPlainText()
-                wlNumbers = [round(10000/float(w),3) for w in wlString.split(',')]
-                self.wlwnList.setText(', '.join(map(str, wlNumbers)))
-            except:
-                self.wlwnList.setText('Something went wrong during the conversion!\nInsert in the correct format again!')
-
-            self.buttons['WlWn'][0].setText('Wls.\n(μm)')
-            self.wlUnits = defaults.DEF_WL_UNIT
-            self.mainGUI.wl_units()
+        self.mainGUI.wl_units()
 '''
 Create a child class 'snakeBrowser' to scanBrowser
 Po-Ting Shen
@@ -326,9 +304,8 @@ class snakeUI(scanUI):
             self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 7, 0, 2, 1]
             self.mainGUI.isSnakeBrowserInit = True
         else:
-            self.buttons['WlWn'] = [QPushButton(''), 7, 0, 2, 1]
-            self.buttons['WlWn'][0].setEnabled(False)
-            self.buttons['WlWn'][0].setText('Units follow scan 0')
+            self.buttons['WlWn'] = [QPushButton('Wls.\n(μm)'), 7, 0, 2, 1]
+            #self.buttons['WlWn'][0].setText('Units follow scan 0')
 
 
         self.buttons['WlWn'][0].setToolTip('Toggle between wavelengths and wavenumbers')
@@ -340,6 +317,7 @@ class snakeUI(scanUI):
             self.grid.addWidget(k[0], k[1], k[2], k[3], k[4])
         ### Input fields
         self.inputFields = dict()
+        '''Need fixing for new tabs'''
         self.inputFields['xOrig'] = [QLineEdit('{}'.format(
                                     self.mainGUI.displayed_coordinates[0] )), 1, 1, 1, 1]
         self.inputFields['xOrig'][0].setToolTip('Scan x origin')

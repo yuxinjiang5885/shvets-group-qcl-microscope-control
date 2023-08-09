@@ -9,6 +9,7 @@ Created 2022-Aug-05
 import numpy as np
 import csv
 import experiment.defaults as defaults
+from scipy.io import savemat
 
 class experimentParameters():
     '''Holds experiment parameters'''
@@ -158,7 +159,6 @@ class snakeScanData(scanningImagingData):
         self.dataCh2 = []
         self.sampleNumber = defaults.DEF_SAMPLES_SNAKESCAN
         self.savedStagePosition = (0, 0)
-        self.displacement = (0, 0)
         self.xPixels = 0
         self.yPixels = 0
         self.xPixelRes = defaults.SNAKE_SCAN_RES_X_UM
@@ -226,11 +226,6 @@ class snakeScanData(scanningImagingData):
         self.snakeScans[idx][jdx]= np.array(voltageLines)
         self.writeSnakeScan(idx,jdx, wlUnits, filepath)
 
-
-
-
-
-
     def writeSnakeScan(self, pattern_idx, wlwn_idx,
                     wlUnits,
                     filepath):
@@ -255,11 +250,8 @@ class snakeScanData(scanningImagingData):
                 #Write item to outcsv
                 write.writerow(line)
 
-
-
     def guiFormat(self):
         '''
-        GUI's x and y convention is transposed.
         Format snakescan data to its parent class's (scanningImagingData's) format for GUI to work
         Prerequisite: After all the patterns are done
         '''
@@ -267,7 +259,45 @@ class snakeScanData(scanningImagingData):
         self.Xcont = self.X
         self.Ycont = self.Y
 
+    def saveMat(self, wlUnits: str):
+        '''
+        Stack each wavelength/wavenumber of a pattern to one 3d numpy datacube.
+        Save those datacubes to one .mat file.
+        '''
+        hypercube_dict = {}
 
+        hypercube_dict['wlUnits'] = wlUnits
+
+        for idx, pattern in enumerate(self.snakeScans):
+            temp_list = []
+
+            for jdx, wlwn in enumerate(self.W[idx]):
+                temp_list.append(self.snakeScans[idx][jdx])
+
+            hypercube = np.stack(temp_list, axis = 2)
+            wn = np.array(self.W[idx])
+
+            key = f'pattern{idx}'
+            hypercube_dict[key] = hypercube
+            key = f'wn{idx}'
+            hypercube_dict[key] = wn
+
+        # Save the dictionary to a .mat file
+        savemat('hcubes.mat', hypercube_dict)
+
+
+
+
+
+
+class repeatSnakeScanParameters(snakeScanParameters):
+    '''Holds experiment parameters for repeated snake scans.'''
+    def __init__(self):
+        super().__init__()
+        self.data = snakeScanData()
+        self.maxStageSpeed = defaults.HLD117_REC_SPEED
+        self.scanMode = 'repeat_snake_scan'
+        self.timeStamps = {}
 
 
 

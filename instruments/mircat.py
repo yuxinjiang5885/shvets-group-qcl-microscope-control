@@ -456,9 +456,16 @@ class laser():
         self.isTuned = c_bool(False)
         start = timer()
         while not self.isTuned.value:
-            print('Tuning in progress ({:.3f} s).'.format(timer()-start),
+            t = timer() - start
+            print('Tuning in progress ({:.3f} s).'.format(t),
                   end='\r') # overwrite line
             time.sleep(0.05) # refresh interval (DLS default: 0.05 s)
+            ### Timeout for infinite tuning 08/08/2023
+            if t > 60:
+                self.isTuned = c_bool(True)
+                print('There seems to be a problem in the following wavelength:')
+                break
+            ### Timeout for infinite tuning 08/08/2023
             SDK.MIRcatSDK_IsTuned(byref(self.isTuned))
         print() # clear line
         # Read tuned wavelength
