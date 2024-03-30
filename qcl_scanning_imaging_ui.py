@@ -1794,7 +1794,7 @@ class mainWindow(QMainWindow):
         self.worker.outParams.connect(self.update_scanning_imaging_parameters)
         ### Unlock GUI controls
         self.worker.finished.connect(lambda: self.lock_controls(lock=False))
-        self.worker.finished.connect(lambda: self.statusbar.showMessage('Scans completed! Laser emission diabled.'))
+        self.worker.finished.connect(lambda: self.statusbar.showMessage('Scans completed! Laser emission disabled.'))
         ### Uncheck UI buttons
         self.worker.finished.connect(lambda: self.tabSnakeButtons['Repeat'][0].setChecked(False))
         self.worker.finished.connect(lambda: self.btn['Emission'][0].setChecked(False))
