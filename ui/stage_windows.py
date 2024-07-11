@@ -487,7 +487,7 @@ class stageMotionWindow(QMainWindow):
         exitAction.setToolTip('Close stage motion window')
         exitAction.triggered.connect(lambda: self.close())
         updateAction = QAction(QIcon(None), 'Update readings', self)
-        updateAction.setShortcut('Ctrl+U')
+        updateAction.setShortcut('Ctrl+R')
         updateAction.setToolTip('Update x/y stage position readings')
         updateAction.triggered.connect(lambda: self.update_readings())
         gamepadBindingsAction = QAction(QIcon(None), 'Gamepad bindings', self)

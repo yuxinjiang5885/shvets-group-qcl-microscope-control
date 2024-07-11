@@ -461,7 +461,7 @@ class laser():
                   end='\r') # overwrite line
             time.sleep(0.05) # refresh interval (DLS default: 0.05 s)
             ### Timeout for infinite tuning 08/08/2023
-            if t > 60:
+            if t > 30:
                 self.isTuned = c_bool(True)
                 print('There seems to be a problem in the following wavelength:')
                 break
