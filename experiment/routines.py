@@ -22,12 +22,10 @@ from instruments.daylight.MIRcatSDKConstants import MIRcatSDK_UNITS_CM1, MIRcatS
 # from PyQt5.QtCore import QObject, QThread, pyqtSignal
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 '''
-06/02/2023 Po-Ting Shen
-import mircat for whichQCL()
-import hld117
 '''
 from instruments.mircat import whichQCL
 import instruments.hld117 as hld117
+from instruments.pi_scanner import piScanner, piScanner_widget
 '''
 '''
 '''
@@ -1032,16 +1030,67 @@ class snakeScan(imagingScan):
                 '''
                 Tune laser to <wlwn>.
                 '''
+                self.parameters.laser.tune(qcl = whichQCL(wlwn,self.parameters.units),
+                                           wl = wlwn,
+                                           wlUnits = self.parameters.units)
+
+
+
+
+                ###for autofocusing after tuning to each discrete frequency
+                ###note: need to adjust the position, since the original x and y starting position has been set to zero
+                xOrig = self.parameters.xParameters[idx][0]
+                yOrig = self.parameters.yParameters[idx][0]
+
+                # --- Run autofocus before any scan pattern or stage movement ---
+                if self.parameters.pi_scanner.autofocus_on_imaging:
+                    if hasattr(self.parameters, 'pi_scanner_widget'):
+                        #store the original autofocus stage position (target_x, target_y)
+                        target_x_orig = self.parameters.pi_scanner.target_x
+                        target_y_orig = self.parameters.pi_scanner.target_y
+                        #calculate the shifted positions, due to stage zeroing
+                        target_x_modified = self.parameters.pi_scanner.target_x - xOrig
+                        target_y_modified = self.parameters.pi_scanner.target_y - yOrig
+                        #set the new positions to the widget (note this is connected to pi_scanner target_x and target_y)
+                        self.parameters.pi_scanner_widget.set_target_x_signal.emit(str(target_x_modified))
+                        self.parameters.pi_scanner_widget.set_target_y_signal.emit(str(target_y_modified))
+                        #do the actual autofocus, which is in the scanner_widget
+                        self.parameters.pi_scanner_widget.autofocus()
+                        #then reset the target_x and target_y values
+                        self.parameters.pi_scanner.target_x = target_x_orig
+                        self.parameters.pi_scanner.target_y = target_y_orig
+                        self.parameters.pi_scanner_widget.set_target_x_signal.emit(str(target_x_orig))
+                        self.parameters.pi_scanner_widget.set_target_y_signal.emit(str(target_y_orig))
+
+                    else:
+                        self.parameters.pi_scanner_widget = piScanner_widget(self.parameters.pi_scanner, stage_instance=self.parameters.stage)
+
+                        #store the original autofocus stage position (target_x, target_y)
+                        target_x_orig = self.parameters.pi_scanner.target_x
+                        target_y_orig = self.parameters.pi_scanner.target_y
+                        #calculate the shifted positions, due to stage zeroing
+                        target_x_modified = self.parameters.pi_scanner.target_x - xOrig
+                        target_y_modified = self.parameters.pi_scanner.target_y - yOrig
+                        #set the new positions to the widget (note this is connected to pi_scanner target_x and target_y)
+                        self.parameters.pi_scanner_widget.set_target_x_signal.emit(str(target_x_modified))
+                        self.parameters.pi_scanner_widget.set_target_y_signal.emit(str(target_y_modified))
+                        #do the actual autofocus, which is in the scanner_widget
+                        self.parameters.pi_scanner_widget.autofocus()
+                        #then reset the target_x and target_y values
+                        self.parameters.pi_scanner.target_x = target_x_orig
+                        self.parameters.pi_scanner.target_y = target_y_orig
+                        self.parameters.pi_scanner_widget.set_target_x_signal.emit(str(target_x_orig))
+                        self.parameters.pi_scanner_widget.set_target_y_signal.emit(str(target_y_orig))
+
+                        self.parameters.pi_scanner_widget.deleteLater()
+
+
                 ### Setup, start triggered acquisition task
                 multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
                 multipleAI.configure_triggered(defaults.PCI_SNAKE_TRIG, self.parameters.sampleNumbers[idx], self.parameters.sampleRates[idx])
                 #multipleAI.stream_to_disk()
                 multipleAI.start_task()
 
-
-                self.parameters.laser.tune(qcl = whichQCL(wlwn,self.parameters.units),
-                                           wl = wlwn,
-                                           wlUnits = self.parameters.units)
                 ### Move the stage position to (xOrig,yOrig)
                 ### Change this
                 ### Start snake scan!
@@ -1210,16 +1259,65 @@ class repeatSnakeScan(imagingScan):
                 '''
                 Tune laser to <wlwn>.
                 '''
+                ###for autofocusing after tuning to each discrete frequency
+                self.parameters.laser.tune(qcl = whichQCL(wlwn,self.parameters.units),
+                                           wl = wlwn,
+                                           wlUnits = self.parameters.units)
+
+
+
+                ###note: need to adjust the position, since the original x and y starting position has been set to zero
+                xOrig = self.parameters.xParameters[idx][0]
+                yOrig = self.parameters.yParameters[idx][0]
+
+                # --- Run autofocus before any scan pattern or stage movement ---
+                if self.parameters.pi_scanner.autofocus_on_imaging:
+                    if hasattr(self.parameters, 'pi_scanner_widget'):
+                        #store the original autofocus stage position (target_x, target_y)
+                        target_x_orig = self.parameters.pi_scanner.target_x
+                        target_y_orig = self.parameters.pi_scanner.target_y
+                        #calculate the shifted positions, due to stage zeroing
+                        target_x_modified = self.parameters.pi_scanner.target_x - xOrig
+                        target_y_modified = self.parameters.pi_scanner.target_y - yOrig
+                        #set the new positions to the widget (note this is connected to pi_scanner target_x and target_y)
+                        self.parameters.pi_scanner_widget.set_target_x_signal.emit(str(target_x_modified))
+                        self.parameters.pi_scanner_widget.set_target_y_signal.emit(str(target_y_modified))
+                        #do the actual autofocus, which is in the scanner_widget
+                        self.parameters.pi_scanner_widget.autofocus()
+                        #then reset the target_x and target_y values
+                        self.parameters.pi_scanner.target_x = target_x_orig
+                        self.parameters.pi_scanner.target_y = target_y_orig
+                        self.parameters.pi_scanner_widget.set_target_x_signal.emit(str(target_x_orig))
+                        self.parameters.pi_scanner_widget.set_target_y_signal.emit(str(target_y_orig))
+                    else:
+                        self.parameters.pi_scanner_widget = piScanner_widget(self.parameters.pi_scanner, stage_instance=self.parameters.stage)
+
+                        #store the original autofocus stage position (target_x, target_y)
+                        target_x_orig = self.parameters.pi_scanner.target_x
+                        target_y_orig = self.parameters.pi_scanner.target_y
+                        #calculate the shifted positions, due to stage zeroing
+                        target_x_modified = self.parameters.pi_scanner.target_x - xOrig
+                        target_y_modified = self.parameters.pi_scanner.target_y - yOrig
+                        #set the new positions to the widget (note this is connected to pi_scanner target_x and target_y)
+                        self.parameters.pi_scanner_widget.set_target_x_signal.emit(str(target_x_modified))
+                        self.parameters.pi_scanner_widget.set_target_y_signal.emit(str(target_y_modified))
+                        #do the actual autofocus, which is in the scanner_widget
+                        self.parameters.pi_scanner_widget.autofocus()
+                        #then reset the target_x and target_y values
+                        self.parameters.pi_scanner.target_x = target_x_orig
+                        self.parameters.pi_scanner.target_y = target_y_orig
+                        self.parameters.pi_scanner_widget.set_target_x_signal.emit(str(target_x_orig))
+                        self.parameters.pi_scanner_widget.set_target_y_signal.emit(str(target_y_orig))
+
+                        self.parameters.pi_scanner_widget.deleteLater()
+
+
                 ### Setup, start triggered acquisition task
                 multipleAI = MultiAI([defaults.PCI_CH_X, defaults.PCI_CH_Y])
                 multipleAI.configure_triggered(defaults.PCI_SNAKE_TRIG, self.parameters.sampleNumbers[idx], self.parameters.sampleRates[idx])
                 #multipleAI.stream_to_disk()
                 multipleAI.start_task()
 
-
-                self.parameters.laser.tune(qcl = whichQCL(wlwn,self.parameters.units),
-                                           wl = wlwn,
-                                           wlUnits = self.parameters.units)
                 ### Move the stage position to (xOrig,yOrig)
                 ### Change this
                 ### Start snake scan!

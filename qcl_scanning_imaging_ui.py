@@ -45,6 +45,8 @@ from PyQt6.QtWidgets import (QApplication,
                              QSizePolicy,
                              QTabWidget,
                              QTextEdit)
+
+from instruments.pi_scanner import piScanner, piScanner_widget
 import warnings
 
 rcParams.update({'figure.autolayout': True}) # Essential for plots to fit figure
@@ -115,6 +117,9 @@ class mainWindow(QMainWindow):
         startupDialog2 = stageStartupDialog(COM_PORT = STAGE_COM_PORT) # Closes when startup finishes
         self.stageWorker.stageInitialized.connect(lambda: startupDialog2.done(0))
         startupDialog2.exec()
+
+        ### Set objective scanner instance
+        self.pi_scanner = piScanner()
 
         ### Other initialization
         self.displayed_coordinates = self.get_displayed_coordinates()
@@ -229,6 +234,14 @@ class mainWindow(QMainWindow):
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
+
+        # Close the PI device connection
+        try:
+            self.pi_scanner.pidevice.CloseConnection()
+            print("PI E-709 connection closed.")
+        except Exception as e:
+             print(f"Error closing PI device: {e}")
+
         self.stage.disconnect()
         self.laser.disable()
         self.laser.disarm()
@@ -415,6 +428,15 @@ class mainWindow(QMainWindow):
         for _, k in self.btn.items():
             k[0].setEnabled(enabled)
 
+    def show_pi_scanner_widget(self):
+        # Check if an instance already exists and is visible
+        if hasattr(self, 'pi_scanner_widget') and self.pi_scanner_widget.isVisible():
+            self.pi_scanner_widget.raise_()
+        else:
+            self.pi_scanner_widget = piScanner_widget(self.pi_scanner, stage_instance=self.stage)
+            self.pi_scanner_widget.show()
+            self.pi_scanner_widget.raise_()
+
     def make_gui(self):
         '''Create main GUI window.'''
         ### Set size
@@ -480,6 +502,14 @@ class mainWindow(QMainWindow):
         stageMotion.setStatusTip('Open stage motion window')
         stageMenu.addAction(stageMotion)
         stageMotion.triggered.connect(lambda: self.stage_motion_window())
+
+        ### "Objective" menu
+        objectiveMenu = self.menubar.addMenu('Objective')
+        objectiveMenu.setStyleSheet(defaults.STYLE_MENU)
+        objectiveScannerAction = QAction(QIcon(None), 'Objective Scanner', self)
+        objectiveScannerAction.setStatusTip('Show objective scanner window')
+        objectiveMenu.addAction(objectiveScannerAction)
+        objectiveScannerAction.triggered.connect(self.show_pi_scanner_widget)
         ### "Options" menu
         optionsMenu = self.menubar.addMenu('Options')
         optionsMenu.setStyleSheet(defaults.STYLE_MENU)
@@ -811,7 +841,8 @@ class mainWindow(QMainWindow):
         self.tabSnakeGrid.addWidget(self.snakeBrowser, 7, 0, 6, 6)
 
         ### Snake scan tab - text box
-        self.snakeScanRepeatTextbox = QLineEdit('Enter the repetition count...')
+        self.snakeScanRepeatTextbox = QLineEdit()
+        self.snakeScanRepeatTextbox.setPlaceholderText('Enter the repetition count...')
         self.snakeScanRepeatTextbox.setStyleSheet(defaults.STYLE_INPUT)
         self.snakeScanRepeatTextbox.setFont(font)
         self.snakeScanRepeatTextbox.setToolTip('Enter positive integers.')
@@ -1456,11 +1487,16 @@ class mainWindow(QMainWindow):
                 self.stageMotionWindow.workerG.stop = True
                 self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
         print('All stage joysticks disabled')
+
+
         ### Read and compile general experiment parameters
         self.scanImagParameters = snakeScanParameters()
         #Use a child class to store our required parameters while multiplexing the old GUI
         self.scanImagParameters.laser = self.laser
         self.scanImagParameters.stage = self.stage
+        self.scanImagParameters.pi_scanner = self.pi_scanner
+        if hasattr(self, 'pi_scanner_widget'):
+            self.scanImagParameters.pi_scanner_widget = self.pi_scanner_widget
 
         ### Read and compile scanning patterns (for experiment log)
         self.scanImagParameters.patterns = []
@@ -1639,6 +1675,8 @@ class mainWindow(QMainWindow):
                 self.stageMotionWindow.workerG.stop = True
                 self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
         print('All stage joysticks disabled')
+
+
         ### Read and compile general experiment parameters
         self.scanImagParameters = repeatSnakeScanParameters()
         '''
@@ -1648,6 +1686,9 @@ class mainWindow(QMainWindow):
         #Use a child class to store our required parameters while multiplexing the old GUI
         self.scanImagParameters.laser = self.laser
         self.scanImagParameters.stage = self.stage
+        self.scanImagParameters.pi_scanner = self.pi_scanner
+        if hasattr(self, 'pi_scanner_widget'):
+            self.scanImagParameters.pi_scanner_widget = self.pi_scanner_widget
 
         ### Read and compile scanning patterns (for experiment log)
         self.scanImagParameters.patterns = []

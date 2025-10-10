@@ -212,7 +212,7 @@ WL_MINIMUMS_UM = [MIN_WL_QCL1_UM,
 ### Default NI PCIe card sampling parameters
 # DEF_SAMPLERATE = 1000 # Hz
 # DEF_SAMPLERATE = 1000000 # Hz
-DEF_SAMPLERATE = 100000 # Hz Default
+DEF_SAMPLERATE = 100000 # Hz Default, this rate is used for raster scan, 100kHz originally
 #DEF_SAMPLERATE = 10000 # Hz
 #DEF_SAMPLERATE = 1000 # Hz
 # DEF_SAMPLES = 100
@@ -223,7 +223,7 @@ DEF_SAMPLES_IMAGING = 1
 Added by Po-Ting Shen
 03/16/2023
 '''
-DEF_SAMPLES_SNAKESCAN = 2 # x sampling time per trigger
+DEF_SAMPLES_SNAKESCAN = 2 # x sampling time per trigger, originally 2
 
 ### Default scan/sweep parameters
 DEF_WL_START_UM = 5.2 # Default scan/sweep start wavelength, um

@@ -135,6 +135,8 @@ class scanningImagingParameters():
         self.wlwnList = [] # List of wavelengths (um) or wavenumbers (cm^-1)
         self.xParameters = [] # Axis x scan parameters
         self.yParameters = [] # Axis y scan parameters
+        self.pi_scanner = [] # Objective scanner instance, placeholder value
+        self.pi_scanner_widget = [] # Objective scanner widget instance, placeholder value
 
 '''
 class of snakeScanParameters and snakeScanData

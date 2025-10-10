@@ -313,3 +313,13 @@ class stage():
             paths.append(d)
 
         return paths
+
+    #added functions by Steven
+    def wait_until_ready(self, timeout=5):
+        """Wait until the stage is idle or timeout (in seconds) is reached."""
+        start_time = time.time()
+        while self.busy() != '0':
+            time.sleep(0.1)
+            if time.time() - start_time > timeout:
+                print("Timeout waiting for stage to become idle.")
+                break
