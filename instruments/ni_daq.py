@@ -153,15 +153,23 @@ class MultiChannelAnalogInput():
                               DAQmx_Val_Rising,
                               DAQmx_Val_FiniteSamps,
                               sampleNumber)
+#        DAQmxCfgSampClkTiming(  self.taskHandle,
+#                                triggerChannel,          # pixel pulse line as clock source
+#                                sampleRate,              # ignored for external clock
+#                                DAQmx_Val_Rising,
+#                                DAQmx_Val_ContSamps,     # continuous streaming
+#                                sampleNumber)
         # DAQmxCfgDigEdgeRefTrig(self.taskHandle,
         #                        triggerChannel,
         #                        DAQmx_Val_Rising, 2)
         DAQmxCfgDigEdgeStartTrig(self.taskHandle,
                                  triggerChannel,
-                                 DAQmx_Val_Rising);
+                                 DAQmx_Val_Rising)
         ### Make task retriggerable. Requires X-series (63XX) hardware.
         DAQmxSetTrigAttribute(self.taskHandle,
                               DAQmx_StartTrig_Retriggerable, True)
+#        DAQmxSetTrigAttribute(self.taskHandle,
+#                              DAQmx_StartTrig_Retriggerable, False)
 
     def start_task(self):
         '''Start task.'''
