@@ -1,3 +1,7 @@
+# Modification: Keep gamepad UI updates on the GUI thread and coordinate shutdown.
+# Author: Yuxin Jiang
+# Email: yj546@cornell.edu
+
 '''
 qcl_spectral_scan_ui_multithread
 Giovanni Sartorello (srtgnn@gmail.com)
@@ -234,6 +238,10 @@ class mainWindow(QMainWindow):
 
     def closeEvent(self, event): # Redefined from parent QMainWindow
         '''Show warning dialog on close.'''
+
+        if not self.stageMotionWindow.stop_gamepad():
+            event.ignore()
+            return
 
         # Close the PI device connection
         try:
@@ -1480,13 +1488,8 @@ class mainWindow(QMainWindow):
             return
 
         ### Disable stage joystick(s)
-        self.stageMotionWindow.stage.joystick(enable=False)
-        self.stageMotionWindow.inputMethods['hw'][0].setChecked(False)
-        if self.stageMotionWindow.threadG not in [[]]:
-            if self.stageMotionWindow.threadG.isRunning:
-                self.stageMotionWindow.workerG.stop = True
-                self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
-        print('All stage joysticks disabled')
+        if not self.stageMotionWindow.disable_stage_inputs():
+            return
 
 
         ### Read and compile general experiment parameters
@@ -1668,13 +1671,8 @@ class mainWindow(QMainWindow):
             return
 
         ### Disable stage joystick(s)
-        self.stageMotionWindow.stage.joystick(enable=False)
-        self.stageMotionWindow.inputMethods['hw'][0].setChecked(False)
-        if self.stageMotionWindow.threadG not in [[]]:
-            if self.stageMotionWindow.threadG.isRunning:
-                self.stageMotionWindow.workerG.stop = True
-                self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
-        print('All stage joysticks disabled')
+        if not self.stageMotionWindow.disable_stage_inputs():
+            return
 
 
         ### Read and compile general experiment parameters
@@ -1854,13 +1852,8 @@ class mainWindow(QMainWindow):
             # self.btn['Sweep'][0].setChecked(False)
             return
         ### Disable stage joystick(s)
-        self.stageMotionWindow.stage.joystick(enable=False)
-        self.stageMotionWindow.inputMethods['hw'][0].setChecked(False)
-        if self.stageMotionWindow.threadG not in [[]]:
-            if self.stageMotionWindow.threadG.isRunning:
-                self.stageMotionWindow.workerG.stop = True
-                self.stageMotionWindow.inputMethods['gp'][0].setChecked(False)
-        print('All stage joysticks disabled')
+        if not self.stageMotionWindow.disable_stage_inputs():
+            return
         ### Read and compile general experiment parameters
         self.scanImagParameters = scanningImagingParameters()
         self.scanImagParameters.laser = self.laser

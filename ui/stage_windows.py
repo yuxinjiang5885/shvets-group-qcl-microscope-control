@@ -1,3 +1,7 @@
+# Modification: Keep gamepad UI updates on the GUI thread and coordinate shutdown.
+# Author: Yuxin Jiang
+# Email: yj546@cornell.edu
+
 '''
 stage_windows
 Giovanni Sartorello (srtgnn@gmail.com)
@@ -14,10 +18,11 @@ from instruments.hld117 import stage
 # from .software_joystick import Joystick
 from .xbox_controller import xboxController
 import time
+from threading import Event, Lock
 from time import perf_counter as timer, sleep
 from ui.plot_widgets import mplCanvas
 from PyQt6.QtCore import QThread
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QAction, QIcon, QFont
 from PyQt6.QtWidgets import (QDialog,
                              QGridLayout,
@@ -34,13 +39,42 @@ class gamepad(QObject):
     '''Handle stage movement with gamepad'''
     stopped = pyqtSignal()
 
-    def __init__(self, motionWindowInstance):
+    readingsReady = pyqtSignal(float, float, float, float)
+    failed = pyqtSignal(str)
+
+    def __init__(self, stage_instance, step_text):
         super().__init__()
         self.updateInterval = defaults.GAMEPAD_UPDATE_INTERVAL_S
-        self.motionWindow = motionWindowInstance
-        self.stage = motionWindowInstance.stage
-        self.gamepad = xboxController()
-        self.stop = False
+        self.stage = stage_instance
+        self.gamepad = None
+        self.stop_requested = Event()
+        self.settings_lock = Lock()
+        self.step_text = step_text
+
+    def set_step_text(self, text):
+        # Called by the GUI thread; the read loop does not process queued slots.
+        with self.settings_lock:
+            self.step_text = text
+
+    def request_stop(self):
+        self.stop_requested.set()
+
+    def read(self):
+        try:
+            self.gamepad = xboxController()
+            self.read_loop()
+        except Exception as exc:
+            self.failed.emit(str(exc))
+        finally:
+            try:
+                self.stage.stop_smoothly()
+            except Exception as exc:
+                self.failed.emit(str(exc))
+            finally:
+                if self.gamepad is not None:
+                    self.gamepad.stop()
+                print('Gamepad stopped')
+                self.stopped.emit()
 
     def find_index_of_nearest(self, array, value):
         '''https://stackoverflow.com/a/2566508'''
@@ -48,7 +82,7 @@ class gamepad(QObject):
         i = (np.abs(array - value)).argmin()
         return i
 
-    def read(self):
+    def read_loop(self):
         ### Initialize parameters
         deadzone = defaults.JOY_DEADZONE
         self.stage_speed = self.stage.get_speed() # um/s
@@ -58,7 +92,7 @@ class gamepad(QObject):
         leftBumperTriggered = False
         rightBumperTriggered = False
         ### Start read loop
-        while self.stop == False:
+        while not self.stop_requested.is_set():
             start = timer()
             ### Read gamepad inputs
             gamepadInput = self.gamepad.read()
@@ -84,11 +118,13 @@ class gamepad(QObject):
             ### Send commands: buttons pressed
             if selectBtn == 1:
                 ### Menu button: stop loop
-                self.stop = True
+                self.request_stop()
+                break
             elif (hatX != 0) or (hatY != 0):
                 ### Hat: move by step at maximum speed
                 if not hatTriggered:
-                    self.step = float(self.motionWindow.inputField['stepSet'][0].text())
+                    with self.settings_lock:
+                        self.step = float(self.step_text)
                     xRel = hatX * self.step
                     yRel = hatY * self.step
                     current_speed = self.stage.get_speed()
@@ -131,14 +167,10 @@ class gamepad(QObject):
                 self.stage.move_at_velocity(0, 0)
             ### No inputs and stage not busy: update position reading
             if self.stage.busy() in ['0']:
-                self.motionWindow.update_readings()
-            ### Wait out update interval
-            while timer()-start < self.updateInterval:
-                time.sleep(0.1 * self.updateInterval)
-        self.stage.stop_smoothly()
-        self.gamepad.stop()
-        print('Gamepad stopped')
-        self.stopped.emit()
+                x, y = self.stage.get_position()
+                self.readingsReady.emit(x, y, self.stage.get_speed(), self.stage.get_acc())
+            ### Wait out update interval, waking promptly on a stop request.
+            self.stop_requested.wait(max(0, self.updateInterval - (timer() - start)))
 
 
 class gamepadBindingsWindow(QMainWindow):
@@ -253,14 +285,6 @@ class stageMotion(QObject):
     def multiwell(self):
         '''Multiwell scan: move to a number of positions in a sequence, stop and
            dwell at each'''
-        ### Disable stage joystick(s)
-        self.parameters.stage.joystick(enable=False)
-        self.mainGUI.inputMethods['hw'][0].setChecked(False)
-        if self.mainGUI.threadG not in [[]]:
-            if self.mainGUI.threadG.isRunning:
-                self.mainGUI.workerG.stop = True
-                self.mainGUI.inputMethods['gp'][0].setChecked(False)
-        print('All stage joysticks disabled')
         ### Read parameters
         acquisitions = self.parameters.acquisitions
         xWells = self.parameters.xWells
@@ -353,8 +377,8 @@ class stageMotionWindow(QMainWindow):
         self.parameters = stageMotionParameters() # Passed to "run"
         self.threadMW = [] # Multiwell thread
         self.workerMW = [] # Multiwell worker
-        self.threadG = [] # Gamepad thread
-        self.workerG = [] # Gamepad worker
+        self.threadG = None # Gamepad thread
+        self.workerG = None # Gamepad worker
         self.gamepadBindingsWindow = gamepadBindingsWindow()
         if model in ['H117', 'h117']:
             self.xTravel = defaults.H117_X_TRAVEL_UM
@@ -398,16 +422,68 @@ class stageMotionWindow(QMainWindow):
             return
 
     def goto_gamepad(self):
-        '''Control stage with gamepad'''
+        """Control stage with gamepad; keep references until the thread finishes."""
+        if self.threadG is not None:
+            return
         self.threadG = QThread()
-        self.workerG = gamepad(self)
+        self.workerG = gamepad(self.stage, self.inputField['stepSet'][0].text())
         self.workerG.moveToThread(self.threadG)
+        self.workerG.readingsReady.connect(self.apply_gamepad_readings,
+                                          Qt.ConnectionType.QueuedConnection)
+        self.workerG.failed.connect(self.gamepad_error, Qt.ConnectionType.QueuedConnection)
         self.workerG.stopped.connect(self.workerG.deleteLater)
-        self.workerG.stopped.connect(self.threadG.quit)
+        # quit() is thread-safe; direct delivery lets stop_gamepad() wait safely.
+        self.workerG.stopped.connect(self.threadG.quit, Qt.ConnectionType.DirectConnection)
         self.threadG.started.connect(self.workerG.read)
-        self.threadG.finished.connect(self.threadG.deleteLater)
+        self.threadG.finished.connect(self.gamepad_finished)
         self.threadG.start()
 
+    @pyqtSlot(str)
+    def update_gamepad_step(self, text):
+        if self.workerG is not None:
+            self.workerG.set_step_text(text)
+
+    @pyqtSlot(float, float, float, float)
+    def apply_gamepad_readings(self, x, y, speed, acceleration):
+        if (self.workerG is not None and self.sender() is self.workerG
+                and not self.workerG.stop_requested.is_set()):
+            self.apply_readings(x, y, speed, acceleration)
+
+    @pyqtSlot(str)
+    def gamepad_error(self, message):
+        print('Gamepad error: {}'.format(message))
+
+    @pyqtSlot()
+    def gamepad_finished(self):
+        if self.threadG is not None and self.sender() is self.threadG:
+            self.release_gamepad()
+
+    def release_gamepad(self):
+        thread = self.threadG
+        self.threadG = None
+        self.workerG = None
+        self.inputMethods['gp'][0].setChecked(False)
+        if thread is not None:
+            thread.deleteLater()
+
+    def stop_gamepad(self):
+        """Wait for stage commands to finish before handing control to another caller."""
+        if self.threadG is None:
+            return True
+        self.workerG.request_stop()
+        if not self.threadG.wait(3000):
+            print('Gamepad is still stopping; retry after the current stage command finishes.')
+            return False
+        self.release_gamepad()
+        return True
+
+    def disable_stage_inputs(self):
+        if not self.stop_gamepad():
+            return False
+        self.stage.joystick(enable=False)
+        self.inputMethods['hw'][0].setChecked(False)
+        print('All stage joysticks disabled')
+        return True
 
     def goto_joystick(self, joystickPosition):
         '''Move stage according to software joystick position'''
@@ -453,8 +529,8 @@ class stageMotionWindow(QMainWindow):
             else:
                 # self.gamepadEnable.setChecked(False)
                 # self.inputMethods['gp'][0].setChecked(False)
-                if self.threadG.isRunning:
-                    self.workerG.stop = True
+                if not self.stop_gamepad():
+                    self.inputMethods['gp'][0].setChecked(True)
                 print('Gamepad disabled')
 
     def lock_controls(self, lock=True):
@@ -785,6 +861,7 @@ class stageMotionWindow(QMainWindow):
         self.inputMethods['hw'][0].clicked.connect(lambda: self.joystick(selected='hardware'))
         self.inputMethods['sw'][0].clicked.connect(lambda: self.joystick(selected='software'))
         self.inputMethods['gp'][0].clicked.connect(lambda: self.joystick(selected='gamepad'))
+        self.inputField['stepSet'][0].textChanged.connect(self.update_gamepad_step)
         '''
         Connecting to mainGUI to report stage positions.
         Po-Ting
@@ -803,6 +880,9 @@ class stageMotionWindow(QMainWindow):
 
     def run_multiwell(self):
         '''Run multiwell holder scan'''
+        if not self.disable_stage_inputs():
+            self.btn['Start'][0].setChecked(False)
+            return
         ### Lock GUI controls
         self.lock_controls()
         # self.statusbar.showMessage('Busy')
@@ -980,6 +1060,10 @@ class stageMotionWindow(QMainWindow):
         # print('Stage position: {:.0f} μm, {:.0f} μm'.format(x_um, y_um))
         v_um_s = self.stage.get_speed()
         a_um_s2 = self.stage.get_acc()
+        self.apply_readings(x_um, y_um, v_um_s, a_um_s2)
+
+    def apply_readings(self, x_um, y_um, v_um_s, a_um_s2):
+        """Apply a snapshot on the GUI thread, including both Qt-backed plots."""
         paramReadings = [x_um, y_um, v_um_s, a_um_s2]
         inputNames = ['x', 'y', 'v', 'a']
         for x, param in enumerate(self.paramNames):
