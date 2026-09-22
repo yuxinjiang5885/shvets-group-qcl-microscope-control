@@ -1,0 +1,2 @@
+# Optional hardware-independent GDS backend; install with pip -r this file.
+gdstk==1.0.1
