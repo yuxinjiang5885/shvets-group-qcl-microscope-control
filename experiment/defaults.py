@@ -31,7 +31,8 @@ HLD117_Y_TRAVEL_UM = 80000 # um
 For implementing snakeScan, default stage drift during the return scan.
 Po-Ting 04/04/23
 '''
-HLD117_X_RETURN_DRIFT_UM = -6 # um, for stage speed 2,000um/s. -2 for stage speed 30,000um/s
+# HLD117_X_RETURN_DRIFT_UM = -6 # um, for stage speed 2,000um/s. -2 for stage speed 30,000um/s
+HLD117_X_RETURN_DRIFT_UM = -7 # um, for stage speed 2,000um/s. -2 for stage speed 30,000um/s
 HLD117_REC_SPEED = 2000 # Recommended maximum stage speed for cells
 
 ### H117 parameters (stepper motors, BE13)
