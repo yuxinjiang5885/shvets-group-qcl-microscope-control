@@ -2,6 +2,8 @@
 
 Author: Yuxin Jiang
 Email: yj546@cornell.edu
+
+Modification: launch the Module 4 manual assignment preview.
 """
 
 import argparse
@@ -10,7 +12,7 @@ import sys
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
-from ui.gds_preview import GDSLayoutPreviewWidget
+from ui.gds_assignment import GDSAssignmentWidget
 
 
 def main():
@@ -19,9 +21,9 @@ def main():
     parser.add_argument("--smoke-test", action="store_true", help="Show preview and exit after event-loop validation")
     args = parser.parse_args()
     app = QApplication(sys.argv[:1])
-    widget = GDSLayoutPreviewWidget()
-    widget.setWindowTitle("GDS Layout Preview")
-    widget.resize(1250, 820)
+    widget = GDSAssignmentWidget()
+    widget.setWindowTitle("GDS Layout Preview and Manual Assignment")
+    widget.resize(1350, 1000)
     if args.source:
         try:
             widget.load_file(args.source)
