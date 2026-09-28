@@ -1,3 +1,11 @@
+"""NI DAQ helpers; add checked, timed block acquisition for Module 6 adapters.
+
+Author: Yuxin Jiang
+Email: yj546@cornell.edu
+
+Legacy acquisition methods remain available. No device is created on import.
+"""
+
 '''
 ni_daq
 Giovanni Sartorello (srtgnn@gmail.com)
@@ -10,6 +18,8 @@ Created 2017-Sep-08
 from random import sample
 import numpy as np
 import weakref ### Added by Po-Ting on 3/17/23
+from math import isfinite
+from time import monotonic
 from PyDAQmx.DAQmxConstants import (DAQmx_Val_Cfg_Default,
                                     DAQmx_Val_ContSamps,
                                     DAQmx_Val_CountUp,
@@ -81,6 +91,54 @@ class MultiChannelAnalogInput():
                            None)
         # DAQmxWaitUntilTaskDone(self.taskHandle, DAQMX_TIMEOUT)
         DAQmxStopTask(self.taskHandle)
+        return data
+
+    def acquire_bounded(self, sampleNumber, *, timeout_s):
+        """Read exactly one block from an already configured task, then stop it.
+
+        Supplies the remaining budget to DAQmxReadAnalogF64; Start/StopTask have
+        no timeout argument. Always attempt stop, including when starting/reading
+        fails. The owner remains responsible for clearing the task. Never reset
+        or reconfigure a device here. Negative DAQmx statuses are errors; positive
+        warning statuses are rejected conservatively for localization scans.
+        """
+        if isinstance(sampleNumber, bool) or not isinstance(sampleNumber, int) or sampleNumber < 1:
+            raise ValueError('sampleNumber must be a positive integer')
+        if isinstance(timeout_s, bool) or not isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('timeout_s must be finite and positive')
+        deadline = monotonic() + timeout_s
+
+        def checked(status, operation):
+            # PyDAQmx versions can return None after their own error checking.
+            if status is not None and status != 0:
+                raise RuntimeError(f'{operation} returned DAQmx status {status}')
+
+        data = np.zeros((self.numberOfChannel, sampleNumber), dtype=np.float64)
+        read = int32()
+        failure = None
+        try:
+            checked(DAQmxStartTask(self.taskHandle), 'StartTask')
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise TimeoutError('DAQ start exceeded read deadline')
+            checked(DAQmxReadAnalogF64(
+                self.taskHandle, sampleNumber, remaining, DAQmx_Val_GroupByChannel,
+                data, data.size, byref(read), None), 'ReadAnalogF64')
+            if read.value != sampleNumber:
+                raise RuntimeError(f'Short DAQ read: {read.value} of {sampleNumber} samples per channel')
+        except BaseException as error:
+            failure = error
+        finally:
+            try:
+                checked(DAQmxStopTask(self.taskHandle), 'StopTask')
+            except BaseException as stop_error:
+                if failure is None:
+                    raise
+                raise RuntimeError(f'DAQ acquisition failed ({failure}); task stop also failed ({stop_error})') from failure
+        if failure is not None:
+            raise failure
+        if monotonic() >= deadline:
+            raise TimeoutError('DAQ acquisition/cleanup exceeded read deadline')
         return data
 
     def acquire_fast(self, sampleNumber):
