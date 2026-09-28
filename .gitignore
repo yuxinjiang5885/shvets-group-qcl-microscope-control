@@ -1,3 +1,6 @@
 __pycache__
 ._DS_Store
 .vscode
+/integrated_scan_*.jsonl
+/gold_patch_scan_*.jsonl
+/right_side_extension_*.jsonl

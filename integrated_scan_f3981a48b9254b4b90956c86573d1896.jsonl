@@ -1,0 +1,9 @@
+{"type": "header", "schema_version": 1, "settings": {"axis": "x", "start_um": 4918, "end_um": 5018, "step_um": 20, "fixed_um": -23417, "bounds": {"x_min_um": 4917, "x_max_um": 5019, "y_min_um": -23418, "y_max_um": -23416, "frame_id": "integrated-six-point-current-controller-frame"}, "signal_unit": "V", "movement_timeout_s": 5.0, "settling_s": 0.1, "settling_timeout_s": 2.0, "read_timeout_s": 2.0, "stop_timeout_s": 2.0, "poll_interval_s": 0.01, "position_tolerance_um": 1.0}, "position_unit": "um", "timestamp_unit": "unix_s", "started_unix_s": 1790632398.0895295}
+{"type": "initial_position", "position_um": [4918.0, -23417.0], "source": "readback"}
+{"type": "point", "index": 0, "commanded_um": [4918, -23417], "measured_um": [4918.0, -23417.0], "signal": 0.5524951656119781, "timestamp_unix_s": 1790632398.2317362, "elapsed_s": 0.14099999982863665}
+{"type": "point", "index": 1, "commanded_um": [4938, -23417], "measured_um": [4938.0, -23417.0], "signal": 0.5531091976840253, "timestamp_unix_s": 1790632398.444169, "elapsed_s": 0.35999999986961484}
+{"type": "point", "index": 2, "commanded_um": [4958, -23417], "measured_um": [4958.0, -23417.0], "signal": 0.5537055344934739, "timestamp_unix_s": 1790632398.6744778, "elapsed_s": 0.578999999910593}
+{"type": "point", "index": 3, "commanded_um": [4978, -23417], "measured_um": [4978.0, -23417.0], "signal": 0.5566557637166237, "timestamp_unix_s": 1790632398.8887453, "elapsed_s": 0.7970000000204891}
+{"type": "point", "index": 4, "commanded_um": [4998, -23417], "measured_um": [4998.0, -23417.0], "signal": 0.5656155204331348, "timestamp_unix_s": 1790632399.1017377, "elapsed_s": 1.0159999998286366}
+{"type": "point", "index": 5, "commanded_um": [5018, -23417], "measured_um": [5018.0, -23417.0], "signal": 0.5655910746678571, "timestamp_unix_s": 1790632399.317681, "elapsed_s": 1.2189999998081475}
+{"type": "result", "status": "completed", "reasons": [], "point_count": 6}

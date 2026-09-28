@@ -1,0 +1,22 @@
+{"type": "header", "schema_version": 1, "settings": {"axis": "x", "start_um": 4430, "end_um": 4790, "step_um": 20, "fixed_um": -26100, "bounds": {"x_min_um": 4239, "x_max_um": 4791, "y_min_um": -26101, "y_max_um": -26099, "frame_id": "right-side-extension-current-controller-frame"}, "signal_unit": "V", "movement_timeout_s": 5.0, "settling_s": 0.1, "settling_timeout_s": 2.0, "read_timeout_s": 2.0, "stop_timeout_s": 2.0, "poll_interval_s": 0.01, "position_tolerance_um": 1.0}, "position_unit": "um", "timestamp_unit": "unix_s", "started_unix_s": 1790633949.7776322}
+{"type": "initial_position", "position_um": [4240.0, -26100.0], "source": "readback"}
+{"type": "point", "index": 0, "commanded_um": [4430, -26100], "measured_um": [4430.0, -26100.0], "signal": 4.985478523830382, "timestamp_unix_s": 1790633950.0464857, "elapsed_s": 0.2660000000614673}
+{"type": "point", "index": 1, "commanded_um": [4450, -26100], "measured_um": [4450.0, -26100.0], "signal": 4.997222475148376, "timestamp_unix_s": 1790633950.262346, "elapsed_s": 0.48400000017136335}
+{"type": "point", "index": 2, "commanded_um": [4470, -26100], "measured_um": [4470.0, -26100.0], "signal": 1.9275887160886123, "timestamp_unix_s": 1790633950.4768004, "elapsed_s": 0.7029999999795109}
+{"type": "point", "index": 3, "commanded_um": [4490, -26100], "measured_um": [4490.0, -26100.0], "signal": 2.008762588368771, "timestamp_unix_s": 1790633950.6765723, "elapsed_s": 0.8910000000614673}
+{"type": "point", "index": 4, "commanded_um": [4510, -26100], "measured_um": [4510.0, -26100.0], "signal": 1.9500282872674102, "timestamp_unix_s": 1790633950.8917363, "elapsed_s": 1.1090000001713634}
+{"type": "point", "index": 5, "commanded_um": [4530, -26100], "measured_um": [4530.0, -26100.0], "signal": 1.9711681067077036, "timestamp_unix_s": 1790633951.1055574, "elapsed_s": 1.327999999979511}
+{"type": "point", "index": 6, "commanded_um": [4550, -26100], "measured_um": [4550.0, -26100.0], "signal": 1.9671538301489113, "timestamp_unix_s": 1790633951.320045, "elapsed_s": 1.547000000020489}
+{"type": "point", "index": 7, "commanded_um": [4570, -26100], "measured_um": [4570.0, -26100.0], "signal": 1.9516633510651307, "timestamp_unix_s": 1790633951.5493655, "elapsed_s": 1.7660000000614673}
+{"type": "point", "index": 8, "commanded_um": [4590, -26100], "measured_um": [4590.0, -26100.0], "signal": 1.9400298779553706, "timestamp_unix_s": 1790633951.7639828, "elapsed_s": 1.9840000001713634}
+{"type": "point", "index": 9, "commanded_um": [4610, -26100], "measured_um": [4610.0, -26100.0], "signal": 1.8288119918644936, "timestamp_unix_s": 1790633951.9777682, "elapsed_s": 2.202999999979511}
+{"type": "point", "index": 10, "commanded_um": [4630, -26100], "measured_um": [4630.0, -26100.0], "signal": 3.46390617524636, "timestamp_unix_s": 1790633952.2059891, "elapsed_s": 2.422000000020489}
+{"type": "point", "index": 11, "commanded_um": [4650, -26100], "measured_um": [4650.0, -26100.0], "signal": 4.954145107544642, "timestamp_unix_s": 1790633952.4212322, "elapsed_s": 2.6410000000614673}
+{"type": "point", "index": 12, "commanded_um": [4670, -26100], "measured_um": [4670.0, -26100.0], "signal": 4.906968136277324, "timestamp_unix_s": 1790633952.6353552, "elapsed_s": 2.8590000001713634}
+{"type": "point", "index": 13, "commanded_um": [4690, -26100], "measured_um": [4690.0, -26100.0], "signal": 5.0197144528394055, "timestamp_unix_s": 1790633952.8484776, "elapsed_s": 3.0620000001508743}
+{"type": "point", "index": 14, "commanded_um": [4710, -26100], "measured_um": [4710.0, -26100.0], "signal": 4.576558935144113, "timestamp_unix_s": 1790633953.0634642, "elapsed_s": 3.280999999959022}
+{"type": "point", "index": 15, "commanded_um": [4730, -26100], "measured_um": [4730.0, -26100.0], "signal": 1.9158724526767335, "timestamp_unix_s": 1790633953.278857, "elapsed_s": 3.5}
+{"type": "point", "index": 16, "commanded_um": [4750, -26100], "measured_um": [4750.0, -26100.0], "signal": 1.686407648521747, "timestamp_unix_s": 1790633953.4932942, "elapsed_s": 3.719000000040978}
+{"type": "point", "index": 17, "commanded_um": [4770, -26100], "measured_um": [4770.0, -26100.0], "signal": 1.6928719345917465, "timestamp_unix_s": 1790633953.722102, "elapsed_s": 3.9370000001508743}
+{"type": "point", "index": 18, "commanded_um": [4790, -26100], "measured_um": [4790.0, -26100.0], "signal": 1.7578030810298417, "timestamp_unix_s": 1790633953.9359744, "elapsed_s": 4.155999999959022}
+{"type": "result", "status": "completed", "reasons": [], "point_count": 19}
