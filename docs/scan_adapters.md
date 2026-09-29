@@ -15,12 +15,17 @@ Automated tests remain hardware-independent and use fake devices. Separately,
 operator-run real-hardware normal-path validation passed: Prior stage readback,
 controlled +100 um X motion and return, stationary NI-DAQ acquisition with emission
 OFF and ON, an integrated stage + DAQ scan, and horizontal localization of the
-500 um gold marker. Stage return/readback and owned-resource cleanup passed in
+500 um gold marker, followed by vertical single-profile localization. Stage
+return/readback and owned-resource cleanup passed in
 these supervised tests.
 
 Hardware fault injection, protective-stop behavior under a real hardware fault,
 and native SDK hang interruption/recovery remain unvalidated. These normal-path
 results do not establish recovery safety or hard bounds on native calls.
+The later lower-bar Y scan exercised real position-mismatch rejection and saved
+68 points plus a failed footer. Its software stop path has only partial evidence;
+the journal does not independently verify physical stopping or cleanup.
+See [final Module 6 evidence and limitations](module6_hardware_validation.md).
 
 ## Stage
 

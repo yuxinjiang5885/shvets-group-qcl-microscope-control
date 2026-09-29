@@ -1,0 +1,39 @@
+{"type": "header", "schema_version": 1, "settings": {"axis": "y", "start_um": -26450, "end_um": -25750, "step_um": 20, "fixed_um": 4210, "bounds": {"x_min_um": 4209, "x_max_um": 4241, "y_min_um": -26451, "y_max_um": -25749, "frame_id": "vertical-marker-current-controller-frame"}, "signal_unit": "V", "movement_timeout_s": 5.0, "settling_s": 0.1, "settling_timeout_s": 2.0, "read_timeout_s": 2.0, "stop_timeout_s": 2.0, "poll_interval_s": 0.01, "position_tolerance_um": 1.0}, "position_unit": "um", "timestamp_unit": "unix_s", "started_unix_s": 1790636297.6955292}
+{"type": "initial_position", "position_um": [4240.0, -26100.0], "source": "readback"}
+{"type": "point", "index": 0, "commanded_um": [4210, -26450], "measured_um": [4210.0, -26450.0], "signal": 2.0750799625148617, "timestamp_unix_s": 1790636298.1240115, "elapsed_s": 0.4220000000204891}
+{"type": "point", "index": 1, "commanded_um": [4210, -26430], "measured_um": [4210.0, -26430.0], "signal": 2.049351965393697, "timestamp_unix_s": 1790636298.4762607, "elapsed_s": 0.7809999999590218}
+{"type": "point", "index": 2, "commanded_um": [4210, -26410], "measured_um": [4210.0, -26410.0], "signal": 2.03607829738832, "timestamp_unix_s": 1790636298.8734126, "elapsed_s": 1.172000000020489}
+{"type": "point", "index": 3, "commanded_um": [4210, -26390], "measured_um": [4210.0, -26390.0], "signal": 1.993862133141132, "timestamp_unix_s": 1790636299.2846434, "elapsed_s": 1.577999999979511}
+{"type": "point", "index": 4, "commanded_um": [4210, -26370], "measured_um": [4210.0, -26370.0], "signal": 2.0320708171943074, "timestamp_unix_s": 1790636299.6815774, "elapsed_s": 1.9839999999385327}
+{"type": "point", "index": 5, "commanded_um": [4210, -26350], "measured_um": [4210.0, -26350.0], "signal": 4.0858290988450925, "timestamp_unix_s": 1790636300.0920944, "elapsed_s": 2.390000000130385}
+{"type": "point", "index": 6, "commanded_um": [4210, -26330], "measured_um": [4210.0, -26330.0], "signal": 4.863855008800693, "timestamp_unix_s": 1790636300.4889808, "elapsed_s": 2.780999999959022}
+{"type": "point", "index": 7, "commanded_um": [4210, -26310], "measured_um": [4210.0, -26310.0], "signal": 4.834686456877756, "timestamp_unix_s": 1790636300.8993595, "elapsed_s": 3.202999999979511}
+{"type": "point", "index": 8, "commanded_um": [4210, -26290], "measured_um": [4210.0, -26290.0], "signal": 4.812290167666632, "timestamp_unix_s": 1790636301.313865, "elapsed_s": 3.6089999999385327}
+{"type": "point", "index": 9, "commanded_um": [4210, -26270], "measured_um": [4210.0, -26270.0], "signal": 4.7854773280040375, "timestamp_unix_s": 1790636301.7572358, "elapsed_s": 4.062000000150874}
+{"type": "point", "index": 10, "commanded_um": [4210, -26250], "measured_um": [4210.0, -26250.0], "signal": 4.74741602037653, "timestamp_unix_s": 1790636302.2003298, "elapsed_s": 4.5}
+{"type": "point", "index": 11, "commanded_um": [4210, -26230], "measured_um": [4210.0, -26230.0], "signal": 4.757053671868353, "timestamp_unix_s": 1790636302.6006854, "elapsed_s": 4.905999999959022}
+{"type": "point", "index": 12, "commanded_um": [4210, -26210], "measured_um": [4210.0, -26210.0], "signal": 4.745870266434086, "timestamp_unix_s": 1790636302.9981399, "elapsed_s": 5.297000000020489}
+{"type": "point", "index": 13, "commanded_um": [4210, -26190], "measured_um": [4210.0, -26190.0], "signal": 4.71102227091831, "timestamp_unix_s": 1790636303.3648098, "elapsed_s": 5.655999999959022}
+{"type": "point", "index": 14, "commanded_um": [4210, -26170], "measured_um": [4210.0, -26170.0], "signal": 4.68550993359407, "timestamp_unix_s": 1790636303.7915225, "elapsed_s": 6.094000000040978}
+{"type": "point", "index": 15, "commanded_um": [4210, -26150], "measured_um": [4210.0, -26150.0], "signal": 4.667379728199125, "timestamp_unix_s": 1790636304.1888394, "elapsed_s": 6.483999999938533}
+{"type": "point", "index": 16, "commanded_um": [4210, -26130], "measured_um": [4210.0, -26130.0], "signal": 4.645572652240636, "timestamp_unix_s": 1790636304.570592, "elapsed_s": 6.875}
+{"type": "point", "index": 17, "commanded_um": [4210, -26110], "measured_um": [4210.0, -26110.0], "signal": 4.628876257697029, "timestamp_unix_s": 1790636305.1680624, "elapsed_s": 7.469000000040978}
+{"type": "point", "index": 18, "commanded_um": [4210, -26090], "measured_um": [4210.0, -26090.0], "signal": 4.603792254576304, "timestamp_unix_s": 1790636305.5964425, "elapsed_s": 7.890000000130385}
+{"type": "point", "index": 19, "commanded_um": [4210, -26070], "measured_um": [4210.0, -26070.0], "signal": 4.585900267398061, "timestamp_unix_s": 1790636305.9639595, "elapsed_s": 8.265000000130385}
+{"type": "point", "index": 20, "commanded_um": [4210, -26050], "measured_um": [4210.0, -26050.0], "signal": 4.56885481209668, "timestamp_unix_s": 1790636306.3612323, "elapsed_s": 8.655999999959022}
+{"type": "point", "index": 21, "commanded_um": [4210, -26030], "measured_um": [4210.0, -26030.0], "signal": 4.529340904280842, "timestamp_unix_s": 1790636306.7273476, "elapsed_s": 9.030999999959022}
+{"type": "point", "index": 22, "commanded_um": [4210, -26010], "measured_um": [4210.0, -26010.0], "signal": 4.524489271484905, "timestamp_unix_s": 1790636307.0943155, "elapsed_s": 9.390000000130385}
+{"type": "point", "index": 23, "commanded_um": [4210, -25990], "measured_um": [4210.0, -25990.0], "signal": 4.493546241887546, "timestamp_unix_s": 1790636307.4604812, "elapsed_s": 9.765000000130385}
+{"type": "point", "index": 24, "commanded_um": [4210, -25970], "measured_um": [4210.0, -25970.0], "signal": 4.456055855657992, "timestamp_unix_s": 1790636307.842965, "elapsed_s": 10.140000000130385}
+{"type": "point", "index": 25, "commanded_um": [4210, -25950], "measured_um": [4210.0, -25950.0], "signal": 4.4236733530478185, "timestamp_unix_s": 1790636308.2250268, "elapsed_s": 10.515000000130385}
+{"type": "point", "index": 26, "commanded_um": [4210, -25930], "measured_um": [4210.0, -25930.0], "signal": 4.415068815908831, "timestamp_unix_s": 1790636308.6078596, "elapsed_s": 10.905999999959022}
+{"type": "point", "index": 27, "commanded_um": [4210, -25910], "measured_um": [4210.0, -25910.0], "signal": 4.401550119445315, "timestamp_unix_s": 1790636309.0041533, "elapsed_s": 11.297000000020489}
+{"type": "point", "index": 28, "commanded_um": [4210, -25890], "measured_um": [4210.0, -25890.0], "signal": 4.387522499322531, "timestamp_unix_s": 1790636309.3879986, "elapsed_s": 11.687000000150874}
+{"type": "point", "index": 29, "commanded_um": [4210, -25870], "measured_um": [4210.0, -25870.0], "signal": 4.28860637997841, "timestamp_unix_s": 1790636309.786734, "elapsed_s": 12.077999999979511}
+{"type": "point", "index": 30, "commanded_um": [4210, -25850], "measured_um": [4210.0, -25850.0], "signal": 1.0144785859139935, "timestamp_unix_s": 1790636310.1554685, "elapsed_s": 12.452999999979511}
+{"type": "point", "index": 31, "commanded_um": [4210, -25830], "measured_um": [4210.0, -25830.0], "signal": 1.5655295305979777, "timestamp_unix_s": 1790636310.5365665, "elapsed_s": 12.827999999979511}
+{"type": "point", "index": 32, "commanded_um": [4210, -25810], "measured_um": [4210.0, -25810.0], "signal": 1.505035207770365, "timestamp_unix_s": 1790636310.919968, "elapsed_s": 13.219000000040978}
+{"type": "point", "index": 33, "commanded_um": [4210, -25790], "measured_um": [4210.0, -25790.0], "signal": 1.5094648770588919, "timestamp_unix_s": 1790636311.3152602, "elapsed_s": 13.608999999938533}
+{"type": "point", "index": 34, "commanded_um": [4210, -25770], "measured_um": [4210.0, -25770.0], "signal": 1.5028621203750034, "timestamp_unix_s": 1790636311.6985378, "elapsed_s": 14.0}
+{"type": "point", "index": 35, "commanded_um": [4210, -25750], "measured_um": [4210.0, -25750.0], "signal": 1.500196261627479, "timestamp_unix_s": 1790636312.0965586, "elapsed_s": 14.390000000130385}
+{"type": "result", "status": "completed", "reasons": [], "point_count": 36}
