@@ -249,33 +249,63 @@ orientation and unit-scale assumptions.
 **Outputs** Planned: accepted registration, residuals, uncertainty/limitations and
 diagnostics; no production registration is currently complete.
 
-**Key files** Existing untracked prototype `experiment/marker_profile_classification.py`,
+**Key files** `experiment/marker_profile_classification.py`,
 `tests/test_marker_profile_classification.py`,
-`square_marker_profile_classification_check.py`; five
-`square_marker_rotation_profile_*_check.py` harnesses and their journals.
+`square_marker_profile_classification_check.py`; the five original profile
+journals listed explicitly in the evaluator are preserved as offline evidence.
+The five repetitive `square_marker_rotation_profile_*_check.py` hardware harnesses
+remain local/untracked and are not required to replay classification.
 
 **Dependencies** Modules 4–6.
 
-**Completed work** Initial horizontal/vertical scans and five horizontal profiles
-collected. Classification prototype and synthetic tests already exist locally;
-the preceding development run reported 23 tests passing and classified P1–P4
-CENTRAL, P5 INCONSISTENT. This was not rerun or changed during the wrap-up.
-This corrects the older plan saying classification implementation had not begun.
+**Completed work** Automatic horizontal-profile classification:
+**COMPLETE / OFFLINE VALIDATED**. Module 7 as a whole remains **IN PROGRESS**.
+Initial horizontal/vertical scans and five horizontal profiles were collected.
+Validated states are CENTRAL / CORNER_AFFECTED / INCONSISTENT / INVALID.
+The classifier uses one deterministic seed, midpoint-based provisional rotation,
+geometric central/corner boundaries and guard, robust width screening, and separate
+edge/midpoint residual screening. Final count/distinct-Y/Y-span and seed-support
+gates fail closed; `usable_final_fits` is None after any failed set-level QC.
+There is no iterative trimming, alternate-seed search or historical-angle dependence.
+Provisional rotation and QC lines are not production registration outputs.
 
-**Remaining work** Review/validate the prototype and screening thresholds before
-acceptance/integration; production rotation fit, center refinement, uncertainty
-and registration QC. Do not fit toward the historical angle. Bar-based rotation
-was abandoned. No automatic targeting follows from provisional classification.
+**Remaining work**
 
-**Validation / tests** Prototype synthetic tests and offline journal evaluator
-exist. Final registration validation/exit tests: Needs review and definition before
-implementation. Interpolated edge digits are not physical accuracy.
+1. Production rotation fitting from accepted CENTRAL profiles.
+2. Rotation uncertainty / residual QC.
+3. Rotation-corrected center refinement using the vertical scan.
+4. Final marker registration QC.
+5. Physical validation of StageRegistration predictions.
+
+Thresholds remain provisional screening thresholds, not experimentally calibrated
+production uncertainty limits. Do not fit toward the historical angle. Bar-based
+rotation was abandoned. No automatic targeting follows from classification.
+
+**Validation / tests** Milestone rerun passed 31 classifier tests,
+47 reflection-scan tests and 25 adapter tests: 103 hardware-independent tests.
+Run each with `python -B -m unittest discover -s tests -p <filename> -v`, using
+`test_marker_profile_classification.py`, `test_reflection_scan.py` and
+`test_scan_adapters.py`. `python -B square_marker_profile_classification_check.py`
+reloads all five journals and reruns single-scan analysis before classification.
+Profiles 1–4 are CENTRAL; Profile 5 is INCONSISTENT (width, left-edge and midpoint
+residual failures). Four accepted profiles have four distinct Y coordinates and
+240 um accepted Y span; `sufficient_for_rotation_fit = True`.
+
+Each preserved journal records 71 completed points, measured and commanded XY,
+scalar reflection, bounds, scan timing settings and completion status. All saved
+command/readback pairs agree exactly. The journals do not record raw DAQ samples,
+laser/lock-in telemetry, physical clearance, acquisition-time code revision,
+post-scan return or cleanup. Classification is reproducible offline; those other
+hardware facts require separate operator evidence. Final registration validation
+tests still need definition. Interpolated edge digits are not physical accuracy.
 
 **Exit criteria** Independently tested classification and fitting reject ambiguous
 or inconsistent data; sufficient accepted profiles support consistent side slopes;
 center/angle and residual QC pass supervised validation. Not yet met.
 
-**Relevant commits** None for current Module 7 work; files remain untracked.
+**Relevant commits** Classifier milestone: `feat(registration): add horizontal
+profile classification`. Record its resulting hash in the next roadmap update;
+this document is part of that commit.
 
 ### Module 8 — Registration UI integration
 
@@ -387,14 +417,14 @@ contain its own final hash. Do not amend completed history just to add that hash
 
 ## Current handoff
 
-Module 6 is complete within its documented hardware-validation limits. Module 7
-is active, temporarily paused for this wrap-up. Resume by reviewing and validating
-the existing automatic horizontal-profile classification prototype, completing
-any required implementation before production rotation fitting. Final rotation,
-rotation-corrected center refinement and registration are not complete.
+Module 6 is complete within its documented hardware-validation limits.
+Module 7 classifier is complete and offline validated; Module 7 remains in progress.
+Next task: implement production rotation fitting using only accepted CENTRAL
+profiles and requiring successful set-level classification QC. Final rotation,
+uncertainty, rotation-corrected center refinement and registration are not complete.
 
-Profiles 1–5 and their journals are experimental Module 7 evidence and must not be
-silently folded into Module 6. Lower-bar exploratory files remain local abandoned
+Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
+hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned
 experiments; the Y-repeatability harness has no reported execution results and
 remains local diagnostic work.
 No experiment files were deleted, and this roadmap authorizes no hardware motion.
