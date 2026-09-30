@@ -51,7 +51,8 @@ class HVServices(HOnlyServices):
             raise ValueError('H_plus_V_spec_and_confirmation_required')
         super().prepare(settings)
 
-    def work(self, settings, checkpoint, progress):
+    def acquire_initial_center(self, checkpoint, progress):
+        """Verified initial H/V only; callers decide when success-only return is allowed."""
         _, h = self.acquire_horizontal(checkpoint, progress)
         checkpoint()  # Verified H journal; no V movement before this gate.
         vsettings = self.spec.vertical(h.midpoint_um)
@@ -74,6 +75,10 @@ class HVServices(HOnlyServices):
             vertical_edge_diagnostics=asdict(edge),
             initial_center=(h.midpoint_um, edge.midpoint_um),
             center_interpretation='initial H/V estimate only; not rotation corrected')
+        return self.report['initial_center']
+
+    def work(self, settings, checkpoint, progress):
+        self.acquire_initial_center(checkpoint, progress)
         self._phase('success_only_return', checkpoint, progress)
         self.report['return_status'] = 'FAILED_OR_INCOMPLETE'
         self._return(checkpoint)

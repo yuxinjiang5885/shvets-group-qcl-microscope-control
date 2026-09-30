@@ -209,7 +209,7 @@ class LocalizationPipelineServices:
         self.diagnostics.update(data)
         progress(dict(phase=name, **data))
 
-    def _scan(self, name, settings, checkpoint, progress):
+    def _scan(self, name, settings, checkpoint, progress, *, require_valid_edges=True):
         self._phase(name, checkpoint, progress, geometry=asdict(settings))
         path = self.path/(name+'.jsonl')
         def cancelled():
@@ -226,7 +226,7 @@ class LocalizationPipelineServices:
             raise ValueError('scan_or_journal_failed:' + name + ':' + repr(result.reasons))
         edge = analyze_scan(saved, EdgeSettings(expected_width_um=self.spec.side_um,
             width_tolerance_um=self.spec.width_tolerance_um))
-        if not edge.valid:
+        if require_valid_edges and not edge.valid:
             raise ValueError('edge_failed:' + name + ':' + repr(edge.reasons))
         self.journals.append(path)
         progress(dict(profile_completed=name, journal=str(path), edge=asdict(edge)))

@@ -547,13 +547,17 @@ MANUALLY REVIEWED**. M8.2a ownership/worker/cancellation framework:
 bridge are implemented in the working tree and fake/inert tested, not live validated.
 The first supervised live H-only validation **PASSED** (run
 `495ebff7920b4d1296f5e9680afdd2a5`, 71/71 points, valid edges, return and cleanup
-PASS, ownership AVAILABLE, no registration published). The H+V development action
-is implemented for separate supervised validation, with full 2D preview, explicit
-both-axis confirmation, dynamic rounded H-midpoint X, separate journals and
-success-only return. Full live Locate Marker remains disabled/pending.
+PASS, ownership AVAILABLE, no registration published). The first supervised live
+H+V validation **PASSED**, run `8493cabf1df6424fa2bee5e25e5d8396`: both analyses
+valid, return/cleanup PASS, ownership AVAILABLE, no registration published.
+Supervised multi-H acquisition/classification is implemented and fake/inert
+validated (615 tests); its separate live test is pending. It uses the measured H/V center, existing
+conservative planner/classifier, a larger explicit clearance envelope, separate
+journals and success-only return. Production live rotation/refinement remain
+pending; full live Locate Marker remains disabled.
 
-**Remaining work** Review and run supervised H+V validation, then separately
-validate planned multi-H acquisition/classification and the full localization chain.
+**Remaining work** Review and run supervised multi-H acquisition/classification,
+then separately validate production live rotation/refinement and the full chain.
 Retain fresh-session objective/DAQ blockers and sole-Python laser ownership.
 Joystick acknowledgement is not independent readback; laser state/settings still
 require operator confirmation. Finish registered-preview presentation and arbitrary
@@ -737,13 +741,14 @@ motion (Module 9) -> Width/Height ROI preview and existing Snake Scan launch fro
 its verified top-left start (Module 10 MVP).
 
 Next task:
-Review the H+V implementation, then perform one separately supervised H+V validation
-using the documented fresh-session, ownership, laser, live-frame and full 2D
-clearance prerequisites. H-only live validation has passed; H+V has not yet been
-executed on hardware. After successful H+V evidence review, prepare supervised
-multi-H acquisition/classification before full-pipeline validation. Full live Locate
-Marker remains disabled. Preserve stable UI isolation and the finalized Modules
-8-10 workflow; no target movement or ROI execution is authorized by this update.
+Review the supervised multi-H implementation, then perform one separately supervised
+H+V+profiles/classifier validation with fresh-session ownership, laser, live-frame
+and full-sequence clearance confirmation. H-only and H+V live validation passed;
+multi-H hardware validation has not yet occurred. Production live rotation,
+refinement and full Locate Marker remain pending/disabled. After successful
+multi-H/classifier evidence review, separately prepare production rotation validation.
+Preserve stable UI isolation and the finalized Modules 8-10 workflow; no target
+movement or ROI execution is authorized by this update.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned

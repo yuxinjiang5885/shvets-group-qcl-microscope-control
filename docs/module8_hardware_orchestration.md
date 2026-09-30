@@ -928,3 +928,129 @@ plus 33 new H+V orchestration/Qt tests). Stable UI SHA256 remains
 `fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
 No hardware was initialized or commanded during implementation/testing.
 Readiness is for a separately supervised H+V test, not a completed live H+V result.
+
+
+## First supervised live H+V validation: PASSED
+
+Run `8493cabf1df6424fa2bee5e25e5d8396` completed on real hardware, as reported by
+the operator and recorded in the local `hv_result.json`. Existing evidence was
+read only; runtime journals are not altered by this implementation.
+
+| Quantity | Result (um unless noted) |
+| --- | --- |
+| H requested X / fixed Y / count | 3830 to 4530 / -26100 / 71 |
+| H left / right | 3965.934549550488 / 4463.664592482027 |
+| H midpoint / width | 4214.799571016258 / 497.7300429315387 |
+| V chosen integer X / rounding delta | 4215 / +0.200428983742313 |
+| V requested Y / count | -26450 to -25750 / 71 |
+| V lower / upper | -26346.34241019074 / -25857.20103169517 |
+| V midpoint / height | -26101.771720942954 / 489.14137849556937 |
+| Initial H/V center | (4214.799571016258, -26101.771720942954) |
+
+Both analyses VALID; return PASS; cleanup PASS; ownership AVAILABLE;
+`hv_complete=True`, registration_published=False. The operator also reported
+H completion. Journals are `localization_runs/8493cabf1df6424fa2bee5e25e5d8396/initial_H.jsonl`
+and `initial_V.jsonl` in the same directory. Known warnings remain
+`joystick_command_ack_only` and `laser_operator_confirmation_not_fresh_SDK_readback`.
+This validates normal H+V acquisition, not rotation, full Locate Marker, fault
+injection or calibrated physical accuracy. The values above are evidence, never
+production defaults.
+
+## Supervised multi-H acquisition and classification
+
+`ui/multi_h_validation.py` reuses `HVServices.acquire_initial_center`, the shared
+Qt runner, persistent owner/handoff/DAQ/cleanup, and unchanged Module 6 scanner and
+Module 7 classifier. `purpose='multi_h'` is explicitly non-publishing. Existing
+H-only and H+V actions stay separate. Full live Locate Marker stays disabled.
+
+The existing `LocalizationSpec` / `plan_profiles` supply profile planning and scan
+geometry. Defaults: side 500 um, supported rotation +/-5 degrees, center allowance
+20 um, inward guard 10 um, 5 profiles, minimum 3 accepted and minimum 100 um span,
+integer-um resolution. The planner computes
+`Amax = S/2*(cos(theta_max)-sin(theta_max)) - guard - allowance` for this supported
+small-angle branch. For the defaults this is approximately 197.26 um. Rounded
+profiles are symmetric about the rounded measured V midpoint, with rechecked
+central margin, distinct Y, count, leverage and full path bounds. At an integer
+preview center their offsets are (-197,-98,0,98,197) um (394 um span); these are
+computed outcomes, not hardcoded historical offsets. Final positions depend on
+actual H/V measurements. Profile X scans are centered on the initial H midpoint,
+with the existing planner's integer rounding; Y positions use the V midpoint.
+
+**Envelope:** let L=S/2+margin. Because initial center estimates are not known
+before acquisition, require the conservative clearance rectangle
+`X0 +/- (2L+1)` and `Y0 +/- (L+S/2+1)`; for defaults X0 +/-701, Y0 +/-601 um.
+This deliberately covers possible recentering, approach, diagonal reposition and
+return, rather than guessing the live center in the preview. It is not a claim of
+mechanical limits or physical clearance. Manual bounds must contain this envelope;
+the complete measured-center-derived profile plan is checked again before profile
+1 moves. An inadequate plan fails closed, without expansion or additional profiles.
+
+**Acquisition and classification:** initial H/V must both have finalized journals
+and valid unique edges. Then acquire exactly the planned profile count, each using
+unchanged scan_1d, independent journal finalization/readback verification and edge
+analysis. Journals: initial_H.jsonl, initial_V.jsonl, profile_H_01.jsonl through
+profile_H_05.jsonl in one unique run directory. Hardware/acquisition/position/journal
+failures abort at once. Completed profiles with invalid optical edges are retained
+as edge_valid=False and passed to the classifier, not deleted. Measured Y mean and
+spread are recorded; unstable measured-Y profiles are marked unusable, not trimmed.
+All planned profiles reach one call to the existing classify_profiles. Its settings
+are unchanged (only nominal side supplied), and it alone assigns CENTRAL,
+CORNER_AFFECTED, INCONSISTENT or INVALID. No alternate subset or replacement scan.
+
+Report each profile's requested/measured Y, edges/midpoint/width, contrast/noise,
+edge diagnostics, classification/reasons and journal path. Also report CENTRAL IDs,
+count, accepted measured-Y span, other IDs, classifier reasons,
+sufficient_for_rotation_fit and usable_final_fits availability. The classifier API
+has no separate warnings field; this is recorded as empty, while upstream hardware
+warnings remain. Classifier provisional/QC fit angles are not displayed as accepted
+production rotation. Success requires classifier sufficiency and usable fits, plus
+the run's minimum accepted count/span. Only then attempt return. No production
+rotation fit, center refinement or StageRegistration call occurs.
+
+**Lifecycle:** checkpoints after H/V, before planning, before/during/after every
+profile, before classification and return. No automatic return after scan, journal,
+classifier failure or cancellation; partial evidence remains. Return failure fails
+the run. Cleanup/stop/idle/restore uncertainty quarantines. Native calls cannot be
+forcibly interrupted. Results are saved as multi_h_result.json; successful cleanup
+adds multi_h_complete=True and registration_published=False. READY FOR ROTATION FIT
+means classifier/leverage eligibility only, not production rotation QC approval.
+
+### Next supervised multi-H procedure (not executed in this task)
+
+1. Close stable UI, MIRcat vendor GUI, standalone stage/DAQ scripts and other hardware
+   owners. Launch `python .\qcl_scanning_imaging_autorelocation_ui.py --hardware`
+   in a fresh session. Do not first open objective/autofocus or run legacy acquisition.
+2. Python remains sole MIRcat owner. Establish/physically confirm 1500 cm^-1 and
+   emission ON; SR865A 20 mV, 300 us, Advanced 24 dB. The action does not enable/tune
+   emission. Existing acknowledgement/operator-confirmation warnings still apply.
+3. Load GDS, manually select the square gold marker, enter current frame/sample/input
+   identities, and use existing gamepad/stage controls to reach a roughly central
+   point. Release sticks. Set margin100, step10 and operator note/output directory.
+4. Press **Preview Multi-H Envelope**. Review fresh XY, initial H/V paths, dynamic
+   V X, approximate five-profile Y positions/span, recentered profile X policy,
+   full clearance rectangle and original-start return target. Verify the ENTIRE
+   rectangle physically. An old H/H+V clearance does not authorize this envelope.
+5. Check the original four confirmations and the separate **Multi-H** full-sequence
+   clearance checkbox; press **Run Multi-H Validation** once. Expect initial H and V
+   (71 points each), then five H profiles (normally 71 each) centered from those
+   measurements, followed by classification. Inspect progress index/total and rows.
+   DAQ/timings unchanged: ai0/ai1, +/-10 V, clipping9.9 V, 32 samples/channel at
+   100 kS/s, finite untriggered reset=False; tolerance1 um, polling10 ms, idle100 ms,
+   movement5 s, readback/settling/DAQ/stop2 s.
+6. Accept only verified journals for all seven scans, classifier sufficiency with
+   usable fits, >=3 CENTRAL and >=100 um accepted span, successful return/cleanup,
+   ownership AVAILABLE, multi_h_complete=True and registration_published=False.
+   Inspect every rejected/other row and retained warning; do not manually trim.
+7. Cancel for unexpected behavior. There is no failure/cancel return, retry or
+   replacement profile. Retain journals/current position; resolve error/idle/frame/
+   cleanup/clearance under supervision before retry. An unresolved native call is
+   not cancelled by timeout; never force-close it or open a second owner.
+8. Do not run production rotation/refinement, full Locate Marker, target navigation,
+   ROI or Snake Scan. After reviewing successful multi-H/classifier evidence,
+   separately prepare the production rotation stage of live validation.
+
+Multi-H implementation validation: **615 offline/fake tests passed**, including
+40 new multi-H orchestration/Qt tests and all H-only/H+V regressions. Stable UI
+SHA256 remains `fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
+No hardware was initialized in this implementation task. Ready for a separately
+supervised multi-H test; no multi-H live result is claimed.
