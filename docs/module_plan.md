@@ -42,7 +42,7 @@ the QCL imaging workflow.
 | 4 | Manual marker / MS selection | User-defined semantics | COMPLETE | Assignments, ChipLayout | 1–3 |
 | 5 | GDS-local to stage transform | Orientation, rotation, translation | COMPLETE AT ALGORITHM LEVEL | StageRegistration, StageLayout | 1, 4 |
 | 6 | 1D reflection scan and single-scan edge analysis | Adapters, scans, journals, edges | COMPLETE / HARDWARE VALIDATED within documented limits | ScanResult, EdgeResult | Hardware adapters; geometry supplies width prior |
-| 7 | Automatic square-marker registration | Multi-profile classification, fitting, QC | IN PROGRESS; paused for this wrap-up | Validated center and angle | 4–6 |
+| 7 | Automatic square-marker registration | Multi-profile classification, fitting, QC | COMPLETE within documented validation limits | Offline center/angle; qualitative overlay agreement | 4–6 |
 | 8 | Registration UI integration | Workflow and registration lifecycle | NOT STARTED | UI with QC/invalidation | 3–7 |
 | 9 | Move to selected MS and physical validation | Safe registered targeting | NOT STARTED | Verified target/readback/residual | 5–8 |
 | 10 | ROI / QCL imaging integration | Registered geometry to imaging | NOT STARTED | ROIs and imaging workflow | 8–9 |
@@ -247,7 +247,8 @@ rotation fit -> rotation-corrected center refinement -> QC -> (x_center,y_center
 orientation and unit-scale assumptions.
 
 **Outputs** Accepted offline StageRegistration, residuals, uncertainty/limitations
-and diagnostics. Physical targeting validation remains outstanding.
+and diagnostics; qualitative QCL-image physical overlay agreement. Quantitative
+physical localization accuracy is **NOT CALIBRATED**.
 
 **Key files** `experiment/marker_profile_classification.py`,
 `tests/test_marker_profile_classification.py`,
@@ -262,11 +263,16 @@ Center refinement: `experiment/marker_center_refinement.py`,
 Stage integration: `experiment/marker_stage_registration.py`,
 `tests/test_marker_stage_registration_integration.py`,
 `square_marker_stage_registration_check.py`.
+Overlay validation: `experiment/qcl_registration_validation.py`,
+`ui/gds_validation_selection.py`, `square_marker_qcl_overlay_check.py`,
+`tests/test_qcl_registration_validation.py`.
+Permanent evidence: [overlay validation note](evidence/module7/qcl_overlay_validation.md),
+PNG overlay and selection/prediction JSON in `docs/evidence/module7/`.
 
 **Dependencies** Modules 4–6.
 
 **Completed work** Automatic horizontal-profile classification:
-**COMPLETE / OFFLINE VALIDATED**. Module 7 as a whole remains **IN PROGRESS**.
+**COMPLETE / OFFLINE VALIDATED**. Module 7 is **COMPLETE within documented validation limits**.
 Initial horizontal/vertical scans and five horizontal profiles were collected.
 Validated states are CENTRAL / CORNER_AFFECTED / INCONSISTENT / INVALID.
 The classifier uses one deterministic seed, midpoint-based provisional rotation,
@@ -301,20 +307,40 @@ The QC bridge requires valid, matching rotation and center results, preserves
 upstream warnings, and delegates transformation to the existing Module 5 API.
 It uses the refined center and accepted midpoint angle with FLIP_X, unit scale,
 and no shear. No transform mathematics is duplicated and no hardware is accessed.
-Physical validation is explicitly still outstanding; Module 7 remains in progress.
+Marker-local origin mapping, transform sign, inverse and distance invariants pass.
+Actual GDS target coordinates are predicted offline; upstream warnings are preserved.
 
-**Remaining work**
+QCL-image physical overlay validation: **QUALITATIVE PASS**.
+The operator-reviewed overlay shows the reference marker aligned with the measured
+QCL structure and independently selected gold bars/crosses in the correct general
+predicted locations. Quadrant/orientation behavior, FLIP_X, scale and gross
+translation are physically consistent; no large sign/orientation failure is visible.
+Marker identity and validation-feature identities were operator selected; software
+does not infer marker/bar/cross semantics. Labels are `L=1.05`, `empty`, `P=1.5`,
+`P=1.6`, `Cross_left`, `Cross_right`; cross selections are individual polygons,
+not automatically grouped full crosses. Full selected polygons are transformed
+without image-based refitting/optimization or hardware motion.
 
-1. Choose an appropriate physical-validation target/sample.
-2. Physically validate predicted stage coordinates.
-3. Quantify observed localization error.
-4. Finalize Module 7 registration QC / exit criteria.
+**Validation limits and future precision work**
+
+Quantitative physical localization accuracy: **NOT CALIBRATED**. Manual observed
+feature centers and observed-minus-predicted errors were not measured.
+A small systematic angular/positional mismatch remains visible in the overlay.
+Possible contributors include rotation estimation, marker geometry, optical edge
+bias, scan-coordinate convention and drift. The cause has not been quantitatively
+isolated; the mismatch is not attributed definitely to rotation.
+The overlay deliberately reproduces the normal QCL snake-scan UI display convention,
+which differs from acquisition/trigger coordinates; it is not a coordinate calibration.
+
+Future precision work may include improved rotation estimation, more horizontal
+profiles, quantitative clicked/observed feature centers, scan-coordinate calibration,
+and drift/systematic-error characterization. These are future improvements, not
+blockers for moving to Module 8.
 
 The current physical sample does not contain the intended GDS MS pixels, so those
-MS coordinates cannot be directly physically validated on this sample. Choose a
-separately identified physically present GDS feature or an appropriate sample
-containing the intended targets. This does not establish the fabrication status
-or suitability of any other visible GDS feature.
+MS coordinates cannot be directly physically validated on this sample. The qualitative
+overlay uses separately operator-selected visible gold structures; it does not
+establish the fabrication status or suitability of all other GDS features.
 
 Thresholds remain provisional screening thresholds, not experimentally calibrated
 production uncertainty limits. Do not fit toward the historical angle. Bar-based
@@ -332,16 +358,19 @@ edge-analysis width tolerance 100 um and angle/slope consistency tolerance 1e-12
 Exact guarded-boundary equality is rejected. These are not calibrated physical
 uncertainty limits; constraint residuals check algebra, not physical accuracy.
 
-**Validation / tests** Stage-integration milestone rerun passed 20 integration,
+**Validation / tests** Module 7 closeout rerun passed 20 overlay, 20 integration,
 32 center, 28 rotation, 31 classifier, 47 reflection-scan, 25 adapter,
 11 StageRegistration, 11 ChipLayout, 12 layout-assignment and 21 GDS-layout tests:
-238 hardware-independent tests, including available actual S37a fixture checks.
+258 hardware-independent tests, including available actual S37a fixture checks.
 Run each with `python -B -m unittest discover -s tests -p <filename> -v`, using
 `test_marker_stage_registration_integration.py`, `test_stage_registration.py`,
 `test_chip_layout.py`, `test_layout_assignment.py`, `test_gds_layout.py`,
 `test_marker_center_refinement.py`, `test_marker_rotation.py`,
 `test_marker_profile_classification.py`, `test_reflection_scan.py` and
-`test_scan_adapters.py`. `python -B square_marker_profile_classification_check.py`
+`test_scan_adapters.py` and `test_qcl_registration_validation.py`.
+The overlay evaluator replayed the archived manual selection successfully; see
+the permanent evidence note for its command and external CSV/GDS prerequisites.
+`python -B square_marker_profile_classification_check.py`
 reloads all five journals and reruns single-scan analysis before classification.
 Profiles 1–4 are CENTRAL; Profile 5 is INCONSISTENT (width, left-edge and midpoint
 residual failures). Four accepted profiles have four distinct Y coordinates and
@@ -390,8 +419,8 @@ The tracked vertical evidence is
 | Warning | left_right_angle_disagreement_warning |
 | Hard-failure reasons / valid | () / True |
 
-This estimate is now integrated into Module 5 StageRegistration offline, but is
-not physical targeting validation. P1-P4 are CENTRAL; P5 remains INCONSISTENT.
+This estimate is integrated into Module 5 StageRegistration and has qualitative
+overlay agreement, not calibrated physical accuracy. P1-P4 are CENTRAL; P5 remains INCONSISTENT.
 The side-angle warning is retained without assigning it a physical cause.
 
 `python -B square_marker_stage_registration_check.py` replays the accepted Module 7
@@ -444,13 +473,18 @@ scalar reflection, bounds, scan timing settings and completion status. All saved
 command/readback pairs agree exactly. The journals do not record raw DAQ samples,
 laser/lock-in telemetry, physical clearance, acquisition-time code revision,
 post-scan return or cleanup. Classification is reproducible offline; those other
-hardware facts require separate operator evidence. Final registration validation
-tests still need definition. Interpolated edge digits are not physical accuracy.
+hardware facts require separate operator evidence. Quantitative registration
+accuracy remains uncalibrated. Interpolated edge digits are not physical accuracy.
 
-**Exit criteria** Independently tested classification and fitting reject ambiguous
-or inconsistent data; sufficient accepted profiles pass rotation hard QC with
-side-quality warnings preserved;
-center/angle and residual QC pass supervised validation. Not yet met.
+**Exit criteria: SATISFIED within documented validation limits.**
+
+- Robust single-scan acquisition/edge analysis is available from Module 6.
+- Marker profile classification fails closed.
+- Production midpoint rotation and refined marker center are available.
+- StageRegistration transform is verified and actual GDS predictions are generated.
+- QCL overlay gives qualitative physical agreement.
+- Warnings and limitations are preserved.
+- No quantitative or micron-level physical localization accuracy is claimed.
 
 **Relevant commits** Classifier milestone:
 `0675a29861f30df44bbfdf042eea5301d2ab054e` —
@@ -460,9 +494,10 @@ Rotation milestone: `031d6468403c5711f9eec90a9ab9d6078829b285` —
 Center milestone: `3166ce66c9c646c75e02b57f0caa0ae887b92e05` —
 `feat(registration): add marker center refinement`.
 Stage-integration milestone:
+`cc88978be45f72c4fa73569cce43b2963b8df8ab` —
 `feat(registration): integrate marker registration with stage transform`.
-Record its resulting hash in the next roadmap update; this document is part of
-that commit.
+Closeout milestone: `feat(registration): complete Module 7 validation workflow`.
+Record its resulting hash in the next roadmap update; this document is part of that commit.
 
 ### Module 8 — Registration UI integration
 
@@ -574,14 +609,14 @@ contain its own final hash. Do not amend completed history just to add that hash
 
 ## Current handoff
 
-Module 6 is complete within its documented hardware-validation limits.
-Module 7 classification, rotation fitting, center refinement, and
-StageRegistration integration are complete and offline validated.
-Module 7 as a whole remains in progress.
-Next task: plan supervised physical validation of predicted coordinates.
-The current sample lacks the intended MS pixels, so choose either
-another physically present GDS feature on this sample or an appropriate
-sample containing the intended target features.
+Module 6 complete.
+Module 7 complete within documented validation limits.
+
+Next module: Module 8 — Registration UI integration.
+
+Goal: integrate the existing marker-selection, localization, registration,
+QC/warnings, and StageRegistration workflow into the operational UI
+without changing the validated underlying registration algorithms.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned
