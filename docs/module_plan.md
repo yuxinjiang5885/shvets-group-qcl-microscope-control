@@ -246,8 +246,8 @@ rotation fit -> rotation-corrected center refinement -> QC -> (x_center,y_center
 **Inputs** Selected square geometry, measured profiles and explicit Module 5 frame,
 orientation and unit-scale assumptions.
 
-**Outputs** Planned: accepted registration, residuals, uncertainty/limitations and
-diagnostics; no production registration is currently complete.
+**Outputs** Accepted offline StageRegistration, residuals, uncertainty/limitations
+and diagnostics. Physical targeting validation remains outstanding.
 
 **Key files** `experiment/marker_profile_classification.py`,
 `tests/test_marker_profile_classification.py`,
@@ -259,6 +259,9 @@ Production rotation: `experiment/marker_rotation.py`,
 `tests/test_marker_rotation.py`, `square_marker_rotation_fit_check.py`.
 Center refinement: `experiment/marker_center_refinement.py`,
 `tests/test_marker_center_refinement.py`, `square_marker_center_refinement_check.py`.
+Stage integration: `experiment/marker_stage_registration.py`,
+`tests/test_marker_stage_registration_integration.py`,
+`square_marker_stage_registration_check.py`.
 
 **Dependencies** Modules 4–6.
 
@@ -293,14 +296,25 @@ stability, vertical chord height, central-region guard and constraint-substituti
 checks fail closed: both output center coordinates are None on hard failure.
 Angle-fit sensitivity is reported; no hardware or StageRegistration is invoked.
 
+StageRegistration integration: **COMPLETE / OFFLINE VALIDATED**.
+The QC bridge requires valid, matching rotation and center results, preserves
+upstream warnings, and delegates transformation to the existing Module 5 API.
+It uses the refined center and accepted midpoint angle with FLIP_X, unit scale,
+and no shear. No transform mathematics is duplicated and no hardware is accessed.
+Physical validation is explicitly still outstanding; Module 7 remains in progress.
+
 **Remaining work**
 
-1. Assemble final marker registration result.
-2. Integrate accepted center + rotation with Module 5 StageRegistration.
-3. Predict selected MS stage coordinates.
-4. Physically validate predicted MS positions (requires fabricated targets;
-   current-sample MS pixels are absent, as recorded in Module 9).
-5. Finalize Module 7 registration QC / exit criteria.
+1. Choose an appropriate physical-validation target/sample.
+2. Physically validate predicted stage coordinates.
+3. Quantify observed localization error.
+4. Finalize Module 7 registration QC / exit criteria.
+
+The current physical sample does not contain the intended GDS MS pixels, so those
+MS coordinates cannot be directly physically validated on this sample. Choose a
+separately identified physically present GDS feature or an appropriate sample
+containing the intended targets. This does not establish the fabrication status
+or suitability of any other visible GDS feature.
 
 Thresholds remain provisional screening thresholds, not experimentally calibrated
 production uncertainty limits. Do not fit toward the historical angle. Bar-based
@@ -318,11 +332,13 @@ edge-analysis width tolerance 100 um and angle/slope consistency tolerance 1e-12
 Exact guarded-boundary equality is rejected. These are not calibrated physical
 uncertainty limits; constraint residuals check algebra, not physical accuracy.
 
-**Validation / tests** Center-refinement milestone rerun passed 32 center tests,
-28 rotation tests,
-31 classifier tests, 47 reflection-scan tests and 25 adapter tests:
-163 hardware-independent tests.
+**Validation / tests** Stage-integration milestone rerun passed 20 integration,
+32 center, 28 rotation, 31 classifier, 47 reflection-scan, 25 adapter,
+11 StageRegistration, 11 ChipLayout, 12 layout-assignment and 21 GDS-layout tests:
+238 hardware-independent tests, including available actual S37a fixture checks.
 Run each with `python -B -m unittest discover -s tests -p <filename> -v`, using
+`test_marker_stage_registration_integration.py`, `test_stage_registration.py`,
+`test_chip_layout.py`, `test_layout_assignment.py`, `test_gds_layout.py`,
 `test_marker_center_refinement.py`, `test_marker_rotation.py`,
 `test_marker_profile_classification.py`, `test_reflection_scan.py` and
 `test_scan_adapters.py`. `python -B square_marker_profile_classification_check.py`
@@ -374,9 +390,39 @@ The tracked vertical evidence is
 | Warning | left_right_angle_disagreement_warning |
 | Hard-failure reasons / valid | () / True |
 
-This is an offline registration estimate, not yet a production StageRegistration
-or physical targeting validation. P1-P4 are CENTRAL; P5 remains INCONSISTENT.
+This estimate is now integrated into Module 5 StageRegistration offline, but is
+not physical targeting validation. P1-P4 are CENTRAL; P5 remains INCONSISTENT.
 The side-angle warning is retained without assigning it a physical cause.
+
+`python -B square_marker_stage_registration_check.py` replays the accepted Module 7
+chain, resolves the reviewed occurrence IDs from actual S37a geometry, and uses
+LayoutAssignments/ChipLayout to compute marker-local offsets. The lower marker
+reference is GDS (0,-4600) um, under Arra / Altug2009 / instance:0.
+The local origin maps exactly to stage (4214.965309833208,-26111.10204224153) um.
+Accepted rotation is +0.13199759820576185 deg; FLIP_X / scale 1 / shear none.
+
+The verified transform is `stage = translation + R(theta) B local`, with
+`B(x,y)=(-x,y)`. Thus stage X = center X - cos(theta)*local X - sin(theta)*local Y,
+and stage Y = center Y - sin(theta)*local X + cos(theta)*local Y.
+The midpoint-line slope is -tan(theta), so the Module 7 angle passes directly
+into Module 5 with no sign reversal. Inverse and distance invariants pass:
+origin error 0 um; maximum round-trip error 1.8225386545374702e-12 um;
+maximum pairwise-distance discrepancy 2.5011104298755527e-12 um.
+
+**OFFLINE PREDICTION ONLY** (all coordinates in um):
+
+| Example name | Absolute GDS XY | Marker-local XY | Predicted stage XY |
+| --- | --- | --- | --- |
+| MS_1 | (-498.192,-5100.475) | (-498.192,-500.475) | (4714.308977,-26610.427984) |
+| MS_2 | (502.158,-5100.125) | (502.158,-500.125) | (3713.960826,-26612.382582) |
+| MS_3 | (-498.192,-4100.475) | (-498.192,499.525) | (4712.005187,-25610.430638) |
+| MS_4 | (501.808,-4100.475) | (501.808,499.525) | (3712.007840,-25612.734428) |
+
+Names follow the committed assignment example/order, not intrinsic GDS semantics
+or unsaved interactive state. Full feature IDs and paths are printed by the
+evaluator. These physical positions are not validated. The upstream warning
+`left_right_angle_disagreement_warning` is retained; hard-failure reasons are ().
+The external GDS file remains a prerequisite for replaying this evaluator.
 
 The original center reconstructed from committed horizontal and vertical journals
 is (4209.550599411898, -26111.11348130628) um. The refined-minus-original
@@ -411,7 +457,10 @@ center/angle and residual QC pass supervised validation. Not yet met.
 `feat(registration): add horizontal profile classification`.
 Rotation milestone: `031d6468403c5711f9eec90a9ab9d6078829b285` —
 `feat(registration): add production marker rotation fitting`.
-Center milestone: `feat(registration): add marker center refinement`.
+Center milestone: `3166ce66c9c646c75e02b57f0caa0ae887b92e05` —
+`feat(registration): add marker center refinement`.
+Stage-integration milestone:
+`feat(registration): integrate marker registration with stage transform`.
 Record its resulting hash in the next roadmap update; this document is part of
 that commit.
 
@@ -526,13 +575,13 @@ contain its own final hash. Do not amend completed history just to add that hash
 ## Current handoff
 
 Module 6 is complete within its documented hardware-validation limits.
-Module 7 profile classification is complete and offline validated.
-Module 7 production rotation fitting is complete and offline validated.
-Module 7 center refinement is complete and offline validated.
+Module 7 classification, rotation fitting, center refinement, and
+StageRegistration integration are complete and offline validated.
 Module 7 as a whole remains in progress.
-Next task: integrate the accepted marker center and midpoint rotation with
-Module 5 StageRegistration, without moving hardware yet, and verify
-predicted coordinates offline before physical validation.
+Next task: plan supervised physical validation of predicted coordinates.
+The current sample lacks the intended MS pixels, so choose either
+another physically present GDS feature on this sample or an appropriate
+sample containing the intended target features.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned
