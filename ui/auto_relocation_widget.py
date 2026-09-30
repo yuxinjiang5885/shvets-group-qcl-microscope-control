@@ -10,12 +10,14 @@ from PyQt6.QtWidgets import (QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineE
 from experiment.stage_registration import Orientation
 from ui.gds_assignment import GDSAssignmentWidget
 from ui.registration_state import RegistrationState, RegistrationStatus, replay_archived_evidence
+from ui.localization_orchestration import LocalizationController, Command
 
 
 class AutoRelocationWidget(QWidget):
     def __init__(self, parent=None, *, evidence_loader=None):
         super().__init__(parent)
         self.state = RegistrationState()
+        self.orchestration = LocalizationController(self.state)
         self._model = None
         self._gds_hash = ''
         self._source_path = ''
@@ -56,8 +58,9 @@ class AutoRelocationWidget(QWidget):
         self.warnings_label = QLabel()
         self.failures_label = QLabel()
         self.prediction_label = QLabel()
+        self.acquisition_label = QLabel()
         for label in (self.status_label, self.values_label, self.warnings_label,
-                      self.failures_label, self.prediction_label):
+                      self.failures_label, self.prediction_label, self.acquisition_label):
             label.setTextFormat(Qt.TextFormat.PlainText)
             label.setWordWrap(True)
             layout.addWidget(label)
@@ -107,9 +110,13 @@ class AutoRelocationWidget(QWidget):
             marker_id=marker.feature_id if marker else '',
             orientation=Orientation(self.orientation.currentData()),
             **{key: edit.text() for key, edit in self.context_fields.items()}))
+        self.orchestration.context_updated()
         self.refresh()
 
     def load_registration(self):
+        if not self.orchestration.ownership.guard(Command.REPLAY).allowed:
+            self.refresh()
+            return
         self.sync_context()
         self.state.begin()
         self.refresh()
@@ -147,6 +154,19 @@ class AutoRelocationWidget(QWidget):
         self.refresh()
 
     def refresh(self):
+        snapshot = self.orchestration.snapshot()
+        self.acquisition_label.setText(
+            f"Acquisition: {snapshot['acquisition']}; run: {snapshot['run_id'] or 'none'}; "
+            f"ownership: {snapshot['ownership']}; context generation: {snapshot['generation']}\n"
+            f"Candidate pending: {snapshot['candidate_pending']}; approved retained: {snapshot['approved_retained']}; "
+            f"run warnings: {snapshot['warnings'] or 'none'}; "
+            f"run/ownership failures: {snapshot['reasons'] or 'none'}")
+        editable = self.orchestration.ownership.guard(Command.GDS_CHANGE).allowed
+        self.selection.setEnabled(editable)
+        self.orientation.setEnabled(editable)
+        for edit in self.context_fields.values():
+            edit.setEnabled(editable)
+        self.load_button.setEnabled(self.orchestration.ownership.guard(Command.REPLAY).allowed)
         self.status_label.setText('Registration: ' + self.state.status.value + ' (offline evidence)')
         reg = self.state.registration.registration if self.state.registration else None
         self.values_label.setText('No usable registration' if reg is None else

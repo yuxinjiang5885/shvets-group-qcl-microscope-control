@@ -510,6 +510,9 @@ Record its resulting hash in the next roadmap update; this document is part of t
 **Key files** `qcl_scanning_imaging_autorelocation_ui.py`,
 `ui/auto_relocation_widget.py`, `ui/registration_state.py`,
 `tests/test_auto_relocation_ui.py`, [milestone review](module8_ui_milestone.md).
+M8.2a adds `ui/localization_orchestration.py`, `ui/localization_worker.py`,
+`tests/test_auto_relocation_orchestration.py` and the
+[orchestration design](module8_hardware_orchestration.md).
 Reuses `ui/gds_assignment.py`. The stable `qcl_scanning_imaging_ui.py` remains
 byte-identical; the experimental full-window path uses a lazy subclass.
 
@@ -526,17 +529,33 @@ marker/GDS/orientation/frame/sample/registration-input changes invalidate approv
 Default startup is offline, without hardware imports/initialization.
 Locate Marker remains disabled; there is no move-to-target action.
 
+M8.2a ownership / worker / cancellation architecture:
+**COMPLETE / OFFLINE VALIDATED**.
+The fake-service framework provides an exclusive localization lease abstraction,
+structured legacy-activity blockers, unique run IDs, deterministic worker states,
+thread-safe cooperative cancellation, transactional registration publication,
+context-generation stale-result rejection, busy guards, frame-change invalidation
+and a quarantine/recovery model. Ordinary stage movement and target-only selection
+changes do not invalidate registration. Close during a run requests cancellation
+and defers shutdown; uncertain cleanup quarantines ownership.
+
+M8.2b supervised initial-H integration: **NOT STARTED**.
 Operational hardware integration: **NOT YET IMPLEMENTED**.
 The explicit `--hardware` entry path inherits existing startup side effects but
 has not been exercised in milestone validation. It is not a Locate Marker integration.
 
-**Remaining work** Safe Locate Marker orchestration: exclusive worker/resource
-ownership, cancellation/failure behavior, UI busy-state rules and live coordinate-
-frame invalidation. Registration persistence and supervised hardware validation
-remain outstanding. Archived offline approval is not live hardware registration.
+**Remaining work / limitations** Legacy operational callers are not yet wired
+through the new guards; shared real Prior/DAQ ownership is not yet connected.
+Native SDK call interruption remains unsupported. Recovery attestations are not
+real hardware verification. Locate Marker remains disabled. Real command guarding,
+live frame-event hooks, worker lifetime/close integration, registration persistence
+and supervised hardware validation remain outstanding. Archived offline approval
+is not live hardware registration.
 
-**Validation / tests** Closeout rerun passed 298 offline tests: 22 Auto Relocation,
-258 upstream Module 5-7/layout/overlay, 12 GDS preview and 6 GDS assignment tests.
+**Validation / tests** M8.2a closeout rerun passed 350 offline tests: 48 orchestration,
+26 Auto Relocation UI, 258 upstream Module 5-7/layout/overlay, 12 GDS preview and
+6 GDS assignment tests. No failures or skips. Core fake runs block Qt and device
+imports; offline UI tests block hardware imports. Adapter tests use fake bindings.
 `python -B -m unittest discover -s tests -p test_auto_relocation_ui.py -v` includes
 blocked hardware imports, fake-base construction, lifecycle, warning/failure,
 manual-selection and real archived-evidence replay tests.
@@ -547,7 +566,9 @@ started during automated validation.
 registration use. Offline shell criteria are satisfied; live ownership, cancellation,
 frame-event hooks and supervised integration are still required. Module 8 is not complete.
 
-**Relevant commits** Offline shell milestone: `feat(ui): add auto-relocation UI shell`.
+**Relevant commits** Offline shell milestone:
+`75a1c885ec37d1bea59f97e2a01e0b25d9bac485` — `feat(ui): add auto-relocation UI shell`.
+M8.2a milestone: `feat(ui): add localization orchestration framework`.
 Record its resulting hash in a subsequent roadmap update.
 
 ### Module 9 — Move to selected MS and physical validation
@@ -637,11 +658,13 @@ contain its own final hash. Do not amend completed history just to add that hash
 Module 6 complete.
 Module 7 complete within documented validation limits.
 
-Module 8 offline UI shell is complete.
-Next task: design safe Locate Marker hardware orchestration,
-including worker ownership, cancellation/failure behavior,
-live coordinate-frame invalidation, and UI busy-state rules,
-before enabling any real acquisition.
+Module 8 offline shell complete.
+M8.2a orchestration framework complete and offline validated.
+
+Next task:
+M8.2b — connect the experimental autorelocation UI to the existing
+operational hardware ownership model using fake/inert integration tests first,
+then prepare a separately supervised single initial-horizontal scan.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned

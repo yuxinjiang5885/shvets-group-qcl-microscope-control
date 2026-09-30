@@ -9,6 +9,8 @@ from hashlib import sha256
 import json
 from pathlib import Path
 from statistics import mean
+from threading import RLock
+from functools import wraps
 
 from experiment.marker_profile_classification import (ClassificationResult, ProfileClass,
                                                        classify_profiles, ProfileGeometry)
@@ -25,6 +27,25 @@ class RegistrationStatus(str, Enum):
     REGISTERING = 'REGISTERING'
     VALID = 'VALID'
     INVALID = 'INVALID'
+
+
+class ContextEvent(str, Enum):
+    MOVEMENT = 'ordinary_movement'
+    FRAME = 'frame_redefinition'
+    RECONNECT = 'reconnect_reset'
+    SAMPLE = 'sample_replacement'
+    GDS = 'gds_replacement'
+    MARKER = 'marker_change'
+    ORIENTATION = 'orientation_change'
+    INPUTS = 'registration_input_change'
+
+
+def _locked(method):
+    @wraps(method)
+    def call(self, *args, **kwargs):
+        with self.lock:
+            return method(self, *args, **kwargs)
+    return call
 
 
 @dataclass(frozen=True)
@@ -65,6 +86,8 @@ class RegistrationState:
     No approval is resurrected just because a setting is changed back.
     """
     def __init__(self):
+        self.lock = RLock()
+        self.context_generation = 0
         self.context = RegistrationContext()
         self.status = RegistrationStatus.NOT_REGISTERED
         self.assignments = None
@@ -74,19 +97,44 @@ class RegistrationState:
         self.reasons = ()
         self.prediction = None
 
-    def invalidate(self, reason):
+    @property
+    def approved_registration(self):
+        return self.registration
+
+    @_locked
+    def invalidate(self, reason, *, context_changed=True):
+        if context_changed:
+            self.context_generation += 1
         self.registration = None
         self.prediction = None
         self.status = RegistrationStatus.INVALID
         self.reasons = (reason,)
         # Last evidence/warnings remain inspectable, but never usable as approval.
 
+    @_locked
     def set_context(self, context):
         if context != self.context:
             self.context = context
             self.invalidate('registration_context_changed')
 
+    @_locked
+    def handle_context_event(self, event, context=None):
+        event = ContextEvent(event)
+        if event is ContextEvent.MOVEMENT:
+            if context is not None and context != self.context:
+                raise ValueError('movement_cannot_redefine_context')
+            return
+        if context is not None:
+            self.context = context
+        self.invalidate(event.value)
+
+    @_locked
     def begin(self):
+        """Legacy offline replay replacement. Candidate runs must not call this.
+
+        LocalizationController retains approval and uses publish_candidate only
+        after successful work/cleanup. Existing offline replay behavior is kept.
+        """
         self.registration = None
         self.prediction = None
         self.evidence = None
@@ -94,6 +142,7 @@ class RegistrationState:
         self.reasons = ()
         self.status = RegistrationStatus.REGISTERING
 
+    @_locked
     def accept(self, evidence):
         self.begin()
         self.evidence = evidence
@@ -114,15 +163,36 @@ class RegistrationState:
             self.warnings = registration.warnings
             self.status = RegistrationStatus.VALID
         except ValueError as error:
-            self.invalidate(str(error))
+            self.invalidate(str(error), context_changed=False)
             self.reasons = tuple(dict.fromkeys((*self.reasons, *evidence.classification.reasons,
                                                *evidence.rotation.reasons, *evidence.center.reasons)))
             raise
 
+    @_locked
+    def publish_candidate(self, evidence, generation):
+        """Validate in isolation then replace atomically; rejection leaves approval.
+
+        Controller owns the full-run/cleanup gate. This method additionally checks
+        generation/context and reuses the existing approval checks, without refits.
+        """
+        if generation != self.context_generation:
+            raise ValueError('stale_candidate_generation')
+        checked = RegistrationState()
+        checked.context = self.context
+        checked.accept(evidence)
+        self.evidence = checked.evidence
+        self.registration = checked.registration
+        self.warnings = checked.warnings
+        self.reasons = ()
+        self.status = RegistrationStatus.VALID
+        self.prediction = None
+
+    @_locked
     def targets_changed(self, assignments):
         self.assignments = assignments
         self.prediction = None
 
+    @_locked
     def predict(self, feature_id):
         self.prediction = None
         if self.status is not RegistrationStatus.VALID or self.registration is None:

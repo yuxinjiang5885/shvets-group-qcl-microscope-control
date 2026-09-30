@@ -21,6 +21,7 @@ from experiment.layout_assignment import LayoutAssignments
 from experiment.stage_registration import Orientation, local_to_stage
 from ui.registration_state import RegistrationState, RegistrationStatus, replay_archived_evidence
 from ui.auto_relocation_widget import AutoRelocationWidget
+from ui.localization_orchestration import RunSettings, CleanupOutcome
 from qcl_scanning_imaging_autorelocation_ui import OfflineAutoRelocationWindow, operational_window_class
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -277,6 +278,60 @@ window.close()
         self.widget.load_registration()
         self.assertIsNone(self.widget.state.registration)
         self.assertIn('test_center_failure', self.widget.failures_label.text())
+
+
+    def test_orchestration_shell_idle_and_locate_disabled(self):
+        self.assertIn('Acquisition: IDLE', self.widget.acquisition_label.text())
+        self.assertIn('ownership: AVAILABLE', self.widget.acquisition_label.text())
+        self.assertFalse(self.widget.locate_button.isEnabled())
+
+    def test_running_shell_blocks_replay_preserves_review_and_approval(self):
+        self.accept()
+        state = self.widget.state
+        approved = state.registration
+        handle = self.widget.orchestration.start(RunSettings(
+            state.context, state.context_generation, 'fake-start'))
+        self.widget.refresh()
+        self.assertIn(handle.run_id, self.widget.acquisition_label.text())
+        self.assertIn('approved retained: True', self.widget.acquisition_label.text())
+        self.assertFalse(self.widget.load_button.isEnabled())
+        self.assertFalse(self.widget.selection.isEnabled())
+        self.assertFalse(self.widget.orientation.isEnabled())
+        self.assertTrue(self.widget.review_button.isEnabled())
+        self.widget.load_registration()
+        self.assertIs(state.registration, approved)
+        self.assertFalse(self.widget.locate_button.isEnabled())
+
+    def test_quarantine_is_visible_and_keeps_controls_disabled(self):
+        self.accept()
+        state = self.widget.state
+        controller = self.widget.orchestration
+        handle = controller.start(RunSettings(state.context, state.context_generation, 'fake-start'))
+        controller.finish(handle, succeeded=False, cleanup=CleanupOutcome(False, False))
+        self.widget.refresh()
+        self.assertIn('QUARANTINED', self.widget.acquisition_label.text())
+        self.assertIn('ownership_uncertain', self.widget.failures_label.text())
+        self.assertFalse(self.widget.load_button.isEnabled())
+        self.assertFalse(self.widget.locate_button.isEnabled())
+
+    def test_qt_worker_adapter_delivers_typed_events(self):
+        from ui.localization_worker import LocateMarkerQtWorker
+        from ui.localization_orchestration import LocateMarkerWorker
+        from test_auto_relocation_orchestration import FakeServices
+        state = self.widget.state
+        controller = self.widget.orchestration
+        handle = controller.start(RunSettings(state.context, state.context_generation, 'fake-start'))
+        adapter = LocateMarkerQtWorker(LocateMarkerWorker(controller, handle, FakeServices(self.evidence)))
+        events = []
+        adapter.started.connect(events.append)
+        adapter.warning.connect(events.append)
+        adapter.registration_completed.connect(events.append)
+        adapter.finished.connect(events.append)
+        adapter.run()
+        self.assertEqual(events[0].name, 'started')
+        self.assertEqual(events[-1].name, 'finished')
+        self.assertEqual(events[-1].detail, 'COMPLETE')
+        self.assertTrue(all(event.run_id == handle.run_id for event in events))
 
 
 if __name__ == '__main__':
