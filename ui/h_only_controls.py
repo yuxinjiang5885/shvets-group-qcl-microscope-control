@@ -2,6 +2,7 @@
 from pathlib import Path
 from dataclasses import asdict
 import json
+from math import isfinite
 from PyQt6.QtCore import QObject,QThread,Qt,pyqtSlot,QTimer
 from PyQt6.QtWidgets import QWidget,QFormLayout,QLineEdit,QCheckBox,QPushButton,QLabel,QVBoxLayout
 from experiment.scan_1d import StageBounds
@@ -89,10 +90,11 @@ class HOnlyControls(QWidget):
     def __init__(self,window):
         super().__init__(window.auto_relocation)
         self.window=window
+        self.preview_xy=None
         layout=QVBoxLayout(self)
         layout.addWidget(QLabel('SUPERVISED DEVELOPMENT: one H scan only; no registration publication.'))
         form=QFormLayout();self.fields={}
-        for key,label,value in (('x','Confirmed rough X (um)',''),('y','Confirmed rough Y (um)',''),
+        for key,label,value in (('x','Fresh preview X (um)',''),('y','Fresh preview Y (um)',''),
             ('xmin','Clearance bounds X min',''),('xmax','Clearance bounds X max',''),
             ('ymin','Clearance bounds Y min',''),('ymax','Clearance bounds Y max',''),
             ('margin','Scan margin (um)','100'),('step','Step (um)','10'),
@@ -100,6 +102,14 @@ class HOnlyControls(QWidget):
             ('output','Journal directory',str(Path.cwd()/'localization_runs'))):
             self.fields[key]=QLineEdit(value);form.addRow(label,self.fields[key])
         layout.addLayout(form)
+        for key in ('x','y'):
+            self.fields[key].setReadOnly(True)
+            self.fields[key].setPlaceholderText('Read from stage on Preview')
+        self.automatic_bounds=QCheckBox('Propose bounds from H envelope (clearance still requires operator confirmation)')
+        self.automatic_bounds.setChecked(True)
+        layout.addWidget(self.automatic_bounds)
+        self.automatic_bounds.toggled.connect(self.bounds_mode_changed)
+        self.bounds_mode_changed(True)
         self.checks=[]
         for text in ('I confirm the current XY/frame and full approach/scan/return clearance.',
             'I confirm physical emission ON at the stated wavenumber.',
@@ -124,31 +134,86 @@ class HOnlyControls(QWidget):
         for check in self.checks:check.setChecked(False)
 
     def set_busy(self,busy):
-        for widget in (*self.fields.values(),*self.checks,self.preview_button):
+        for widget in (*self.fields.values(),*self.checks,self.preview_button,self.automatic_bounds):
             widget.setEnabled(not busy)
         self.invalidate_review()
 
+    def bounds_mode_changed(self,automatic):
+        for key in ('xmin','xmax','ymin','ymax'):
+            self.fields[key].setReadOnly(automatic)
+            self.fields[key].setPlaceholderText('Proposed on Preview' if automatic else 'Operator-reviewed current-frame limit')
+        if hasattr(self,'run_button'):self.invalidate_review()
+
+    def number(self,key,label):
+        text=self.fields[key].text().strip()
+        if not text:raise ValueError(f'H-only {label} is missing')
+        try:value=float(text)
+        except ValueError:raise ValueError(f'H-only {label} must be a number') from None
+        if not isfinite(value):raise ValueError(f'H-only {label} must be finite')
+        return value
+
+    def marker_side(self):
+        assignments=self.window.auto_relocation.selection.assignments
+        if assignments is None or assignments.marker is None:
+            raise ValueError('H-only reference square marker must be manually selected')
+        marker=assignments.marker
+        if not marker.width_um or marker.width_um!=marker.height_um:
+            raise ValueError('H-only selected marker must have square geometry')
+        return marker.width_um
+
     def build(self):
         state=self.window.auto_relocation.state
-        assignments=self.window.auto_relocation.selection.assignments
-        if assignments is None or assignments.marker is None:raise ValueError('manually_select_square_gold_marker')
-        side=assignments.build_chip_layout().marker.width
-        def num(k):return float(self.fields[k].text())
-        spec=HOnlySpec((num('x'),num('y')),StageBounds(num('xmin'),num('xmax'),num('ymin'),num('ymax'),state.context.frame_id),
-            side_um=side,scan_margin_um=num('margin'),step_um=num('step'))
+        if self.preview_xy is None:raise ValueError('H-only fresh stage position is unavailable; preview first')
+        side=self.marker_side()
+        spec=HOnlySpec(self.preview_xy,StageBounds(
+            self.number('xmin','clearance X minimum'),self.number('xmax','clearance X maximum'),
+            self.number('ymin','clearance Y minimum'),self.number('ymax','clearance Y maximum'),state.context.frame_id),
+            side_um=side,scan_margin_um=self.number('margin','scan margin'),step_um=self.number('step','scan step'))
         confirmation=OperatorConfirmation(*(c.isChecked() for c in self.checks),
-            wavenumber_cm=num('wn'),note=self.fields['note'].text())
+            wavenumber_cm=self.number('wn','wavenumber'),note=self.fields['note'].text())
         return spec,confirmation
 
     def preview(self):
+        self.invalidate_review()
+        self.preview_xy=None
         try:
+            if self.window.h_only_runner.busy:raise ValueError('H-only preview unavailable during acquisition')
+            side=self.marker_side()
+            margin=self.number('margin','scan margin')
+            self.number('step','scan step')
+            state=self.window.auto_relocation.state
+            if not state.context.frame_id.strip():raise ValueError('H-only coordinate frame identity is missing')
+            try:
+                # Existing shared proxy serializes this read; no handoff, move,
+                # task creation or change to joystick/laser state is performed.
+                stage=self.window.stage
+                with stage.execution_timeout(2.):
+                    xy=stage.get_position()
+                if (not isinstance(xy,(tuple,list)) or len(xy)!=2 or
+                    any(isinstance(v,bool) or not isinstance(v,(int,float)) or not isfinite(v) for v in xy)):
+                    raise ValueError('invalid XY readback')
+            except Exception as error:
+                raise ValueError(f'H-only fresh stage position unavailable: {error}') from error
+            self.preview_xy=tuple(xy)
+            for key,value in zip(('x','y'),xy):self.fields[key].setText(f'{value:g}')
+            if self.automatic_bounds.isChecked():
+                half=side/2+margin
+                # Proposed clearance envelope, NOT controller travel limits or
+                # proof of physical clearance. Run still requires confirmation.
+                padding=HOnlySpec.position_tolerance_um
+                limits=(xy[0]-half-padding,xy[0]+half+padding,xy[1]-padding,xy[1]+padding)
+                for key,value in zip(('xmin','xmax','ymin','ymax'),limits):self.fields[key].setText(f'{value:g}')
             spec,_=self.build();scan=spec.scan()
             self.invalidate_review()
             state=self.window.auto_relocation.state
             self.reviewed=(spec,state.context,state.context_generation)
             self.run_button.setEnabled(True)
-            self.result.setText(f'H only: X {scan.start_um} to {scan.end_um}, Y {scan.fixed_um}; '
-                f'{len(scan.positions())} points. Return {spec.rough_start_xy}. Bounds {spec.bounds}. '
+            self.result.setText(f'Rough start: {spec.rough_start_xy} um\n'
+                f'X start: {scan.start_um}; X end: {scan.end_um}; fixed Y: {scan.fixed_um} um\n'
+                f'Step: {scan.step_um} um; points: {len(scan.positions())}\n'
+                f'Marker: {side} x {side} um; expected width: {side} +/- {spec.width_tolerance_um} um\n'
+                f'Return target: {spec.rough_start_xy}; position tolerance: {spec.position_tolerance_um} um\n'
+                f'Clearance bounds (operator must verify): {spec.bounds}\n'
                 'A rough point far from center may not capture both edges; no automatic extension/retry.')
         except Exception as error:self.result.setText(str(error))
 

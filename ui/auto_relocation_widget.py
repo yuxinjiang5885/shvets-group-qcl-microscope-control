@@ -4,8 +4,9 @@ from hashlib import sha256
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (QComboBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                            QPlainTextEdit, QPushButton, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QComboBox, QFormLayout, QGridLayout, QLabel, QLineEdit,
+                            QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
+                            QScrollArea, QSizePolicy)
 
 from experiment.stage_registration import Orientation
 from ui.gds_assignment import GDSAssignmentWidget
@@ -13,9 +14,43 @@ from ui.registration_state import RegistrationState, RegistrationStatus, replay_
 from ui.localization_orchestration import LocalizationController, Command
 
 
+def auto_location_scroll(content):
+    """Tab wrapper only; the stable operational tabs/palette are untouched."""
+    scroll=QScrollArea()
+    scroll.setObjectName('AutoLocationScroll')
+    scroll.setWidgetResizable(True)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    scroll.setStyleSheet('QScrollArea#AutoLocationScroll { background: #f3f4f6; border: none; }')
+    scroll.setWidget(content)
+    return scroll
+
+
 class AutoRelocationWidget(QWidget):
     def __init__(self, parent=None, *, evidence_loader=None):
         super().__init__(parent)
+        self.setObjectName('AutoLocationPanel')
+        # A local stylesheet overrides inherited legacy dark QWidget rules.
+        # Scene drawing keeps its own deliberate dark canvas/feature colors.
+        self.setStyleSheet('''
+            #AutoLocationPanel, #AutoLocationPanel QWidget {
+                background-color: #f3f4f6; color: #20252b; font-size: 10pt;
+            }
+            #AutoLocationPanel QLineEdit, #AutoLocationPanel QComboBox,
+            #AutoLocationPanel QAbstractItemView, #AutoLocationPanel QPlainTextEdit {
+                background-color: #ffffff; color: #20252b;
+                border: 1px solid #828b95; selection-background-color: #245f96;
+                selection-color: #ffffff;
+            }
+            #AutoLocationPanel QPushButton {
+                background-color: #e5e9ed; border: 1px solid #828b95;
+                border-radius: 3px; padding: 5px;
+            }
+            #AutoLocationPanel QPushButton:hover { background-color: #d4e3ef; }
+            #AutoLocationPanel QWidget:disabled { color: #606975; background-color: #e7eaee; }
+            #AutoLocationPanel QHeaderView::section { background-color: #e5e9ed; color: #20252b; }
+            #AutoLocationPanel QAbstractItemView::item:selected { background-color: #245f96; color: white; }
+        ''')
+        self.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Preferred)
         self.state = RegistrationState()
         self.orchestration = LocalizationController(self.state)
         self.run_display = {}
@@ -24,11 +59,34 @@ class AutoRelocationWidget(QWidget):
         self._source_path = ''
         self._evidence_loader = evidence_loader or (lambda: replay_archived_evidence(Path(__file__).resolve().parents[1]))
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(10,10,10,10)
+        layout.setSpacing(8)
         layout.addWidget(QLabel('OFFLINE PREDICTION ONLY — archived frame, not current hardware registration.\n'
             'Qualitative validation only; quantitative physical accuracy is not calibrated.'))
         self.selection = GDSAssignmentWidget()
         self.selection.ms_button.setText('Add as Target / MS Feature')
-        layout.addWidget(self.selection, 1)
+        # The reusable assignment widget has five buttons in a single row.
+        # Reflow this instance only; other GDS and stable UI consumers are unchanged.
+        outer=self.selection.layout()
+        for index in range(outer.count()):
+            row=outer.itemAt(index).layout()
+            if row and any(row.itemAt(i).widget() is self.selection.marker_button for i in range(row.count())):
+                buttons=[]
+                while row.count():buttons.append(row.takeAt(0).widget())
+                outer.takeAt(index)
+                grid=QGridLayout()
+                for i,button in enumerate(buttons):grid.addWidget(button,i//3,i%3)
+                outer.insertLayout(index,grid)
+                row.deleteLater()
+                break
+        self.selection.root_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.selection.root_combo.setMinimumContentsLength(10)
+        self.selection.view.setMinimumHeight(300)
+        self.selection.info.setMinimumWidth(200)
+        self.selection.assignment_table.setMinimumHeight(115)
+        self.selection.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Preferred)
+        for label in self.selection.findChildren(QLabel):label.setWordWrap(True)
+        layout.addWidget(self.selection)
         form = QFormLayout()
         self.orientation = QComboBox()
         for item in Orientation:
@@ -44,15 +102,17 @@ class AutoRelocationWidget(QWidget):
             edit.textChanged.connect(self.sync_context)
         self.orientation.currentIndexChanged.connect(self.sync_context)
         layout.addLayout(form)
-        actions = QHBoxLayout()
+        actions = QGridLayout()
         self.locate_button = QPushButton('Locate Marker (acquisition not wired)')
         self.locate_button.setEnabled(False)
         self.load_button = QPushButton('Replay archived Module 7 registration')
         self.review_button = QPushButton('Review Registration')
         self.predict_button = QPushButton('Predict Selected Target')
         self.targets = QComboBox()
-        for widget in (self.locate_button, self.load_button, self.review_button, self.targets, self.predict_button):
-            actions.addWidget(widget)
+        self.targets.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.targets.setMinimumContentsLength(12)
+        for i,widget in enumerate((self.locate_button, self.load_button, self.review_button, self.targets, self.predict_button)):
+            actions.addWidget(widget,i//2,i%2)
         layout.addLayout(actions)
         self.status_label = QLabel()
         self.values_label = QLabel()
@@ -68,12 +128,14 @@ class AutoRelocationWidget(QWidget):
         self.review_text = QPlainTextEdit()
         self.review_text.setReadOnly(True)
         self.review_text.setMaximumHeight(120)
+        self.review_text.setMinimumHeight(80)
         layout.addWidget(self.review_text)
         self.selection.chip_layout_changed.connect(self.assignments_changed)
         self.load_button.clicked.connect(self.load_registration)
         self.review_button.clicked.connect(self.review_registration)
         self.predict_button.clicked.connect(self.predict_target)
         self.targets.currentIndexChanged.connect(self.clear_prediction)
+        for label in self.findChildren(QLabel):label.setWordWrap(True)
         self.refresh()
 
     def assignments_changed(self, _=None):

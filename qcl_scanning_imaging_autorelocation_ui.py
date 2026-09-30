@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget
 from PyQt6.QtCore import QTimer
-from ui.auto_relocation_widget import AutoRelocationWidget
+from ui.auto_relocation_widget import AutoRelocationWidget, auto_location_scroll
 from ui.operational_localization_bridge import OperationalLocalizationBridge, MAIN_COMMANDS
 from ui.localization_orchestration import OwnershipError, Command
 from ui.stage_command_dispatcher import qt_main_thread_target
@@ -28,7 +28,8 @@ class OfflineAutoRelocationWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.auto_relocation = AutoRelocationWidget()
-        self.tabs.addTab(self.auto_relocation, 'Auto Relocation')
+        self.auto_location_scroll=auto_location_scroll(self.auto_relocation)
+        self.tabs.addTab(self.auto_location_scroll, 'Auto Relocation')
 
 
 def operational_window_class(base_class=None, *, owner_factory=None):
@@ -65,7 +66,8 @@ def operational_window_class(base_class=None, *, owner_factory=None):
                 super().__init__()  # Existing inert UI fixtures only.
             self.prior_owner = owner
             self.auto_relocation = AutoRelocationWidget()
-            self.tabs.addTab(self.auto_relocation, 'Auto Location')
+            self.auto_location_scroll=auto_location_scroll(self.auto_relocation)
+            self.tabs.addTab(self.auto_location_scroll, 'Auto Location')
             if owner is not None:
                 # Authorization executes in the caller; the proxy queues every
                 # native call to its single persistent owner, not Qt main thread.

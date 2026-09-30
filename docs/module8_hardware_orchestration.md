@@ -749,9 +749,10 @@ motion. Never start a second UI/COM owner to recover a still-running session.
    SR865A 20 mV, 300 us, Advanced 24 dB. Confirm the actual physical/settings state.
    H-only will not tune or enable the laser. Vendor GUI remains closed.
 5. Use the existing stage/gamepad controls to reach a roughly central point on the
-   selected marker. Release sticks and read current XY. Enter this rough XY; do not
-   use archived coordinates. Enter the operator note, explicitly reviewed bounds and
-   confirm sample/objective clearance over the full approach/scan/return rectangle.
+   selected marker. Release sticks. Preview reads fresh XY; do not enter archived
+   coordinates. Enter the operator note and desired margin/step. Leave proposed
+   clearance bounds enabled, or enter explicit reviewed limits in manual mode.
+   Neither mode establishes physical clearance automatically.
 6. For side 500, margin 100, step 10, review X0-350 through X0+350 at Y0 (71 points).
    Bounds must contain every point and start/return; for example X0 +/-351 and
    Y0 +/-1 are a narrow envelope only if the operator has verified their clearance.
@@ -773,3 +774,48 @@ motion. Never start a second UI/COM owner to recover a still-running session.
 10. Stop after this one profile and review the saved evidence. Do not test V, full
     Locate Marker, target moves, ROI or Snake Scan. After a successful reviewed H-only
     run, prepare the separately supervised initial H+V milestone.
+
+### H-envelope preview and tab usability correction
+
+Operator-reported preparation reached GDS selection and confirmations, but Preview
+failed before motion. The former `HOnlyControls.build()` evaluated
+`float(self.fields['x'].text())` while rough X was initialized to an empty string.
+Rough Y and four bounds were also initially blank. Preview did not read the stage.
+
+Preview now reads fresh XY through the existing persistent proxy with a 2-second
+call timeout; it does not stop the gamepad, change joystick state, create DAQ,
+change laser state or move. Release the gamepad before preview. Every preview
+captures a new immutable spec/context/generation and clears prior confirmations.
+Run still re-reads idle/XY after ownership acquisition and DAQ setup, enforcing
+the existing 1 um tolerance. No acquisition/ownership/numerical policy changed.
+
+| Value | Source |
+|---|---|
+| Rough X/Y | Fresh proxy readback on Preview; displayed read-only |
+| Marker width/height and expected width | Operator-selected square GDS marker geometry |
+| Margin and step | Validated defaults 100 um / 10 um; labeled operator-editable configuration |
+| Width tolerance | Existing HOnlySpec default 100 um |
+| Position tolerance | Existing HOnlySpec fixed validated value 1 um |
+| Clearance bounds | Default proposed H envelope plus 1 um padding, explicitly operator-confirmed; optional manual current-frame limits |
+| Physical clearance / laser / lock-in / note | Explicit operator confirmation/input |
+
+Proposed bounds are not discovered mechanical limits or proof of sample/objective
+clearance. Legacy travel extent does not establish absolute limits in a redefined
+controller frame. Preview labels the proposal accordingly. Uncheck the proposal
+option to enter reviewed bounds explicitly; empty/invalid/nonfinite values receive
+field-specific errors before numeric conversion. For side 500, defaults give
+X0-350 to X0+350 at Y0, 71 points and return to X0/Y0. Enter note/settings before
+preview, then review the diagnostics and confirm clearance/settings before Run.
+
+Auto Location now has a widget-resizable vertical scroll wrapper in both entry
+paths. Registration and assignment buttons reflow into shorter rows, while the
+GDS canvas keeps a 300-pixel minimum height. The shared GDS widget implementation
+and stable operational UI are untouched. A local `AutoLocationPanel` stylesheet
+overrides inherited legacy dark container rules with neutral backgrounds and dark
+text, including disabled and selected states. The GDS scene retains its dark
+canvas. No application-wide stylesheet or palette changes are made.
+
+Tests exercise empty-field reproduction, fresh readback, missing/unavailable
+values, unchanged gamepad/DAQ state, scrolling at 1280x720 and contrasting palettes.
+The offscreen Qt environment lacks system fonts; screenshot inspection loaded
+Segoe UI only into the temporary inspection process, not production UI code.
