@@ -255,6 +255,8 @@ diagnostics; no production registration is currently complete.
 journals listed explicitly in the evaluator are preserved as offline evidence.
 The five repetitive `square_marker_rotation_profile_*_check.py` hardware harnesses
 remain local/untracked and are not required to replay classification.
+Production rotation: `experiment/marker_rotation.py`,
+`tests/test_marker_rotation.py`, `square_marker_rotation_fit_check.py`.
 
 **Dependencies** Modules 4–6.
 
@@ -269,27 +271,66 @@ gates fail closed; `usable_final_fits` is None after any failed set-level QC.
 There is no iterative trimming, alternate-seed search or historical-angle dependence.
 Provisional rotation and QC lines are not production registration outputs.
 
+Production marker rotation fitting: **COMPLETE / OFFLINE VALIDATED**.
+It requires successful classifier set-level QC and exactly the complete accepted
+CENTRAL geometry. It fits left/right/midpoint lines once using measured Y and
+the accepted Y mean as reference. The sole accepted rotation is
+`theta_mid = -degrees(atan(dx_mid/dy))`, consistent with Module 5.
+Slope standard errors, propagated midpoint angular statistical SE, RMS/max
+residuals, per-profile residuals and width statistics are reported.
+`accepted_theta_deg` equals `theta_mid_deg` only when valid; it is None on any
+hard QC failure. Warnings are separate from failure reasons. No profile deletion,
+subset search, iterative trimming, angle averaging or historical-angle dependence.
+
 **Remaining work**
 
-1. Production rotation fitting from accepted CENTRAL profiles.
-2. Rotation uncertainty / residual QC.
-3. Rotation-corrected center refinement using the vertical scan.
-4. Final marker registration QC.
-5. Physical validation of StageRegistration predictions.
+1. Rotation-corrected marker-center refinement.
+2. Center-refinement uncertainty / QC.
+3. Final marker registration result.
+4. StageRegistration integration.
+5. Physical validation of predicted MS positions (requires fabricated targets;
+   current-sample MS pixels are absent, as recorded in Module 9).
 
 Thresholds remain provisional screening thresholds, not experimentally calibrated
 production uncertainty limits. Do not fit toward the historical angle. Bar-based
 rotation was abandoned. No automatic targeting follows from classification.
+Production rotation defaults are provisional engineering QC thresholds, not
+calibrated physical uncertainty limits: side disagreement warns above 0.25 deg
+and fails above 1.0 deg; minimum 3 profiles, 2 distinct measured Y values and
+100 um Y span; maximum RMS residual 1 um, absolute residual 2 um (each line),
+and width peak-to-peak 5 um. Equality at both angular limits is accepted.
 
-**Validation / tests** Milestone rerun passed 31 classifier tests,
-47 reflection-scan tests and 25 adapter tests: 103 hardware-independent tests.
+**Validation / tests** Rotation milestone rerun passed 28 rotation tests,
+31 classifier tests, 47 reflection-scan tests and 25 adapter tests:
+131 hardware-independent tests.
 Run each with `python -B -m unittest discover -s tests -p <filename> -v`, using
-`test_marker_profile_classification.py`, `test_reflection_scan.py` and
+`test_marker_rotation.py`, `test_marker_profile_classification.py`, `test_reflection_scan.py` and
 `test_scan_adapters.py`. `python -B square_marker_profile_classification_check.py`
 reloads all five journals and reruns single-scan analysis before classification.
 Profiles 1–4 are CENTRAL; Profile 5 is INCONSISTENT (width, left-edge and midpoint
 residual failures). Four accepted profiles have four distinct Y coordinates and
 240 um accepted Y span; `sufficient_for_rotation_fit = True`.
+
+`python -B square_marker_rotation_fit_check.py` reloads the same committed journals,
+reruns single-scan analysis and classification, and fits only P1-P4. It reproduces:
+
+| Rotation quantity | Result |
+| --- | --- |
+| Left-side angle | -0.08049369300446074 deg |
+| Right-side angle | +0.34448525843138883 deg |
+| Effective midpoint rotation / accepted rotation | +0.13199759820576185 deg |
+| Midpoint regression statistical SE | 0.047127211112961795 deg |
+| Side-angle disagreement | 0.4249789514358496 deg |
+| Warning | left_right_angle_disagreement_warning |
+| Hard-failure reasons | () |
+| Valid | True |
+
+The midpoint line defines the effective rigid-body marker rotation used for
+registration; it does not assert perfectly parallel physical gold edges.
+Side disagreement is retained as a QC warning with no physical cause assigned.
+Statistical SE is regression-only, conditional on the selected profiles and OLS
+assumptions, not calibrated physical uncertainty. It excludes stage calibration,
+Y error, optical edge bias, drift and classification-selection effects.
 
 Each preserved journal records 71 completed points, measured and commanded XY,
 scalar reflection, bounds, scan timing settings and completion status. All saved
@@ -300,12 +341,16 @@ hardware facts require separate operator evidence. Final registration validation
 tests still need definition. Interpolated edge digits are not physical accuracy.
 
 **Exit criteria** Independently tested classification and fitting reject ambiguous
-or inconsistent data; sufficient accepted profiles support consistent side slopes;
+or inconsistent data; sufficient accepted profiles pass rotation hard QC with
+side-quality warnings preserved;
 center/angle and residual QC pass supervised validation. Not yet met.
 
-**Relevant commits** Classifier milestone: `feat(registration): add horizontal
-profile classification`. Record its resulting hash in the next roadmap update;
-this document is part of that commit.
+**Relevant commits** Classifier milestone:
+`0675a29861f30df44bbfdf042eea5301d2ab054e` —
+`feat(registration): add horizontal profile classification`.
+Rotation milestone: `feat(registration): add production marker rotation fitting`.
+Record its resulting hash in the next roadmap update; this document is part of
+that commit.
 
 ### Module 8 — Registration UI integration
 
@@ -418,10 +463,12 @@ contain its own final hash. Do not amend completed history just to add that hash
 ## Current handoff
 
 Module 6 is complete within its documented hardware-validation limits.
-Module 7 classifier is complete and offline validated; Module 7 remains in progress.
-Next task: implement production rotation fitting using only accepted CENTRAL
-profiles and requiring successful set-level classification QC. Final rotation,
-uncertainty, rotation-corrected center refinement and registration are not complete.
+Module 7 profile classification is complete and offline validated.
+Module 7 production rotation fitting is complete and offline validated.
+Module 7 as a whole remains in progress.
+Next task: rotation-corrected marker-center refinement using the accepted midpoint
+rotation and the previous vertical marker scan. Center-refinement uncertainty/QC,
+final registration, StageRegistration integration and physical validation remain.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned
