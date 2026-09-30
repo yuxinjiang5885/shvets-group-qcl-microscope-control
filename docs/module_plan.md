@@ -43,7 +43,7 @@ the QCL imaging workflow.
 | 5 | GDS-local to stage transform | Orientation, rotation, translation | COMPLETE AT ALGORITHM LEVEL | StageRegistration, StageLayout | 1, 4 |
 | 6 | 1D reflection scan and single-scan edge analysis | Adapters, scans, journals, edges | COMPLETE / HARDWARE VALIDATED within documented limits | ScanResult, EdgeResult | Hardware adapters; geometry supplies width prior |
 | 7 | Automatic square-marker registration | Multi-profile classification, fitting, QC | COMPLETE within documented validation limits | Offline center/angle; qualitative overlay agreement | 4–6 |
-| 8 | Registration UI integration | Workflow and registration lifecycle | NOT STARTED | UI with QC/invalidation | 3–7 |
+| 8 | Registration UI integration | Workflow and registration lifecycle | IN PROGRESS; offline shell complete / manually reviewed | UI with QC/invalidation | 3–7 |
 | 9 | Move to selected MS and physical validation | Safe registered targeting | NOT STARTED | Verified target/readback/residual | 5–8 |
 | 10 | ROI / QCL imaging integration | Registered geometry to imaging | NOT STARTED | ROIs and imaging workflow | 8–9 |
 
@@ -505,25 +505,50 @@ Record its resulting hash in the next roadmap update; this document is part of t
 
 **Inputs** Assignments and Module 7 registration/results.
 
-**Outputs** Planned workflow, QC display and invalidation state.
+**Outputs** Offline workflow, QC display and context-bound invalidation state.
 
-**Key files** No dedicated implementation. Existing integration candidates:
-`ui/gds_assignment.py`, `qcl_scanning_imaging_ui.py`; design Needs review.
+**Key files** `qcl_scanning_imaging_autorelocation_ui.py`,
+`ui/auto_relocation_widget.py`, `ui/registration_state.py`,
+`tests/test_auto_relocation_ui.py`, [milestone review](module8_ui_milestone.md).
+Reuses `ui/gds_assignment.py`. The stable `qcl_scanning_imaging_ui.py` remains
+byte-identical; the experimental full-window path uses a lazy subclass.
 
 **Dependencies** Modules 3–7.
 
-**Completed work** None for registration UI; preview/assignment already exist.
+**Completed work** Offline UI shell / lifecycle:
+**COMPLETE / OFFLINE VALIDATED / MANUALLY REVIEWED**.
+Operator manual testing confirmed GDS preview loading, manual marker/target
+selection, archived registration replay becoming VALID, warning retention,
+offline target prediction and correct invalidation lifecycle.
+Warnings and hard failures remain separate. Prediction delegates to Module 5;
+Module 6-7 algorithms are unchanged. Target edits clear predictions only;
+marker/GDS/orientation/frame/sample/registration-input changes invalidate approval.
+Default startup is offline, without hardware imports/initialization.
+Locate Marker remains disabled; there is no move-to-target action.
 
-**Remaining work** Ownership, cancellation, UI threading, persistence and
-invalidation on frame/assignment changes; implementation design Needs review.
+Operational hardware integration: **NOT YET IMPLEMENTED**.
+The explicit `--hardware` entry path inherits existing startup side effects but
+has not been exercised in milestone validation. It is not a Locate Marker integration.
 
-**Validation / tests** New registration UI tests and supervised integration planned;
-no dedicated test filenames established.
+**Remaining work** Safe Locate Marker orchestration: exclusive worker/resource
+ownership, cancellation/failure behavior, UI busy-state rules and live coordinate-
+frame invalidation. Registration persistence and supervised hardware validation
+remain outstanding. Archived offline approval is not live hardware registration.
+
+**Validation / tests** Closeout rerun passed 298 offline tests: 22 Auto Relocation,
+258 upstream Module 5-7/layout/overlay, 12 GDS preview and 6 GDS assignment tests.
+`python -B -m unittest discover -s tests -p test_auto_relocation_ui.py -v` includes
+blocked hardware imports, fake-base construction, lifecycle, warning/failure,
+manual-selection and real archived-evidence replay tests.
+Manual review is operator-reported; no real operational window or hardware was
+started during automated validation.
 
 **Exit criteria** UI safely manages registration state and prevents stale/failed
-registration use. Detailed acceptance criteria Needs review.
+registration use. Offline shell criteria are satisfied; live ownership, cancellation,
+frame-event hooks and supervised integration are still required. Module 8 is not complete.
 
-**Relevant commits** None.
+**Relevant commits** Offline shell milestone: `feat(ui): add auto-relocation UI shell`.
+Record its resulting hash in a subsequent roadmap update.
 
 ### Module 9 — Move to selected MS and physical validation
 
@@ -612,11 +637,11 @@ contain its own final hash. Do not amend completed history just to add that hash
 Module 6 complete.
 Module 7 complete within documented validation limits.
 
-Next module: Module 8 — Registration UI integration.
-
-Goal: integrate the existing marker-selection, localization, registration,
-QC/warnings, and StageRegistration workflow into the operational UI
-without changing the validated underlying registration algorithms.
+Module 8 offline UI shell is complete.
+Next task: design safe Locate Marker hardware orchestration,
+including worker ownership, cancellation/failure behavior,
+live coordinate-frame invalidation, and UI busy-state rules,
+before enabling any real acquisition.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned
