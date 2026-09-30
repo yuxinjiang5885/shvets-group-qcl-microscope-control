@@ -545,23 +545,20 @@ See [shell milestone](module8_ui_milestone.md) and
 MANUALLY REVIEWED**. M8.2a ownership/worker/cancellation framework:
 **COMPLETE / OFFLINE VALIDATED**. Fast-track M8.2b-M8.2e pipeline and experimental
 bridge are implemented in the working tree and fake/inert tested, not live validated.
-The persistent Prior owner and isolated H-only live gates are implemented and
-fake/inert validated. The real operational constructor has hardware side effects
-and was not executed. Full Locate Marker remains disabled; the separate supervised
-H-only development action is ready for its first authorized hardware test, not
-hardware validated. See the ownership document for the exact procedure/limits.
+The first supervised live H-only validation **PASSED** (run
+`495ebff7920b4d1296f5e9680afdd2a5`, 71/71 points, valid edges, return and cleanup
+PASS, ownership AVAILABLE, no registration published). The H+V development action
+is implemented for separate supervised validation, with full 2D preview, explicit
+both-axis confirmation, dynamic rounded H-midpoint X, separate journals and
+success-only return. Full live Locate Marker remains disabled/pending.
 
-**Remaining work** Demonstrate the separately supervised H-only test using the
-persistent owner, deterministic gamepad stop, acknowledged hardware-joystick handoff,
-run-owned reset=False DAQ provider, worker/cancel/deferred-close binding and explicit
-sole-Python laser/operator confirmation. Objective widget presence and unverified
-legacy DAQ cleanup block H-only; use a fresh operational session without other
-acquisition. Joystick acknowledgement is not independent state readback; laser
-settings/emission require operator confirmation because legacy cached values do not
-provide full fresh verification. Finalize registered-preview presentation and
-demonstrate H+V and then full localization
-under supervision before enabling the normal automatic chain. Current fixed scan
-margin must not be treated as proof of coverage from any rough marker point.
+**Remaining work** Review and run supervised H+V validation, then separately
+validate planned multi-H acquisition/classification and the full localization chain.
+Retain fresh-session objective/DAQ blockers and sole-Python laser ownership.
+Joystick acknowledgement is not independent readback; laser state/settings still
+require operator confirmation. Finish registered-preview presentation and arbitrary
+rough-point coverage before normal full Locate Marker enablement. A fixed margin
+is not proof of coverage from any marker point. No Module 9/10 implementation here.
 
 **Safety/lifecycle contract** One stage-command owner and one DAQ-task owner;
 share the persistent Prior owner's proxy, never create a second COM3 owner. Block legacy
@@ -740,15 +737,13 @@ motion (Module 9) -> Width/Height ROI preview and existing Snake Scan launch fro
 its verified top-left start (Module 10 MVP).
 
 Next task:
-Review and authorize the first isolated supervised H-only hardware test using the
-documented fresh-session, gamepad/joystick, objective/DAQ, laser, live-frame and
-clearance prerequisites. Its live gates are implemented and fake/inert validated;
-no new-path hardware run has occurred. The persistent Prior owner and stable UI
-isolation are preserved. After successful H-only evidence review, prepare a
-separately supervised H+V test before full-pipeline validation. Full live Locate
-Marker remains disabled. Resolve arbitrary rough-point scan coverage and
-finish the Auto Location registered-preview presentation. No Module 9/10 execution
-is authorized by this roadmap update; their finalized designs guide later work.
+Review the H+V implementation, then perform one separately supervised H+V validation
+using the documented fresh-session, ownership, laser, live-frame and full 2D
+clearance prerequisites. H-only live validation has passed; H+V has not yet been
+executed on hardware. After successful H+V evidence review, prepare supervised
+multi-H acquisition/classification before full-pipeline validation. Full live Locate
+Marker remains disabled. Preserve stable UI isolation and the finalized Modules
+8-10 workflow; no target movement or ROI execution is authorized by this update.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned

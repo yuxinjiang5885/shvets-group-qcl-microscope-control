@@ -819,3 +819,112 @@ Tests exercise empty-field reproduction, fresh readback, missing/unavailable
 values, unchanged gamepad/DAQ state, scrolling at 1280x720 and contrasting palettes.
 The offscreen Qt environment lacks system fonts; screenshot inspection loaded
 Segoe UI only into the temporary inspection process, not production UI code.
+
+
+## First supervised live H-only validation: PASSED
+
+Operator-reported live run `495ebff7920b4d1296f5e9680afdd2a5` is also recorded in
+`localization_runs/495ebff7920b4d1296f5e9680afdd2a5/initial_H.jsonl` and its local
+`h_only_result.json`. These existing local evidence files were read, not modified.
+Requested and measured X: 3830 to 4530 um, fixed Y -26100 um; 71/71 points.
+Reported edges: 3966.049 and 4463.602 um; midpoint 4214.825 um; width 497.554 um
+(expected 500 um). Edge analysis VALID, return PASS, DAQ cleanup PASS, ownership
+AVAILABLE, H-only complete; registration published False. Rounded figures here
+are evidence summaries, not production defaults or claims of physical accuracy.
+
+The normal live path demonstrated the persistent owner/proxy, input handoff,
+run-owned NI provider, journaled scan, analysis, return and cleanup. It does not
+validate hardware fault injection or native-call interruption. Known warnings:
+`joystick_command_ack_only` and
+`laser_operator_confirmation_not_fresh_SDK_readback` remain explicit limitations.
+Full live Locate Marker remains disabled. This is not full Module 8 validation.
+
+## Next supervised development gate: H+V (implementation and inert validation)
+
+`ui/hv_validation.py` extends the existing H-only spec/services; the shared Qt
+runner, handoff, NI provider, scanner, edge analysis, return and cleanup are reused.
+`RunSettings.purpose='hv'` is explicitly non-publishing, like `h_only`. A successful
+run never calls classification, rotation, center refinement or StageRegistration.
+
+Sequence: operator preview/confirmation -> exclusive ownership and existing input
+handoff -> fresh idle/start checks before and after DAQ setup -> initial H ->
+finalized-journal verification/unique width-guided edges -> dynamic V plan ->
+initial V -> finalized-journal verification/unique width-guided edges -> initial
+(H midpoint, V midpoint) estimate -> verified success-only return -> owned DAQ,
+idle and input-restore cleanup. Both scans call unchanged `scan_1d()` and
+`analyze_scan()`. H-only still performs exactly one scan.
+
+For nominal side 500, margin 100, step 10 and fresh rough start (X0,Y0):
+
+- H: X0-350 to X0+350 at Y0, increasing X, 71 points.
+- V: Y0-350 to Y0+350, increasing numeric Y (including negative coordinates),
+  71 points. Fixed X is nearest integer H midpoint, ties-to-even, never truncation.
+  The result reports the floating midpoint, chosen integer X and signed delta.
+- V X is unknown before H. The operator reviews the rounding policy and the full
+  possible rectangle, not an invented exact V X. Prevalidation checks both extreme
+  V lines at the H endpoints. Dynamic V X must stay inside this reviewed H range;
+  every V target is checked again before motion.
+- Proposed clearance bounds: X0 +/-351 and Y0 +/-351, including tolerance padding.
+  These are not measured mechanical limits. The entire rectangle, diagonal
+  reposition/approach and return require actual operator clearance approval.
+- A roughly central starting point is recommended. This fixed envelope does not
+  guarantee edge coverage from an arbitrary point near a marker corner. Missing
+  edges fail closed; no automatic extension, retry or extra profile is allowed.
+
+**Separate authorization:** Preview H+V Envelope clears old H-only confirmations.
+Run H+V requires all original confirmations plus an explicit BOTH X/Y full-2D
+clearance checkbox. Field/context changes require a fresh review. The shared runner
+prevents overlapping H/H+V runs, and both sets of controls lock during acquisition.
+
+Each run retains `initial_H.jsonl` and `initial_V.jsonl` separately under its unique
+run directory. `hv_result.json` and UI run diagnostics include requested/measured
+ranges, counts, both edge analyses (contrast/noise/candidate details), dynamic V X,
+initial center, warnings, return/cleanup/ownership and completion status. Partial
+journals remain after failure. No StageRegistration is published.
+
+Cancellation checkpoints exist after each verified journal, before V reposition,
+during scan polling, and before/during return. H failure prevents V; either-axis
+failure/cancel prevents automatic return. Failed return prevents success. Cleanup
+failure or uncertain native execution quarantines; no concurrent stop, forced thread
+termination, automatic reset or second session is introduced. Deferred close uses
+the same runner/owner lifecycle as H-only.
+
+### Exact next supervised H+V procedure (not executed by this implementation task)
+
+1. Close other stage/DAQ owners, the stable UI, standalone scripts and MIRcat vendor
+   GUI. Start a fresh `python .\qcl_scanning_imaging_autorelocation_ui.py --hardware`
+   session only for the separately supervised test. Do not open objective/autofocus
+   or perform legacy acquisition first; uncertain legacy DAQ ownership blocks launch.
+2. Python is sole MIRcat owner. Establish and physically confirm emission/settings
+   using existing controls: 1500 cm^-1; SR865A 20 mV, 300 us, Advanced 24 dB.
+   H+V does not tune or enable emission. Acknowledgements/operator confirmation
+   still do not constitute fresh independent hardware telemetry.
+3. Manually select the square gold reference marker, enter current frame/sample/input
+   identities, and use existing gamepad/stage controls to reach a roughly central
+   point. Release sticks. Set margin 100, step 10, operator note and output directory.
+4. Press **Preview H+V Envelope**. Review fresh XY, H endpoints/count, dynamic V X
+   rounding policy, V Y endpoints/count, return target and the full clearance
+   rectangle. Inspect physical clearance; then check all four original confirmations
+   and the separate BOTH X/Y checkbox. Do not reuse remembered coordinates.
+5. Press **Run H+V Validation** once. Expect handoff and owned DAQ setup, exactly
+   71 H points, then 71 V points at rounded H midpoint X, then return only on success.
+   NI: ai0 X/ai1 Y, +/-10 V, clipping +/-9.9 V, 32 samples/channel at 100 kS/s,
+   finite untriggered, reset=False. Position tolerance 1 um; polling 10 ms,
+   continuous idle settling 100 ms; movement 5 s; readback/settling, DAQ and stop 2 s.
+6. Accept only finalized H/V journals, valid unique edges/width within 500 +/-100 um,
+   plausible initial center, return PASS, DAQ/idle/restore cleanup PASS, ownership
+   AVAILABLE, `hv_complete=True`, and registration_published=False. Review warnings.
+7. Cancel on unexpected behavior. Cancellation is cooperative, with no failure return;
+   native calls cannot be forcibly interrupted. After failure retain evidence and
+   current position, inspect reasons, and do not retry until independent idle/frame/
+   cleanup/clearance checks resolve the cause. Uncertain execution remains quarantined;
+   never open another stage session or force-disconnect an unresolved owner.
+8. Do not test multi-H, rotation, refined center, full Locate Marker, target movement,
+   ROI or Snake Scan. After H+V evidence is reviewed, separately prepare supervised
+   planned multi-H acquisition/classification. Module 8 is still in progress.
+
+Offline validation for this H+V implementation: **575 tests passed** (542 baseline
+plus 33 new H+V orchestration/Qt tests). Stable UI SHA256 remains
+`fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
+No hardware was initialized or commanded during implementation/testing.
+Readiness is for a separately supervised H+V test, not a completed live H+V result.

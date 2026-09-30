@@ -1,4 +1,4 @@
-"""Explicit supervised H-only action. Construction performs no device calls."""
+"""Shared supervised H-only/H+V controls. Construction performs no device calls."""
 from pathlib import Path
 from dataclasses import asdict
 import json
@@ -7,6 +7,7 @@ from PyQt6.QtCore import QObject,QThread,Qt,pyqtSlot,QTimer
 from PyQt6.QtWidgets import QWidget,QFormLayout,QLineEdit,QCheckBox,QPushButton,QLabel,QVBoxLayout
 from experiment.scan_1d import StageBounds
 from ui.h_only_validation import HOnlySpec,OperatorConfirmation,InputHandoff,HOnlyServices
+from ui.hv_validation import HVSpec, HVConfirmation, HVServices
 from ui.localization_daq import LocalizationDAQProvider
 from ui.localization_orchestration import RunSettings,LocateMarkerWorker,CleanupOutcome,OwnershipError
 from ui.localization_worker import LocateMarkerQtWorker
@@ -30,14 +31,17 @@ class HOnlyRunner(QObject):
         generation=controller.registration.context_generation
         handle=None
         try:
+            if isinstance(spec,HVSpec) and not isinstance(confirmation,HVConfirmation):
+                raise ValueError('H_plus_V_requires_separate_confirmation')
             confirmation.validate(context,self.window.laser)
             spec.scan().positions()
             if spec.bounds.frame_id!=context.frame_id:raise ValueError('frame_mismatch')
             Path(output_dir).mkdir(parents=True,exist_ok=True)
             handoff=InputHandoff(self.bridge);handoff.prepare()
-            handle=self.bridge.acquire(RunSettings(context,generation,repr(spec.rough_start_xy),purpose='h_only'))
+            handle=self.bridge.acquire(RunSettings(context,generation,repr(spec.rough_start_xy),purpose='hv' if isinstance(spec,HVSpec) else 'h_only'))
             provider=LocalizationDAQProvider(self.bridge,handle,self.backend)
-            self.services=self.services_type(self.bridge,handle,spec,output_dir,provider,
+            services_type = HVServices if isinstance(spec,HVSpec) and self.services_type is HOnlyServices else self.services_type
+            self.services=services_type(self.bridge,handle,spec,output_dir,provider,
                 confirmation=confirmation,handoff=handoff)
             self.thread=QThread(self)
             self.worker=LocateMarkerQtWorker(LocateMarkerWorker(controller,handle,self.services))
@@ -75,12 +79,13 @@ class HOnlyRunner(QObject):
             cleanup_status='PASS' if snapshot['ownership']=='AVAILABLE' else 'UNCONFIRMED',
             reasons=snapshot['reasons'],handoff=self.services.handoff.result,
             restore=self.services.handoff.restore_result,registration_published=False)
+        report[self.services.handle.settings.purpose+'_complete'] = snapshot['acquisition']=='COMPLETE' and snapshot['ownership']=='AVAILABLE'
         try:
             if self.services.path.exists():
-                (self.services.path/'h_only_result.json').write_text(json.dumps(report,indent=2,default=str),encoding='utf-8')
+                (self.services.path/(self.services.handle.settings.purpose+'_result.json')).write_text(json.dumps(report,indent=2,default=str),encoding='utf-8')
         except Exception as error:
             report['report_write_error']=str(error)
-        self.window.auto_relocation.run_display.update(h_only_result=report)
+        self.window.auto_relocation.run_display.update({self.services.handle.settings.purpose+'_result':report})
         self.window.h_only_controls.set_busy(False)
         self.window.auto_relocation.refresh()
         if self.bridge.close_pending:QTimer.singleShot(0,self.window.continue_localization_close)
@@ -91,8 +96,9 @@ class HOnlyControls(QWidget):
         super().__init__(window.auto_relocation)
         self.window=window
         self.preview_xy=None
+        self.mode='h_only'
         layout=QVBoxLayout(self)
-        layout.addWidget(QLabel('SUPERVISED DEVELOPMENT: one H scan only; no registration publication.'))
+        layout.addWidget(QLabel('SUPERVISED DEVELOPMENT: choose H-only or H+V; no registration publication.'))
         form=QFormLayout();self.fields={}
         for key,label,value in (('x','Fresh preview X (um)',''),('y','Fresh preview Y (um)',''),
             ('xmin','Clearance bounds X min',''),('xmax','Clearance bounds X max',''),
@@ -120,10 +126,16 @@ class HOnlyControls(QWidget):
         self.run_button=QPushButton('Run H-Only Validation')
         self.run_button.setEnabled(False)
         self.reviewed=None
-        self.cancel_button=QPushButton('Cancel H-Only / Localization')
+        self.hv_preview_button=QPushButton('Preview H+V Envelope')
+        self.hv_run_button=QPushButton('Run H+V Validation')
+        self.hv_run_button.setEnabled(False)
+        self.hv_clearance=QCheckBox('H+V: I confirm movement in BOTH X and Y.\nFull 2D rectangle, approach and return clearance checked.')
+        self.cancel_button=QPushButton('Cancel H / H+V / Localization')
         self.result=QLabel();self.result.setWordWrap(True)
-        for w in (self.preview_button,self.run_button,self.cancel_button,self.result):layout.addWidget(w)
-        self.preview_button.clicked.connect(self.preview)
+        for w in (self.preview_button,self.run_button,self.hv_preview_button,self.hv_clearance,self.hv_run_button,self.cancel_button,self.result):layout.addWidget(w)
+        self.preview_button.clicked.connect(lambda:self.preview('h_only'))
+        self.hv_preview_button.clicked.connect(lambda:self.preview('hv'))
+        self.hv_run_button.clicked.connect(self.start)
         self.run_button.clicked.connect(self.start)
         self.cancel_button.clicked.connect(lambda:window.localization_bridge.controller.request_cancel())
         for field in self.fields.values():field.textChanged.connect(self.invalidate_review)
@@ -131,10 +143,12 @@ class HOnlyControls(QWidget):
     def invalidate_review(self,*_):
         self.reviewed=None
         self.run_button.setEnabled(False)
+        self.hv_run_button.setEnabled(False)
+        self.hv_clearance.setChecked(False)
         for check in self.checks:check.setChecked(False)
 
     def set_busy(self,busy):
-        for widget in (*self.fields.values(),*self.checks,self.preview_button,self.automatic_bounds):
+        for widget in (*self.fields.values(),*self.checks,self.preview_button,self.hv_preview_button,self.hv_clearance,self.automatic_bounds):
             widget.setEnabled(not busy)
         self.invalidate_review()
 
@@ -165,15 +179,19 @@ class HOnlyControls(QWidget):
         state=self.window.auto_relocation.state
         if self.preview_xy is None:raise ValueError('H-only fresh stage position is unavailable; preview first')
         side=self.marker_side()
-        spec=HOnlySpec(self.preview_xy,StageBounds(
+        spec_type=HVSpec if self.mode=='hv' else HOnlySpec
+        spec=spec_type(self.preview_xy,StageBounds(
             self.number('xmin','clearance X minimum'),self.number('xmax','clearance X maximum'),
             self.number('ymin','clearance Y minimum'),self.number('ymax','clearance Y maximum'),state.context.frame_id),
             side_um=side,scan_margin_um=self.number('margin','scan margin'),step_um=self.number('step','scan step'))
-        confirmation=OperatorConfirmation(*(c.isChecked() for c in self.checks),
-            wavenumber_cm=self.number('wn','wavenumber'),note=self.fields['note'].text())
+        confirmation_type=HVConfirmation if self.mode=='hv' else OperatorConfirmation
+        extra={'both_axes_clearance':self.hv_clearance.isChecked()} if self.mode=='hv' else {}
+        confirmation=confirmation_type(*(c.isChecked() for c in self.checks),
+            wavenumber_cm=self.number('wn','wavenumber'),note=self.fields['note'].text(),**extra)
         return spec,confirmation
 
-    def preview(self):
+    def preview(self,mode='h_only'):
+        self.mode=mode
         self.invalidate_review()
         self.preview_xy=None
         try:
@@ -201,13 +219,14 @@ class HOnlyControls(QWidget):
                 # Proposed clearance envelope, NOT controller travel limits or
                 # proof of physical clearance. Run still requires confirmation.
                 padding=HOnlySpec.position_tolerance_um
-                limits=(xy[0]-half-padding,xy[0]+half+padding,xy[1]-padding,xy[1]+padding)
+                yhalf=half if self.mode=='hv' else 0
+                limits=(xy[0]-half-padding,xy[0]+half+padding,xy[1]-yhalf-padding,xy[1]+yhalf+padding)
                 for key,value in zip(('xmin','xmax','ymin','ymax'),limits):self.fields[key].setText(f'{value:g}')
             spec,_=self.build();scan=spec.scan()
             self.invalidate_review()
             state=self.window.auto_relocation.state
             self.reviewed=(spec,state.context,state.context_generation)
-            self.run_button.setEnabled(True)
+            (self.hv_run_button if self.mode=='hv' else self.run_button).setEnabled(True)
             self.result.setText(f'Rough start: {spec.rough_start_xy} um\n'
                 f'X start: {scan.start_um}; X end: {scan.end_um}; fixed Y: {scan.fixed_um} um\n'
                 f'Step: {scan.step_um} um; points: {len(scan.positions())}\n'
@@ -215,6 +234,9 @@ class HOnlyControls(QWidget):
                 f'Return target: {spec.rough_start_xy}; position tolerance: {spec.position_tolerance_um} um\n'
                 f'Clearance bounds (operator must verify): {spec.bounds}\n'
                 'A rough point far from center may not capture both edges; no automatic extension/retry.')
+            if self.mode=='hv':
+                v=spec.vertical(spec.rough_start_xy[0])
+                self.result.setText(self.result.text()+f'\nH+V: V X is DYNAMIC: nearest integer H midpoint (ties-to-even), unknown until valid H.\nV Y: {v.start_um} to {v.end_um}; step {v.step_um}; {len(v.positions())} points.\nConfirm the full 2D clearance rectangle, not just the H line. Initial center only.')
         except Exception as error:self.result.setText(str(error))
 
     def start(self):
@@ -224,6 +246,6 @@ class HOnlyControls(QWidget):
             if self.reviewed!=(spec,state.context,state.context_generation):
                 raise ValueError('preview_current_envelope_and_context_before_confirmation')
             handle=self.window.h_only_runner.start(spec,confirmation,self.fields['output'].text())
-            self.result.setText('Running H only: '+handle.run_id)
+            self.result.setText(('Running H+V: ' if self.mode=='hv' else 'Running H only: ')+handle.run_id)
             self.invalidate_review() # Fresh preview and confirmation every attempt.
         except Exception as error:self.result.setText('Not started: '+str(error))

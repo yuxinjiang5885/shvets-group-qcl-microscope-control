@@ -159,7 +159,8 @@ class HOnlyServices(LocalizationPipelineServices):
         if not self.spec.bounds.contains(actual) or hypot(*(a-b for a,b in zip(actual,self.spec.rough_start_xy)))>self.spec.position_tolerance_um:
             raise ValueError('confirmed_rough_start_mismatch')
 
-    def work(self,settings,checkpoint,progress):
+    def acquire_horizontal(self,checkpoint,progress):
+        """Shared verified H phase; never returns the stage or publishes registration."""
         scan,edge=self._scan('initial_H',self.spec.scan(),checkpoint,progress)
         xs=[p.measured_um[0] for p in scan.points];ys=[p.measured_um[1] for p in scan.points]
         self.report.update(journal=str(self.journals[0]),requested_x=(self.spec.scan().start_um,self.spec.scan().end_um),
@@ -167,6 +168,10 @@ class HOnlyServices(LocalizationPipelineServices):
             left=edge.left_edge_um,right=edge.right_edge_um,midpoint=edge.midpoint_um,width=edge.width_um,
             expected_width=self.spec.side_um,edge_diagnostics=asdict(edge),
             warnings=('joystick_command_ack_only','laser_operator_confirmation_not_fresh_SDK_readback'))
+        return scan,edge
+
+    def work(self,settings,checkpoint,progress):
+        self.acquire_horizontal(checkpoint,progress)
         self._phase('success_only_return',checkpoint,progress)
         self.report['return_status']='FAILED_OR_INCOMPLETE'
         self._return(checkpoint)

@@ -3,7 +3,7 @@
 --hardware explicitly opts into ALL existing mainWindow startup side effects:
 MIRcat/Prior/PI connections and stage speed/acceleration/joystick configuration.
 The old module is never imported by the default/offline path. The hardware window
-offers an explicitly confirmed, isolated H-only development scan. Full live
+offers separately confirmed H-only and H+V development scans. Full live
 Locate Marker and target motion remain disabled.
 """
 import argparse
@@ -39,7 +39,7 @@ def operational_window_class(base_class=None, *, owner_factory=None):
     legacy module loads vendor libraries, and its constructor starts hardware.
     Experimental overrides guard callbacks and defer close while leased.
     The real experimental path injects one persistent-owner proxy before inherited
-    startup. H-only owns a separately configured DAQ task; Locate Marker stays disabled.
+    startup. H/H+V owns a separately configured DAQ task; Locate Marker stays disabled.
     """
     use_owner = base_class is None or owner_factory is not None
     if base_class is None:

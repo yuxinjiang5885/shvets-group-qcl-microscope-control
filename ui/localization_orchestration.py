@@ -272,7 +272,7 @@ class RunSettings:
     def __post_init__(self):
         if (type(self.context_generation) is not int or self.context_generation < 0
                 or not self.expected_rough_start_id.strip()
-                or self.purpose not in ('registration', 'h_only')):
+                or self.purpose not in ('registration', 'h_only', 'hv')):
             raise ValueError('invalid_run_settings')
 
 
@@ -368,7 +368,7 @@ class LocalizationController:
     def offer_candidate(self, handle, evidence):
         with self.registration.lock:
             self.checkpoint(handle)
-            if handle.settings.purpose == 'h_only':
+            if handle.settings.purpose in ('h_only', 'hv'):
                 raise ValueError('H_only_cannot_publish_registration')
             if (not isinstance(evidence, RegistrationEvidence)
                     or not isinstance(evidence.classification, ClassificationResult)
@@ -405,7 +405,7 @@ class LocalizationController:
                     self.machine.transition(AcquisitionState.CANCELLING)
                 self.reasons += ('cancelled',)
                 target = AcquisitionState.CANCELLED
-            elif succeeded is True and handle.settings.purpose == 'h_only':
+            elif succeeded is True and handle.settings.purpose in ('h_only', 'hv'):
                 target = AcquisitionState.COMPLETE  # Never publishes registration.
             elif succeeded is not True or candidate is None:
                 self.reasons += ('candidate_run_failed',)
@@ -517,8 +517,8 @@ class LocateMarkerWorker:
             emit('phase_changed', 'candidate_work')
             candidate = self.services.work(self.handle.settings,
                 lambda: self.controller.checkpoint(self.handle), progress)
-            if self.handle.settings.purpose == 'h_only':
-                progress({'h_only_result': candidate})
+            if self.handle.settings.purpose in ('h_only', 'hv'):
+                progress({self.handle.settings.purpose + '_result': candidate})
             else:
                 self.controller.offer_candidate(self.handle, candidate)
             succeeded = True
@@ -572,8 +572,8 @@ class LocateMarkerWorker:
                 registration = self.controller.registration.registration
             for warning in warnings:
                 emit('warning', warning)
-            if accepted and self.handle.settings.purpose == 'h_only':
-                emit('progress', {'h_only_complete': True, 'cleanup': 'PASS', 'registration_published': False})
+            if accepted and self.handle.settings.purpose in ('h_only', 'hv'):
+                emit('progress', {self.handle.settings.purpose + '_complete': True, 'cleanup': 'PASS', 'registration_published': False})
             elif accepted:
                 emit('registration_completed', registration)
             elif state is AcquisitionState.CANCELLED:
