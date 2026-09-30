@@ -173,6 +173,15 @@ class HardwareOwnershipController:
             if self._active is not lease or self.status is not OwnershipStatus.LEASED:
                 raise OwnershipError('lease_not_authorized')
 
+    def quarantine(self, lease, reason):
+        """Latch native execution uncertainty without releasing its owner."""
+        with self._lock:
+            if self._active is not lease:
+                raise OwnershipError('stale_quarantine_request')
+            self.status = OwnershipStatus.QUARANTINED
+            self.quarantined_run_id = lease.run_id
+            self.reasons = tuple(dict.fromkeys((*self.reasons, reason)))
+
     def release(self, lease, cleanup):
         with self._lock:
             if self._active is not lease:
@@ -258,10 +267,12 @@ class RunSettings:
     context: RegistrationContext
     context_generation: int
     expected_rough_start_id: str
+    purpose: str = 'registration'
 
     def __post_init__(self):
         if (type(self.context_generation) is not int or self.context_generation < 0
-                or not self.expected_rough_start_id.strip()):
+                or not self.expected_rough_start_id.strip()
+                or self.purpose not in ('registration', 'h_only')):
             raise ValueError('invalid_run_settings')
 
 
@@ -357,6 +368,8 @@ class LocalizationController:
     def offer_candidate(self, handle, evidence):
         with self.registration.lock:
             self.checkpoint(handle)
+            if handle.settings.purpose == 'h_only':
+                raise ValueError('H_only_cannot_publish_registration')
             if (not isinstance(evidence, RegistrationEvidence)
                     or not isinstance(evidence.classification, ClassificationResult)
                     or not isinstance(evidence.rotation, RotationFitResult)
@@ -392,6 +405,8 @@ class LocalizationController:
                     self.machine.transition(AcquisitionState.CANCELLING)
                 self.reasons += ('cancelled',)
                 target = AcquisitionState.CANCELLED
+            elif succeeded is True and handle.settings.purpose == 'h_only':
+                target = AcquisitionState.COMPLETE  # Never publishes registration.
             elif succeeded is not True or candidate is None:
                 self.reasons += ('candidate_run_failed',)
                 target = AcquisitionState.FAILED
@@ -471,6 +486,20 @@ class LocateMarkerWorker:
                 except Exception as error:
                     self.delivery_errors.append(str(error))  # Observer failure cannot skip cleanup.
 
+        def progress(value):
+            emit('progress', value)
+            if isinstance(value, dict):
+                if 'warnings' in value:
+                    with self.controller.registration.lock:
+                        self.controller.warnings = tuple(dict.fromkeys(
+                            (*self.controller.warnings, *value['warnings'])))
+                    for warning in value['warnings']:
+                        emit('warning', warning)
+                if 'phase' in value:
+                    emit('phase_changed', value['phase'])
+                if 'profile_completed' in value:
+                    emit('profile_completed', value)
+
         touched = False
         succeeded = False
         reasons = ()
@@ -487,8 +516,11 @@ class LocateMarkerWorker:
             self.controller.checkpoint(self.handle)
             emit('phase_changed', 'candidate_work')
             candidate = self.services.work(self.handle.settings,
-                lambda: self.controller.checkpoint(self.handle), lambda value: emit('progress', value))
-            self.controller.offer_candidate(self.handle, candidate)
+                lambda: self.controller.checkpoint(self.handle), progress)
+            if self.handle.settings.purpose == 'h_only':
+                progress({'h_only_result': candidate})
+            else:
+                self.controller.offer_candidate(self.handle, candidate)
             succeeded = True
         except Cancelled as error:
             self.controller.request_cancel(self.handle)
@@ -524,6 +556,11 @@ class LocateMarkerWorker:
                     stop = checked('protective_stop')
             daq = checked('release_daq') if touched else True
             idle = checked('confirm_idle') if touched else True
+            if hasattr(self.services, 'restore_inputs'):
+                if daq and idle and stop and self.controller.ownership.status is OwnershipStatus.LEASED:
+                    checked('restore_inputs')
+                else:
+                    failures.append('input_restore_withheld_unsafe_cleanup')
             cleanup = CleanupOutcome(daq, idle, stop, tuple(failures))
             # Snapshot terminal output atomically: an observer/new GUI action
             # may start another run as soon as this lease has been settled.
@@ -535,7 +572,9 @@ class LocateMarkerWorker:
                 registration = self.controller.registration.registration
             for warning in warnings:
                 emit('warning', warning)
-            if accepted:
+            if accepted and self.handle.settings.purpose == 'h_only':
+                emit('progress', {'h_only_complete': True, 'cleanup': 'PASS', 'registration_published': False})
+            elif accepted:
                 emit('registration_completed', registration)
             elif state is AcquisitionState.CANCELLED:
                 emit('cancelled', final_reasons)

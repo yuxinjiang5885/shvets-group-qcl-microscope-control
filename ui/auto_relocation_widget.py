@@ -18,6 +18,7 @@ class AutoRelocationWidget(QWidget):
         super().__init__(parent)
         self.state = RegistrationState()
         self.orchestration = LocalizationController(self.state)
+        self.run_display = {}
         self._model = None
         self._gds_hash = ''
         self._source_path = ''
@@ -153,6 +154,18 @@ class AutoRelocationWidget(QWidget):
             return
         self.refresh()
 
+    def consume_localization_event(self, event):
+        """GUI-thread slot for injected/fake runs; never starts acquisition."""
+        if not self.orchestration.event_is_current(event):
+            return
+        if event.name == 'started':
+            self.run_display = {'phase': 'starting'}
+        elif event.name == 'progress' and isinstance(event.detail, dict):
+            self.run_display.update(event.detail)
+        elif event.name == 'phase_changed':
+            self.run_display['phase'] = event.detail
+        self.refresh()
+
     def refresh(self):
         snapshot = self.orchestration.snapshot()
         self.acquisition_label.setText(
@@ -160,7 +173,8 @@ class AutoRelocationWidget(QWidget):
             f"ownership: {snapshot['ownership']}; context generation: {snapshot['generation']}\n"
             f"Candidate pending: {snapshot['candidate_pending']}; approved retained: {snapshot['approved_retained']}; "
             f"run warnings: {snapshot['warnings'] or 'none'}; "
-            f"run/ownership failures: {snapshot['reasons'] or 'none'}")
+            f"run/ownership failures: {snapshot['reasons'] or 'none'}\n"
+            f"Run diagnostics: {self.run_display}")
         editable = self.orchestration.ownership.guard(Command.GDS_CHANGE).allowed
         self.selection.setEnabled(editable)
         self.orientation.setEnabled(editable)

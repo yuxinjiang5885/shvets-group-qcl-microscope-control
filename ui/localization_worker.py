@@ -10,6 +10,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 class LocateMarkerQtWorker(QObject):
     started = pyqtSignal(object)
     progress = pyqtSignal(object)
+    profile_completed = pyqtSignal(object)
     phase_changed = pyqtSignal(object)
     warning = pyqtSignal(object)
     failed = pyqtSignal(object)

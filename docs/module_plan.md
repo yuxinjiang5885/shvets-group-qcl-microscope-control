@@ -2,7 +2,7 @@
 
 This is the authoritative module roadmap. Review and update it before starting a
 module, declaring a module complete, or committing completed module work.
-Status reviewed against the repository on 2026-09-29. Completion is scoped to the
+Module 8-10 workflow design reviewed on 2026-09-30; earlier module evidence retains its recorded dates. Completion is scoped to the
 exit criteria below; it does not imply universal hardware reliability.
 
 ## Project goal
@@ -27,8 +27,10 @@ the QCL imaging workflow.
   selected marker center; units are micrometers.
 - Registration QC precedes automatic MS movement. Bounds require operator-verified
   clearance and are not obstacle avoidance.
-- Supervised acquisition uses exclusive stage/DAQ ownership: Python QCL UI closed,
-  vendor MIRcat GUI controlling emission independently. No unreviewed hardware runs.
+- Module 6 supervised development used Python QCL UI closed with vendor MIRcat
+  control. Integrated Module 8-10 operation must instead establish singular laser
+  ownership and exclusive shared stage/DAQ ownership; do not assume both laser
+  controllers may coexist. No unreviewed hardware runs.
 - Journals prove acquisition facts, not laser settings, return, cleanup or physical
   stopping effectiveness. Preserve the provenance distinctions in the evidence.
 
@@ -43,9 +45,9 @@ the QCL imaging workflow.
 | 5 | GDS-local to stage transform | Orientation, rotation, translation | COMPLETE AT ALGORITHM LEVEL | StageRegistration, StageLayout | 1, 4 |
 | 6 | 1D reflection scan and single-scan edge analysis | Adapters, scans, journals, edges | COMPLETE / HARDWARE VALIDATED within documented limits | ScanResult, EdgeResult | Hardware adapters; geometry supplies width prior |
 | 7 | Automatic square-marker registration | Multi-profile classification, fitting, QC | COMPLETE within documented validation limits | Offline center/angle; qualitative overlay agreement | 4–6 |
-| 8 | Registration UI integration | Workflow and registration lifecycle | IN PROGRESS; offline shell complete / manually reviewed | UI with QC/invalidation | 3–7 |
-| 9 | Move to selected MS and physical validation | Safe registered targeting | NOT STARTED | Verified target/readback/residual | 5–8 |
-| 10 | ROI / QCL imaging integration | Registered geometry to imaging | NOT STARTED | ROIs and imaging workflow | 8–9 |
+| 8 | Auto Location / Locate Marker | Automatic localization and registered preview | IN PROGRESS; offline shell complete / manually reviewed | UI with QC/invalidation | 3–7 |
+| 9 | Registered feature navigation | Click prediction / guarded center motion | NOT STARTED | Target prediction and motion/readback outcome | 5–8 |
+| 10 | Scanning ROI / Snake Scan MVP | Width/Height ROI to existing Snake Scan | NOT STARTED | ROI/start preview and guarded scan | 8–9 |
 
 ## Detailed modules
 
@@ -499,133 +501,203 @@ Stage-integration milestone:
 Closeout milestone: `feat(registration): complete Module 7 validation workflow`.
 Record its resulting hash in the next roadmap update; this document is part of that commit.
 
-### Module 8 — Registration UI integration
+### Module 8 - Auto Location: complete Locate Marker
 
-**Purpose** Expose localization and registration with visible QC and lifecycle.
+**Purpose** Provide an **Auto Location** main tab alongside Single, Snake scan,
+and Scanning imaging in `qcl_scanning_imaging_autorelocation_ui.py`. Preserve
+existing operational behavior through the experimental subclass/supporting modules;
+`qcl_scanning_imaging_ui.py` must remain byte-identical. The experimental operational
+tab is now labeled Auto Location; registered-preview presentation remains work.
 
-**Inputs** Assignments and Module 7 registration/results.
+**Inputs** Loaded GDS, one operator-selected square gold reference marker,
+manually selected desired features/MS pixels, orientation/frame/sample identity,
+operator-confirmed rough stage position, nominal marker size and reviewed bounds.
+Software must not infer marker/MS/bar/cross semantics. Reuse the existing GDS
+preview and assignment model, and the existing gamepad/stage controls; do not add
+a second gamepad implementation within Auto Location.
 
-**Outputs** Offline workflow, QC display and context-bound invalidation state.
+**Normal operator workflow** Load GDS -> select marker and targets -> use existing
+stage/gamepad controls to put the beam at a rough point on the selected marker ->
+confirm rough start and scan envelope -> press **Locate Marker**. The automatic
+chain is rough point -> initial H -> initial V -> planned central H profiles ->
+classification -> midpoint rotation -> center refinement -> StageRegistration.
+Intermediate scans normally require no manual execution. A rough point need not
+be the center: scan-envelope planning must accommodate the declared rough-start
+uncertainty or reject inadequate coverage before motion, without an unreviewed
+whole-chip search. Development H-only/H+V validation gates are not the final UX.
+
+**Outputs** A context-bound, approved registration and registered GDS preview.
+For every selected feature show predicted stage center, with registration state,
+marker center, rotation, orientation, warnings and separate hard failures. All
+predictions delegate to StageRegistration. Selection alone is not motion.
 
 **Key files** `qcl_scanning_imaging_autorelocation_ui.py`,
 `ui/auto_relocation_widget.py`, `ui/registration_state.py`,
-`tests/test_auto_relocation_ui.py`, [milestone review](module8_ui_milestone.md).
-M8.2a adds `ui/localization_orchestration.py`, `ui/localization_worker.py`,
-`tests/test_auto_relocation_orchestration.py` and the
-[orchestration design](module8_hardware_orchestration.md).
-Reuses `ui/gds_assignment.py`. The stable `qcl_scanning_imaging_ui.py` remains
-byte-identical; the experimental full-window path uses a lazy subclass.
+`ui/localization_orchestration.py`, `ui/localization_worker.py`,
+`ui/operational_localization_bridge.py`, `ui/localization_pipeline.py`,
+`ui/gds_assignment.py`; corresponding offline UI/orchestration/bridge/pipeline tests.
+See [shell milestone](module8_ui_milestone.md) and
+[ownership/pipeline design](module8_hardware_orchestration.md).
 
-**Dependencies** Modules 3–7.
+**Dependencies** Modules 3-7, unchanged production scan/analysis/registration APIs.
 
-**Completed work** Offline UI shell / lifecycle:
-**COMPLETE / OFFLINE VALIDATED / MANUALLY REVIEWED**.
-Operator manual testing confirmed GDS preview loading, manual marker/target
-selection, archived registration replay becoming VALID, warning retention,
-offline target prediction and correct invalidation lifecycle.
-Warnings and hard failures remain separate. Prediction delegates to Module 5;
-Module 6-7 algorithms are unchanged. Target edits clear predictions only;
-marker/GDS/orientation/frame/sample/registration-input changes invalidate approval.
-Default startup is offline, without hardware imports/initialization.
-Locate Marker remains disabled; there is no move-to-target action.
+**Current status** Offline shell/lifecycle: **COMPLETE / OFFLINE VALIDATED /
+MANUALLY REVIEWED**. M8.2a ownership/worker/cancellation framework:
+**COMPLETE / OFFLINE VALIDATED**. Fast-track M8.2b-M8.2e pipeline and experimental
+bridge are implemented in the working tree and fake/inert tested, not live validated.
+The persistent Prior owner and isolated H-only live gates are implemented and
+fake/inert validated. The real operational constructor has hardware side effects
+and was not executed. Full Locate Marker remains disabled; the separate supervised
+H-only development action is ready for its first authorized hardware test, not
+hardware validated. See the ownership document for the exact procedure/limits.
 
-M8.2a ownership / worker / cancellation architecture:
-**COMPLETE / OFFLINE VALIDATED**.
-The fake-service framework provides an exclusive localization lease abstraction,
-structured legacy-activity blockers, unique run IDs, deterministic worker states,
-thread-safe cooperative cancellation, transactional registration publication,
-context-generation stale-result rejection, busy guards, frame-change invalidation
-and a quarantine/recovery model. Ordinary stage movement and target-only selection
-changes do not invalidate registration. Close during a run requests cancellation
-and defers shutdown; uncertain cleanup quarantines ownership.
+**Remaining work** Demonstrate the separately supervised H-only test using the
+persistent owner, deterministic gamepad stop, acknowledged hardware-joystick handoff,
+run-owned reset=False DAQ provider, worker/cancel/deferred-close binding and explicit
+sole-Python laser/operator confirmation. Objective widget presence and unverified
+legacy DAQ cleanup block H-only; use a fresh operational session without other
+acquisition. Joystick acknowledgement is not independent state readback; laser
+settings/emission require operator confirmation because legacy cached values do not
+provide full fresh verification. Finalize registered-preview presentation and
+demonstrate H+V and then full localization
+under supervision before enabling the normal automatic chain. Current fixed scan
+margin must not be treated as proof of coverage from any rough marker point.
 
-M8.2b supervised initial-H integration: **NOT STARTED**.
-Operational hardware integration: **NOT YET IMPLEMENTED**.
-The explicit `--hardware` entry path inherits existing startup side effects but
-has not been exercised in milestone validation. It is not a Locate Marker integration.
+**Safety/lifecycle contract** One stage-command owner and one DAQ-task owner;
+share the persistent Prior owner's proxy, never create a second COM3 owner. Block legacy
+workers/gamepad during localization; cooperative cancellation, no native-call
+interruption claim, no retry/return after failure, partial journals retained,
+uncertain cleanup quarantined. Publish candidate registration only after full QC,
+verified success-only return when configured, cleanup and unchanged context.
+GDS/marker/orientation/frame/sample/input changes invalidate registration and cancel
+an active candidate. Ordinary motion does not. Target selection changes predictions,
+not the registration. Warnings remain visible even when VALID; archived replay is
+not automatically a live approved registration.
 
-**Remaining work / limitations** Legacy operational callers are not yet wired
-through the new guards; shared real Prior/DAQ ownership is not yet connected.
-Native SDK call interruption remains unsupported. Recovery attestations are not
-real hardware verification. Locate Marker remains disabled. Real command guarding,
-live frame-event hooks, worker lifetime/close integration, registration persistence
-and supervised hardware validation remain outstanding. Archived offline approval
-is not live hardware registration.
+**Validation / exit criteria** Offline ownership, invalidation, failure/cancel,
+journal and publication tests pass; the stable UI is unchanged; manual selection,
+registered preview and warning display work; the complete Locate Marker chain is
+supervised-hardware validated with documented limits and no duplicate algorithms.
+Module 8 remains **IN PROGRESS**. Target movement belongs to Module 9; ROI scan
+launch belongs to Module 10. Quantitative calibration and improved rotation are
+future precision work, not blockers for this core workflow.
 
-**Validation / tests** M8.2a closeout rerun passed 350 offline tests: 48 orchestration,
-26 Auto Relocation UI, 258 upstream Module 5-7/layout/overlay, 12 GDS preview and
-6 GDS assignment tests. No failures or skips. Core fake runs block Qt and device
-imports; offline UI tests block hardware imports. Adapter tests use fake bindings.
-`python -B -m unittest discover -s tests -p test_auto_relocation_ui.py -v` includes
-blocked hardware imports, fake-base construction, lifecycle, warning/failure,
-manual-selection and real archived-evidence replay tests.
-Manual review is operator-reported; no real operational window or hardware was
-started during automated validation.
+**Relevant commits** Offline shell:
+`75a1c885ec37d1bea59f97e2a01e0b25d9bac485`.
+M8.2a: `b1fb1213ebcebf677eb9bfc49d21a3d7b5cb54d2`.
 
-**Exit criteria** UI safely manages registration state and prevents stale/failed
-registration use. Offline shell criteria are satisfied; live ownership, cancellation,
-frame-event hooks and supervised integration are still required. Module 8 is not complete.
+### Module 9 - Registered feature navigation
 
-**Relevant commits** Offline shell milestone:
-`75a1c885ec37d1bea59f97e2a01e0b25d9bac485` — `feat(ui): add auto-relocation UI shell`.
-M8.2a milestone: `feat(ui): add localization orchestration framework`.
-Record its resulting hash in a subsequent roadmap update.
+**Purpose** Select a registered feature and safely move to its predicted center.
+**Status** NOT STARTED. **Dependencies** Modules 5-8.
 
-### Module 9 — Move to selected MS and physical validation
+**Inputs** Valid context-bound registration, manually assigned target, current
+stage readback, permitted bounds and operator-verified approach clearance.
+**Outputs** Selected feature/predicted XY and explicit motion/readback outcome.
 
-**Purpose** Transform selected targets and verify safe physical localization.
+**Interaction** Single click selects and shows predicted stage XY without motion.
+Double click requests motion to that feature center; a **Move to Selected Feature**
+button may remain. Both use the same guarded action, never independent motion code.
+Selection and double-click events must not issue duplicate commands. Prediction
+uses existing StageRegistration; no transform reimplementation.
 
-**Inputs** Accepted registration, assigned MS feature, current readback and clearance.
+**Remaining work** Add navigation interaction and guarded target-motion service.
+Require valid current registration/target/bounds and exclusive ownership at command
+execution, block gamepad/legacy conflicts, verify idle/readback and preserve
+cancellation/quarantine/frame-invalidation behavior. Ordinary movement preserves
+registration. Stale or failed registration cannot authorize movement.
 
-**Outputs** Planned bounded target motion, readback and physical residual evidence.
+**Validation / exit criteria** Fake tests cover selection versus movement, duplicate
+clicks, stale context, bounds, conflicts, cancellation and failed readback/cleanup.
+Supervised navigation on an operator-confirmed physically present feature passes
+with explicit outcome and documented limitations. Controller readback agreement is
+not quantitative optical localization accuracy. The current sample lacks intended
+MS pixels; choose a present landmark or suitable sample for physical checks.
+Quantitative localization calibration/residual targets remain future work, not an
+MVP exit requirement. No automatic multi-target batch movement/imaging.
 
-**Key files** No dedicated implementation; reuse candidates
-`experiment/stage_registration.py`, `experiment/scan_adapters.py`.
+**Key reuse** `experiment/stage_registration.py`, `experiment/scan_adapters.py`,
+experimental ownership and registration-state modules. No stable-UI edits.
+**Relevant commits** None for registered target motion.
 
-**Dependencies** Modules 5–8.
+### Module 10 - Scanning ROI and existing Snake Scan MVP
 
-**Completed work** None for registered automatic MS targeting.
+**Purpose** After feature navigation, define a Width/Height ROI around the selected
+feature, preview it and launch the existing Snake Scan from its top-left start.
+**Status** NOT STARTED. **Dependencies** Modules 8-9 and existing Snake Scan.
 
-**Remaining work** QC gates, movement workflow and independent physical validation.
-Operator reports the current sample's MS pixels were not fabricated; gold remains.
-Absent MS pixels must not be used as physical validation targets. Suitable sample
-or separately identified fabricated landmark strategy Needs review.
+**Inputs** Valid registration/selected feature, its predicted stage center, positive
+ROI width/height, resolution and existing scan settings, permitted stage bounds.
+**Outputs** A stage-axis-aligned rectangular ROI, center/start overlays, validated
+legacy scan parameters and traceable results. The center is the predicted feature
+center, not the current stage position. Do not require the stage to remain there.
 
-**Validation / tests** Planned fake-stage tests plus separately authorized hardware
-validation; no dedicated implementation/test files yet.
+**UI** Add **Scanning ROI**, Width, Height, **Preview ROI**, and **Start Snake Scan**.
+Show the rectangle, selected center and intended start directly in the registered
+preview. If displayed in GDS coordinates, use the existing inverse StageRegistration
+for the stage-aligned ROI vertices; do not rotate the acquisition grid with the GDS.
 
-**Exit criteria** Safe bounded motion and independently measured localization
-residuals meet reviewed criteria on fabricated targets. Not met.
+**Legacy coordinate contract - inspected source, not a new scan engine**
 
-**Relevant commits** None.
+- `qcl_scanning_imaging_ui.py:run_snake_scan` supplies
+  `xParameters=[xOrig,xPixelRes,xPixelNums]` and equivalent Y parameters.
+  Positive integer resolutions/counts are required; `construct_snakescan_pattern`
+  delegates to `stage.make_snakes` with `M=xPixelNums`, `N=yPixelNums//2`.
+- `instruments/hld117.py:make_snakes` calls `(X0,Y0)` the top-left start.
+  For block i it uses `Y0-2*i*dY`, `Y0-(2*i+1)*dY`, and
+  `X1=X0+xIndent+M*dX`: forward +X, successive rows -Y, alternating return.
+  Use this acquisition convention, not the visual screen's inverted axes.
+- `experiment/routines.py:snakeScan.scan` moves to absolute `(xOrig,yOrig)`,
+  redefines that location as `(0,0)`, executes local paths, and restores the
+  original coordinate labels on normal completion. Start is not required to equal
+  the stage's current location. Temporary zeroing is a real frame change, not goto.
+- Forward trigger indent, backward return drift and local path origins affect
+  actual acquisition/motion bounds. The normal UI display uses inclusive linspace
+  coordinates and adds trigger indent to both displayed origins; these differ
+  from the actual path/trigger convention. Do not silently treat them as identical.
+  The raster-direction selector does not itself make this engine a rotated/Y-fast
+  grid; MVP uses the inspected X-fast path only.
 
-### Module 10 — ROI / QCL imaging integration
+**Remaining conversion work** Implement a small tested parameter adapter and invoke
+this same Snake Scan engine through the experimental ownership boundary. Define
+Width/Height as the requested stage ROI extent; explicitly resolve pixel-count,
+endpoint and resolution semantics against the legacy path and triggers. Reject or
+show requested versus realizable extents before acceptance; never silently truncate
+odd Y counts (`//2`), round origins or change ROI coverage. Distinguish requested
+ROI, sampled locations/display extent and full motion envelope (indent, drift,
+approach, return). Derive the absolute top-left from that tested convention and
+preview the exact start that will be commanded. Do not introduce a competing scan.
 
-**Purpose** Connect registered geometry to QCL imaging ROIs and acquisition.
+**Enablement gates** Valid current registration, selected target, finite positive
+ROI, approved integer parameter conversion, ROI and complete motion envelope within
+permitted bounds, and no acquisition/ownership conflict. Recheck at launch and
+invalidate ROI/predictions when registration context changes. Target or size/settings
+changes require a fresh conversion/preview, not re-registration. Moving elsewhere
+in the same frame does not invalidate the ROI; Snake Scan approaches its start.
 
-**Inputs** Valid registration, selected MS geometry and imaging settings.
+**Frame/ownership integration gate** Reusing legacy code is not permission to bypass
+zero-change invalidation. Before enabling launch, review an experimental frame-aware
+adapter around its temporary local frame, preserve an immutable approved scan
+snapshot, and verify restoration before any subsequent registered navigation.
+Until restoration is confirmed, registration must be unavailable for navigation;
+unexpected redefine/reset or uncertain failure invalidates/quarantines it. Do not
+suppress raw frame hooks without an explicit tested coordinate contract. Review
+legacy laser/DAQ/autofocus ownership, cancellation and exception cleanup as part of
+reuse; keep stable UI unchanged and do not copy the scan engine.
 
-**Outputs** Planned registered ROIs and traceable imaging results.
+**Validation / exit criteria** Tests compare converted starts, directions, counts,
+resolutions, triggers and full bounds with the actual legacy implementation,
+including rounding/even-row, stale-context and failure cases. Preview matches the
+accepted conversion; guarded reuse and coordinate restoration are fake-tested,
+then one ROI Snake Scan is separately supervised and results/provenance recorded.
+No micron-level accuracy claim is required or implied. Rotated grids, automatic
+multi-target batch imaging, quantitative calibration and improved rotation are
+future enhancements, not MVP blockers.
 
-**Key files** No dedicated registration-aware implementation. Existing integration
-candidates `qcl_scanning_imaging_ui.py`, `ui/scan_windows.py`,
-`experiment/routines.py`; detailed design Needs review.
-
-**Dependencies** Modules 8–9 and existing imaging controls.
-
-**Completed work** Existing QCL imaging predates this module; registered ROI
-integration has not started.
-
-**Remaining work** ROI generation, bounds/ownership, registration invalidation,
-acquisition provenance and UI integration.
-
-**Validation / tests** Planned geometry/unit tests, simulated integration and
-separately supervised imaging. Dedicated tests Needs review.
-
-**Exit criteria** Accepted registration produces safe, correct imaging ROIs with
-traceable results and failure handling. Detailed thresholds Needs review.
-
-**Relevant commits** None for this integration.
+**Key reuse** `qcl_scanning_imaging_autorelocation_ui.py`, supporting experimental
+UI modules, `ui/scan_windows.py`, `experiment/routines.py`,
+`instruments/hld117.py` (static reference; no hardware needed for design review).
+**Relevant commits** None for registration-aware ROI launch.
 
 ## Before starting a new module
 
@@ -661,10 +733,22 @@ Module 7 complete within documented validation limits.
 Module 8 offline shell complete.
 M8.2a orchestration framework complete and offline validated.
 
+Finalized workflow: Auto Location main tab -> manual GDS marker/target selection ->
+existing stage/gamepad rough positioning -> automatic Locate Marker -> registered
+preview (Module 8) -> single-click prediction / double-click guarded feature-center
+motion (Module 9) -> Width/Height ROI preview and existing Snake Scan launch from
+its verified top-left start (Module 10 MVP).
+
 Next task:
-M8.2b — connect the experimental autorelocation UI to the existing
-operational hardware ownership model using fake/inert integration tests first,
-then prepare a separately supervised single initial-horizontal scan.
+Review and authorize the first isolated supervised H-only hardware test using the
+documented fresh-session, gamepad/joystick, objective/DAQ, laser, live-frame and
+clearance prerequisites. Its live gates are implemented and fake/inert validated;
+no new-path hardware run has occurred. The persistent Prior owner and stable UI
+isolation are preserved. After successful H-only evidence review, prepare a
+separately supervised H+V test before full-pipeline validation. Full live Locate
+Marker remains disabled. Resolve arbitrary rough-point scan coverage and
+finish the Auto Location registered-preview presentation. No Module 9/10 execution
+is authorized by this roadmap update; their finalized designs guide later work.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned

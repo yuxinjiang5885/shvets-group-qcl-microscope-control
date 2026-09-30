@@ -104,7 +104,7 @@ window.close()
         self.addCleanup(window.close)
         self.assertIsInstance(window, InertMainWindow)
         self.assertEqual([window.tabs.tabText(i) for i in range(4)],
-            ['Single', 'Snake scan', 'Scanning imaging (Legacy)', 'Auto Relocation'])
+                         ['Single', 'Snake scan', 'Scanning imaging (Legacy)', 'Auto Location'])
         window.existing_button.click()
         self.assertTrue(window.called)
         self.assertFalse(window.auto_relocation.locate_button.isEnabled())
@@ -332,6 +332,71 @@ window.close()
         self.assertEqual(events[-1].name, 'finished')
         self.assertEqual(events[-1].detail, 'COMPLETE')
         self.assertTrue(all(event.run_id == handle.run_id for event in events))
+
+
+    def test_operational_wrapper_guard_and_close_deferral(self):
+        from test_operational_localization_bridge import FakePrior, FakeMotion
+        class Inert(QMainWindow):
+            def __init__(self):
+                super().__init__()
+                self.stage = FakePrior()
+                self.stageMotionWindow = FakeMotion(self.stage)
+                self.tabs = QTabWidget()
+                self.setCentralWidget(self.tabs)
+                self.legacy_calls = 0
+                self.closed = 0
+            def run_snake_scan(self):
+                self.legacy_calls += 1
+            def closeEvent(self, event):
+                self.closed += 1
+                event.accept()
+        window = operational_window_class(Inert)()
+        self.addCleanup(window.close)
+        bridge = window.localization_bridge
+        bridge.executor = lambda call, timeout: call()
+        # Only this inert fixture attests its fake session's execution contract.
+        bridge.execution_contract_reviewed = True
+        bridge.joystick_disabled = lambda: True
+        state = window.auto_relocation.state
+        handle = bridge.acquire(RunSettings(state.context, state.context_generation, 'fake'))
+        self.assertFalse(window.run_snake_scan())
+        self.assertEqual(window.legacy_calls, 0)
+        window.show()
+        window.close()
+        self.assertEqual(window.closed, 0)
+        self.assertTrue(handle.cancellation.is_cancelled())
+        bridge.controller.finish(handle, succeeded=False, cleanup=CleanupOutcome(True, True))
+        self.assertTrue(window.continue_localization_close())
+        self.assertEqual(window.closed, 1)
+        self.assertFalse(window.auto_relocation.locate_button.isEnabled())
+
+    def test_full_injected_pipeline_is_displayed_without_enabling_live_action(self):
+        from types import SimpleNamespace
+        from test_operational_localization_bridge import FakePrior, FakeMotion
+        from test_localization_pipeline import FakeDAQ
+        from test_reflection_scan import FakeClock
+        from ui.operational_localization_bridge import OperationalLocalizationBridge
+        from ui.localization_pipeline import LocalizationSpec, LocalizationPipelineServices
+        from ui.localization_orchestration import LocateMarkerWorker
+        from experiment.scan_1d import StageBounds
+        stage = FakePrior()
+        window = SimpleNamespace(stage=stage, stageMotionWindow=FakeMotion(stage))
+        controller = self.widget.orchestration
+        bridge = OperationalLocalizationBridge(window, controller,
+            executor=lambda call, timeout: call(), joystick_disabled=lambda: True)
+        bridge.install_guards()
+        state = self.widget.state
+        handle = bridge.acquire(RunSettings(state.context, state.context_generation, 'fake'))
+        spec = LocalizationSpec((1000.,2000.), StageBounds(600,1400,1600,2400,state.context.frame_id))
+        services = LocalizationPipelineServices(bridge, handle, spec, self.tmp.name,
+            lambda config: FakeDAQ(stage, config), clock=FakeClock())
+        worker = LocateMarkerWorker(controller, handle, services)
+        worker.run(self.widget.consume_localization_event)
+        self.assertEqual(state.status, RegistrationStatus.VALID, controller.reasons)
+        self.assertIn('refined_center', self.widget.acquisition_label.text())
+        self.assertIn('classification', self.widget.acquisition_label.text())
+        self.assertIn('COMPLETE', self.widget.acquisition_label.text())
+        self.assertFalse(self.widget.locate_button.isEnabled())
 
 
 if __name__ == '__main__':
