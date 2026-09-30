@@ -257,6 +257,8 @@ The five repetitive `square_marker_rotation_profile_*_check.py` hardware harness
 remain local/untracked and are not required to replay classification.
 Production rotation: `experiment/marker_rotation.py`,
 `tests/test_marker_rotation.py`, `square_marker_rotation_fit_check.py`.
+Center refinement: `experiment/marker_center_refinement.py`,
+`tests/test_marker_center_refinement.py`, `square_marker_center_refinement_check.py`.
 
 **Dependencies** Modules 4–6.
 
@@ -282,14 +284,23 @@ residuals, per-profile residuals and width statistics are reported.
 hard QC failure. Warnings are separate from failure reasons. No profile deletion,
 subset search, iterative trimming, angle averaging or historical-angle dependence.
 
+Rotation-corrected marker-center refinement: **COMPLETE / OFFLINE VALIDATED**.
+It requires a valid production rotation and its `accepted_theta_deg`, reuses the
+approved horizontal midpoint fit without reselection/refitting, and reanalyzes
+the committed vertical journal using measured X. The center is the algebraic
+intersection of horizontal and vertical centerline constraints. Measured-X
+stability, vertical chord height, central-region guard and constraint-substitution
+checks fail closed: both output center coordinates are None on hard failure.
+Angle-fit sensitivity is reported; no hardware or StageRegistration is invoked.
+
 **Remaining work**
 
-1. Rotation-corrected marker-center refinement.
-2. Center-refinement uncertainty / QC.
-3. Final marker registration result.
-4. StageRegistration integration.
-5. Physical validation of predicted MS positions (requires fabricated targets;
+1. Assemble final marker registration result.
+2. Integrate accepted center + rotation with Module 5 StageRegistration.
+3. Predict selected MS stage coordinates.
+4. Physically validate predicted MS positions (requires fabricated targets;
    current-sample MS pixels are absent, as recorded in Module 9).
+5. Finalize Module 7 registration QC / exit criteria.
 
 Thresholds remain provisional screening thresholds, not experimentally calibrated
 production uncertainty limits. Do not fit toward the historical angle. Bar-based
@@ -300,11 +311,20 @@ and fails above 1.0 deg; minimum 3 profiles, 2 distinct measured Y values and
 100 um Y span; maximum RMS residual 1 um, absolute residual 2 um (each line),
 and width peak-to-peak 5 um. Equality at both angular limits is accepted.
 
-**Validation / tests** Rotation milestone rerun passed 28 rotation tests,
+Center-refinement defaults remain provisional engineering QC settings: square
+side 500 um, maximum measured-X spread 1 um, maximum vertical chord-height error
+20 um, inward boundary guard 10 um, constraint residual tolerance 1e-6 um,
+edge-analysis width tolerance 100 um and angle/slope consistency tolerance 1e-12.
+Exact guarded-boundary equality is rejected. These are not calibrated physical
+uncertainty limits; constraint residuals check algebra, not physical accuracy.
+
+**Validation / tests** Center-refinement milestone rerun passed 32 center tests,
+28 rotation tests,
 31 classifier tests, 47 reflection-scan tests and 25 adapter tests:
-131 hardware-independent tests.
+163 hardware-independent tests.
 Run each with `python -B -m unittest discover -s tests -p <filename> -v`, using
-`test_marker_rotation.py`, `test_marker_profile_classification.py`, `test_reflection_scan.py` and
+`test_marker_center_refinement.py`, `test_marker_rotation.py`,
+`test_marker_profile_classification.py`, `test_reflection_scan.py` and
 `test_scan_adapters.py`. `python -B square_marker_profile_classification_check.py`
 reloads all five journals and reruns single-scan analysis before classification.
 Profiles 1–4 are CENTRAL; Profile 5 is INCONSISTENT (width, left-edge and midpoint
@@ -332,7 +352,48 @@ Statistical SE is regression-only, conditional on the selected profiles and OLS
 assumptions, not calibrated physical uncertainty. It excludes stage calibration,
 Y error, optical edge bias, drift and classification-selection effects.
 
-Each preserved journal records 71 completed points, measured and commanded XY,
+`python -B square_marker_center_refinement_check.py` replays the complete offline
+chain: P1-P5 journals -> single-scan analysis -> classifier -> production rotation
+-> vertical scan analysis -> center refinement, without bypassing upstream QC.
+The tracked vertical evidence is
+`vertical_marker_scan_9392a56a0a0e4517b9b897398376ee3b.jsonl`.
+
+| Center-refinement quantity | Verified result |
+| --- | --- |
+| Refined stage X | 4214.965309833208 um |
+| Refined stage Y | -26111.10204224153 um |
+| Effective midpoint rotation | +0.13199759820576185 deg |
+| Orientation / scale / shear assumptions | FLIP_X / 1 / none |
+| Vertical measured X mean / spread | 4210 / 0 um |
+| Lower / upper Y edge | -26359.297926319337 / -25862.929036293222 um |
+| Vertical midpoint | -26111.11348130628 um |
+| Measured / expected vertical chord height | 496.36889002611497 / 500.0013268681278 um |
+| Chord-height error | -3.6324368420128508 um |
+| Offset from center / guarded central limit | 4.965309833208266 / 239.42338890381313 um |
+| Horizontal / vertical constraint residual | -5.838385330747542e-14 / -1.3091524392327969e-12 um |
+| Warning | left_right_angle_disagreement_warning |
+| Hard-failure reasons / valid | () / True |
+
+This is an offline registration estimate, not yet a production StageRegistration
+or physical targeting validation. P1-P4 are CENTRAL; P5 remains INCONSISTENT.
+The side-angle warning is retained without assigning it a physical cause.
+
+The original center reconstructed from committed horizontal and vertical journals
+is (4209.550599411898, -26111.11348130628) um. The refined-minus-original
+correction is (+5.414710421310701, +0.011439064750448) um, total
+5.4147225043258755 um. This is **not purely a rotation correction**: it also
+replaces the original single coarse horizontal scan estimate with the later
+multi-profile midpoint regression. Do not attribute the full 5.4 um to rotation.
+
+Angle-fit sensitivity only, holding the measured line anchor and vertical
+constraint fixed: theta minus one statistical SE gives delta X +0.032823165 um,
+delta Y -0.004035486 um; theta plus one SE gives delta X -0.032829759 um,
+delta Y +0.003981485 um. This is not full center uncertainty or calibrated physical
+uncertainty. Midpoint slope/intercept covariance and vertical-edge uncertainty
+are not fully propagated; stage calibration, optical edge bias,
+classification-selection uncertainty and drift/systematics are not included.
+
+Each preserved P1-P5 journal records 71 completed points, measured and commanded XY,
 scalar reflection, bounds, scan timing settings and completion status. All saved
 command/readback pairs agree exactly. The journals do not record raw DAQ samples,
 laser/lock-in telemetry, physical clearance, acquisition-time code revision,
@@ -348,7 +409,9 @@ center/angle and residual QC pass supervised validation. Not yet met.
 **Relevant commits** Classifier milestone:
 `0675a29861f30df44bbfdf042eea5301d2ab054e` —
 `feat(registration): add horizontal profile classification`.
-Rotation milestone: `feat(registration): add production marker rotation fitting`.
+Rotation milestone: `031d6468403c5711f9eec90a9ab9d6078829b285` —
+`feat(registration): add production marker rotation fitting`.
+Center milestone: `feat(registration): add marker center refinement`.
 Record its resulting hash in the next roadmap update; this document is part of
 that commit.
 
@@ -465,10 +528,11 @@ contain its own final hash. Do not amend completed history just to add that hash
 Module 6 is complete within its documented hardware-validation limits.
 Module 7 profile classification is complete and offline validated.
 Module 7 production rotation fitting is complete and offline validated.
+Module 7 center refinement is complete and offline validated.
 Module 7 as a whole remains in progress.
-Next task: rotation-corrected marker-center refinement using the accepted midpoint
-rotation and the previous vertical marker scan. Center-refinement uncertainty/QC,
-final registration, StageRegistration integration and physical validation remain.
+Next task: integrate the accepted marker center and midpoint rotation with
+Module 5 StageRegistration, without moving hardware yet, and verify
+predicted coordinates offline before physical validation.
 
 Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
 hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned
