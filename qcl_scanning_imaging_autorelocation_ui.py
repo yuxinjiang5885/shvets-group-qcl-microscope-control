@@ -34,7 +34,8 @@ class OfflineAutoRelocationWindow(QMainWindow):
         self.tabs.addTab(self.auto_location_scroll, 'Auto Relocation')
 
 
-def operational_window_class(base_class=None, *, owner_factory=None, translation_launch_enabled=False, developer_mode=False):
+def operational_window_class(base_class=None, *, owner_factory=None, translation_launch_enabled=False,
+                             developer_mode=False, objective_widget_factory=None):
     """Lazy subclass, with an injectable inert base for offline contract tests.
 
     Do not call without a fake base during offline validation: importing the
@@ -47,6 +48,9 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
     if base_class is None:
         from qcl_scanning_imaging_ui import mainWindow
         base_class = mainWindow
+        if objective_widget_factory is None:
+            from ui.managed_objective_widget import create_managed_objective
+            objective_widget_factory = create_managed_objective
 
     class AutoRelocationMainWindow(base_class):
         def __init__(self):
@@ -115,6 +119,9 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
                     return
             try:
                 super().closeEvent(event)  # Stops gamepad; proxy disconnect owns cleanup.
+                widget = getattr(self, 'pi_scanner_widget', None)
+                if bridge is not None and event.isAccepted() and bridge.managed_objective(widget):
+                    widget.close()
                 if self.prior_owner is not None and event.isAccepted():
                     if not self.prior_owner.shutdown():
                         event.ignore()
@@ -144,6 +151,9 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
                 def authorized_callback():
                     if command in (Command.SPECTRUM,Command.REPEAT_SCAN,Command.MULTIWELL,
                                    Command.SNAKE_SCAN,Command.IMAGING):
+                        if (name in ('run_snake_scan', 'repeat_snake_scan') and
+                                getattr(getattr(self, 'pi_scanner', None), 'autofocus_on_imaging', False)):
+                            raise OwnershipError('worker_origin_autofocus_unsupported_in_V1; disable Autofocus on Imaging')
                         return invoke_acquisition(callback,bridge.mark_legacy_daq_uncertain,*args,snake_bridge=bridge,**kwargs)
                     if command is Command.OBJECTIVE_MOVE:
                         # Construction itself configures NI; partial construction
@@ -159,6 +169,34 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
     for name, command in MAIN_COMMANDS.items():
         if hasattr(base_class, name):
             setattr(AutoRelocationMainWindow, name, wrap(name, command))
+
+    if hasattr(base_class, 'show_pi_scanner_widget'):
+        objective_guard = wrap('show_pi_scanner_widget', Command.OBJECTIVE_MOVE)
+
+        def show_pi_scanner_widget(self):
+            # Preserve Qt's zero-argument slot contract before the variadic guard.
+            if objective_widget_factory is not None:
+                bridge = getattr(self, 'localization_bridge', None)
+                if bridge is None:
+                    raise OwnershipError('managed_objective_requires_initialized_bridge')
+                try:
+                    widget = getattr(self, 'pi_scanner_widget', None)
+                    if widget is None:
+                        self.pi_scanner_widget = objective_widget_factory(self)
+                        widget = self.pi_scanner_widget
+                    elif not bridge.managed_objective(widget):
+                        raise OwnershipError('unmanaged_objective_widget_exists')
+                    # Reopening only shows cached UI, including during localization.
+                    widget.refresh_ownership()
+                    widget.show()
+                    widget.raise_()
+                    return widget
+                except Exception as error:
+                    self.auto_relocation.failures_label.setText('Objective not opened: ' + str(error))
+                    return False
+            return objective_guard(self)
+
+        AutoRelocationMainWindow.show_pi_scanner_widget = show_pi_scanner_widget
 
     return AutoRelocationMainWindow
 

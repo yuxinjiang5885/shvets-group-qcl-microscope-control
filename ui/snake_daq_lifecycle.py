@@ -4,6 +4,7 @@ No NI imports, connection/reset, new scan engine, or global monkey patch.
 """
 from types import FunctionType
 from PyQt6.QtCore import QObject, pyqtSlot
+from ui.localization_orchestration import OwnershipError
 
 
 class SnakeDaqLifecycle:
@@ -117,18 +118,30 @@ def snake_worker_factory(base, bridge, thread, source):
     raw_factory=namespace['MultiAI']
     namespace['MultiAI']=lambda *a,**k:scope.task_factory(raw_factory,*a,**k)
     if 'piScanner_widget' in namespace:
-        objective=namespace['piScanner_widget']
         def objective_factory(*a,**k):
-            bridge.mark_legacy_daq_uncertain('snake_objective_widget_creation')
-            return objective(*a,**k)
+            raise OwnershipError('worker_origin_objective_creation_unsupported_in_V1')
         namespace['piScanner_widget']=objective_factory
     private_scan=FunctionType(scan.__code__,namespace,scan.__name__,scan.__defaults__,scan.__closure__)
 
     class TrackedSnake(base):
-        def scan(self):return private_scan(self)
+        def _check_objective(self):
+            parameters = getattr(self, 'parameters', None)
+            scanner = getattr(parameters, 'pi_scanner', None)
+            if getattr(scanner, 'autofocus_on_imaging', False):
+                raise OwnershipError('worker_origin_autofocus_unsupported_in_V1')
+            widget = getattr(parameters, 'pi_scanner_widget', None)
+            if (widget is not None and not isinstance(widget, list)
+                    and not bridge.managed_objective(widget)):
+                raise OwnershipError('worker_origin_unmanaged_objective_unsupported_in_V1')
+
+        def scan(self):
+            self._check_objective()
+            return private_scan(self)
         def run(self):
             failed=False
-            try:super().run()
+            try:
+                self._check_objective()
+                super().run()
             except Exception as error:
                 failed=True;scope.error=repr(error)
             finally:

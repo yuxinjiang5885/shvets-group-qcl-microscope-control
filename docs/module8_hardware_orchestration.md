@@ -11,6 +11,15 @@ canonical FLIP_X normal UI, transactional translation-only registration and
 registered GDS predictions. Offline failure/cancel/quarantine tests complement
 these successful live workflows; they do not claim every fault was tested live.
 
+**Managed Objective V1 is also COMPLETE — SOFTWARE TESTED AND LIVE HARDWARE
+VALIDATED.** See the [2026-10-01 closeout](#managed-objective-scanner-daq-ownership-v1-closeout-2026-10-01)
+for the operator-reported live results and freshly rerun regression suite. The
+managed window may remain open during localization after verified DAQ release.
+Historical sections below describe the legacy/unmanaged widget and earlier
+experimental checkpoints: their blanket widget-presence/fresh-session restriction
+does not apply to a positively verified RELEASED managed owner. Unknown widgets
+and unresolved evidence remain blocked. No Module 9 implementation is included.
+
 Defaults: requested half-span=1.25*S; step=floor(min(15,S/20)); coverage rounds
 up to whole steps. S=500 gives requested625, actual630, span1260, step15,
 85 points/axis (170 H+V). Manual overrides remain. Local baseline is at most
@@ -289,8 +298,10 @@ binding. It wraps dynamic stage-panel callbacks and the shared `stage.message`
 boundary, including session lifecycle methods. Conflicting callbacks are rejected
 before legacy execution; GUI-level rejections are reported rather than raised out
 of Qt's event loop. The raw driver boundary still raises for worker callers.
-Objective creation is guarded; any existing objective widget prevents localization,
-so its direct-bound PI/DAQ buttons cannot coexist with an acquired lease.
+At this historical checkpoint, Objective creation was guarded and any existing
+widget prevented localization. Managed V1 now guards the widget's hardware entry
+points and permits coexistence only with positively verified resource release;
+unmanaged widgets retain the original blocker.
 This does not intercept arbitrary external applications or direct `stage.SDK`
 calls outside the reviewed command boundary.
 
@@ -665,6 +676,10 @@ for deliberate operator restart after safe cleanup. A failed preflight/handoff
 may leave inputs disabled; it does not guess a restore state or retry.
 
 ### Objective and legacy DAQ blockers
+
+This paragraph records the pre-managed H-only checkpoint. The Managed Objective
+V1 closeout below supersedes its blanket widget-presence restriction; verified
+managed release and source-specific Snake release are now supported.
 
 Actual legacy QThread/callback activity, gamepad ownership, frame operation and
 DAQ ownership remain blockers. An existing `pi_scanner_widget`, even hidden,
@@ -1567,9 +1582,11 @@ clear-all attestation is introduced. Failure does not emit the legacy success
 signal that would falsely claim laser emission was disabled; error diagnostics
 explicitly leave laser state unconfirmed.
 
-Autofocus/objective construction inside Snake Scan is separately marked and cannot
-be cleared by the scan-task release. Reuse testing must initially leave autofocus
-and objective paths unused. Independent objective/DAQ uncertainty still blocks.
+Managed V1 rejects Snake/Repeat worker-origin autofocus and fallback Objective
+construction before those unsupported paths access Objective hardware. Ordinary
+Snake scans must leave Autofocus on Imaging disabled. A managed RELEASED window
+may exist; unknown widgets and independent Objective/DAQ uncertainty still block
+localization. A scan-task release cannot clear another owner's evidence.
 
 DAQ usage itself does not invalidate registration. However the existing Snake
 engine calls set_position to redefine and later restore coordinates. Those frame
@@ -1600,3 +1617,115 @@ Auto Location. Repeat two more scans and then longer sequences only after review
 An active scan must block localization. Any uncertain cleanup stops the sequence;
 do not bypass attestation or retry hardware automatically. No target-motion, ROI,
 rotation or new scan engine work is part of this check.
+
+## Managed Objective Scanner DAQ Ownership V1 closeout (2026-10-01)
+
+**COMPLETE — SOFTWARE TESTED AND LIVE HARDWARE VALIDATED.**
+
+Provenance: the operator supplied the live QCL outcomes and diagnostic fields in
+the checkpoint request. They are recorded as operator-reported hardware validation,
+not hardware execution by the closeout agent. No new run UUIDs, raw journals or
+screenshots were supplied for this closeout; none are invented or added as artifacts.
+The agent inspected the implementation and reran the software-only suite below.
+
+### Implemented boundary
+
+Only the new `qcl_scanning_imaging_autorelocation_ui.py` uses the managed adapter.
+The old `qcl_scanning_imaging_ui.py`, `instruments/pi_scanner.py`,
+`instruments/ni_daq.py`, other hardware drivers and `experiment/routines.py` are
+unchanged. Hash constants are unchanged. The explicit zero-argument
+`show_pi_scanner_widget(self)` adapter preserves the Qt connection contract:
+`QAction.triggered(bool)` cannot leak its Boolean into the legacy zero-argument
+method. Live opening and close/reopen produced no TypeError or UI exit.
+
+`ui/managed_objective_widget.py` overrides DAQ setup before inherited connections
+are established. Opening initializes the UI and guarded non-DAQ position state,
+but does not create a native NI task. It reuses the managed widget on reopen.
+`ui/objective_daq_lifecycle.py` reserves Objective activity through the existing
+bridge/controller lock and uses an operation-scoped task on Dev1/ai0 and Dev1/ai1
+(10 samples/channel, 10 kHz, no reset). Acquire Signal, Move To's post-motion
+read, and GUI Autofocus use this lifecycle. PI/stage position and motion methods
+are also guarded. Autofocus remains synchronous; its reads share one task within
+that operation, and cleanup clears it before release is attested.
+
+State is RELEASED -> ACTIVE -> RELEASING -> RELEASED, or UNCERTAIN after an
+unverified failure. Operation generation/token, task identity, creation/clear
+evidence, execution state and errors are recorded. Stop/clear are checked, cleanup
+does not wait while holding the admission lock, and release is owner-bound through
+LegacyDaqEvidence. The adapter retains hardware/helper failures even if the legacy
+callback catches them. Historical ownerless records are never silently cleared.
+Localization admission is atomic against Objective reservation. Unknown widgets
+remain blocked; managed ACTIVE, RELEASING and UNCERTAIN owners cannot localize.
+Verified localization cleanup and worker completion restore Objective availability;
+quarantine does not. Diagnostics distinguish window visibility from resource state.
+
+### Operator-reported live validation
+
+| Sequence | Observed result |
+| --- | --- |
+| Open Objective Scanner | managed=true, window=OPEN, state=RELEASED, verified_released=true, native_creation_attempted=false, native_task_created=false, uncertain=false, blockers=[] |
+| Leave Objective open -> Locate Marker | H and V completed; registration published; DAQ cleanup and idle cleanup passed; localization COMPLETE; ownership AVAILABLE |
+| Acquire Signal -> Locate Marker | operation=acquire_signal; native creation attempted/created=true; clear_confirmed=true; RELEASED and verified_released=true; execution_in_flight=false; uncertain=false; errors=[]; attestation released=true; later localization succeeded without restart |
+| Move To -> Locate Marker | operation=move_to; native task created and clear confirmed; verified RELEASED, no uncertainty/errors; repeated moves had separate valid generations/tokens; later localization succeeded without restart |
+| Autofocus -> Locate Marker | Normal completion; operation=autofocus; verified RELEASED; autofocus_state=inactive; execution_in_flight=false; native task created and clear confirmed; uncertain=false; errors=[]; later localization succeeded without restart |
+| Locate Marker -> Objective controls | Window stayed visible; Acquire Signal, Move To, Acquire Position, Autofocus and stage/objective movement controls disabled during localization; after completion controls returned and Acquire Signal cleared successfully, with RELEASED/AVAILABLE state |
+| Close/reopen -> Locate Marker | managed=true, OPEN, verified RELEASED, uncertain=false, blockers=[]; no new DAQ transition merely from reopening; prior release evidence retained; later localization succeeded |
+
+Autofocus on Imaging remained disabled: it is unsupported in V1, rather than an
+action automatically re-enabled after localization. Disabled controls were not
+bypassed on real hardware to force conflicts. Software tests cover direct-method
+denial, admission races and injected failures. Successful live sequences do not
+claim live coverage of every timeout, cleanup failure or quarantine path.
+
+### Software closeout verification
+
+Fresh closeout run: **252 passed, 0 failed**. Offscreen Qt; an import finder rejected
+`instruments`, `PyDAQmx`, `pipython`, `inputs`, `serial`,
+`qcl_scanning_imaging_ui` and `experiment.routines`. Tests compile selected legacy
+class/method source with inert dependencies instead of importing hardware modules.
+No stage, laser, PI or NI device was initialized or operated by this run.
+
+Exact test modules:
+
+- `test_auto_relocation_ui`
+- `test_operational_localization_bridge`
+- `test_legacy_daq_attestation`
+- `test_localization_daq`
+- `test_hardware_ownership_diagnostics`
+- `test_snake_daq_lifecycle`
+- `test_objective_daq_lifecycle`
+- `test_managed_objective_widget`
+- `test_h_only_controls`
+- `test_h_only_validation`
+- `test_auto_relocation_orchestration`
+
+Coverage includes real offscreen Qt action payloads, native task non-creation on
+open, operation-scoped acquisition, partial construction, start/read/stop/clear
+failures, checked PI/stage waits, owner-bound release, admission races, no lock held
+across cleanup waits, localization handback/quarantine, stale/unmanaged evidence,
+worker autofocus rejection and close/reopen reuse. Test exception hooks/fake
+hardware are confined to test fixtures, not production bypasses.
+
+Protected legacy/driver/scan/registration files have no diff. Legacy UI SHA-256:
+`fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
+`git diff --check` passes. This checkpoint contains source, tests and these existing
+documents only, with no generated localization runs or hardware-test artifacts.
+
+### Accepted limitations and next module
+
+- No forced autofocus cancellation; V1 waits for normal completion and rejects
+  localization while Objective activity is active or uncertain.
+- No automatic autofocus restart after localization. Restart is manual.
+- Snake/Repeat worker-origin autofocus and fallback Objective construction remain
+  unsupported and fail-closed; this closeout does not redesign those workers.
+- Unmanaged widgets and unresolved cleanup/ownership evidence still require the
+  existing recovery/fresh-session policy. Mere managed opening, clean operations
+  and reopening no longer require restarting the UI.
+- Production registration remains translation-only, theta=0,
+  rotation_calibrated=False. Rotation and quantitative relocation calibration are
+  deferred; successful cleanup is not a physical target-accuracy measurement.
+- Current authoritative numbering: Module 8 is production Locate Marker;
+  Module 9 is registered feature selection/guarded target movement; Module 10 is
+  feature-centered ROI/existing Snake Scan integration. Modules 9 and 10 remain
+  NOT STARTED. `target_motion_not_implemented` remains enforced. The next
+  discussion plans Module 9; no target/MS movement is enabled by this checkpoint.

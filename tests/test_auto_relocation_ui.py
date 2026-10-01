@@ -1,5 +1,6 @@
 """Offline lifecycle and Qt contracts. Never import the operational hardware UI."""
 from dataclasses import replace
+from contextlib import ExitStack
 from hashlib import sha256
 import os
 from pathlib import Path
@@ -15,13 +16,14 @@ import gdstk
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QTabWidget, QWidget
 from PyQt6.QtTest import QTest
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
 
 from experiment.gds_layout import load_gds
 from experiment.layout_assignment import LayoutAssignments
 from experiment.stage_registration import Orientation, local_to_stage
 from ui.registration_state import RegistrationState, RegistrationStatus, replay_archived_evidence
 from ui.auto_relocation_widget import AutoRelocationWidget
-from ui.localization_orchestration import RunSettings, CleanupOutcome
+from ui.localization_orchestration import RunSettings, CleanupOutcome, Command
 from qcl_scanning_imaging_autorelocation_ui import OfflineAutoRelocationWindow, operational_window_class
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -401,6 +403,125 @@ window.close()
         self.assertIn('classification', self.widget.diagnostics_text.toPlainText())
         self.assertIn('COMPLETE', self.widget.acquisition_label.text())
         self.assertFalse(self.widget.locate_button.isEnabled())
+
+
+class ObjectiveGuardTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        from test_operational_localization_bridge import FakePrior, FakeMotion
+
+        class Inert(QMainWindow):
+            def __init__(self):
+                super().__init__()
+                self.stage = FakePrior()
+                self.stageMotionWindow = FakeMotion(self.stage)
+                self.tabs = QTabWidget()
+                self.setCentralWidget(self.tabs)
+                self.objective_calls = 0
+                self.payloads = []
+                self.counts = []
+                self.objective_error = None
+                self.objective_action = QAction('Objective Scanner', self)
+                self.objective_action.triggered.connect(self.show_pi_scanner_widget)
+                self.payload_action = QAction('Payload consumer', self)
+                self.payload_action.triggered.connect(self.run_experiment)
+
+            def show_pi_scanner_widget(self):
+                self.objective_calls += 1
+                if self.objective_error is not None:
+                    raise self.objective_error
+
+            def run_experiment(self, checked):
+                self.payloads.append(checked)
+
+            def repeat_snake_scan(self, count=1):
+                self.counts.append(count)
+
+        self.window = operational_window_class(Inert)()
+        self.addCleanup(self.window.close)
+        self.bridge = self.window.localization_bridge
+        self.bridge.execution_contract_reviewed = True
+        self.bridge.joystick_disabled = lambda: True
+        patches = ExitStack()
+        self.addCleanup(patches.close)
+        self.guard = patches.enter_context(patch.object(
+            self.bridge.controller.ownership, 'guard',
+            wraps=self.bridge.controller.ownership.guard))
+        self.mark = patches.enter_context(patch.object(
+            self.bridge, 'mark_legacy_daq_uncertain',
+            wraps=self.bridge.mark_legacy_daq_uncertain))
+        # Record unexpected Qt slot errors so a regression fails instead of aborting.
+        self.slot_errors = []
+        patches.enter_context(patch.object(sys, 'excepthook',
+            side_effect=lambda *error: self.slot_errors.append(error)))
+
+    def assert_objective_calls(self, count):
+        self.assertEqual(self.slot_errors, [])
+        self.assertEqual(self.window.objective_calls, count)
+        self.assertEqual(self.guard.call_count, count)
+        self.assertEqual(self.mark.call_count, count)
+        for call in self.guard.call_args_list:
+            self.assertEqual(call.args, (Command.OBJECTIVE_MOVE,))
+        for call in self.mark.call_args_list:
+            self.assertEqual(call.args, ('objective_widget_creation_or_reopen',))
+
+    def test_objective_action_zero_argument_callback(self):
+        self.window.objective_action.trigger()
+        self.assert_objective_calls(1)
+        self.assertTrue(self.bridge.legacy_daq_cleanup_unverified)
+
+    def test_objective_boolean_payload_variants(self):
+        for count, checked in enumerate((False, True), 1):
+            self.window.objective_action.triggered.emit(checked)
+            self.assert_objective_calls(count)
+
+    def test_objective_repeated_trigger(self):
+        for count in range(1, 5):
+            self.window.objective_action.trigger()
+            self.assert_objective_calls(count)
+
+    def test_objective_denied_before_callback_and_uncertainty_mark(self):
+        state = self.window.auto_relocation.state
+        handle = self.bridge.acquire(RunSettings(
+            state.context, state.context_generation, 'fake-start'))
+        self.addCleanup(lambda: self.bridge.controller.finish(
+            handle, succeeded=False, cleanup=CleanupOutcome(True, True)))
+        self.window.objective_action.trigger()
+        self.assertEqual(self.slot_errors, [])
+        self.assertEqual(self.window.objective_calls, 0)
+        self.guard.assert_called_once_with(Command.OBJECTIVE_MOVE)
+        self.mark.assert_not_called()
+        self.assertFalse(self.bridge.legacy_daq_cleanup_unverified)
+        self.assertTrue(self.window.auto_relocation.failures_label.text().startswith(
+            'Command blocked: '))
+
+    def test_genuine_signal_payload_preserved(self):
+        for checked in (False, True):
+            self.window.payload_action.triggered.emit(checked)
+        self.assertEqual(self.slot_errors, [])
+        self.assertEqual(self.window.payloads, [False, True])
+        self.assertEqual(self.guard.call_count, 2)
+        self.guard.assert_called_with(Command.SPECTRUM)
+
+    def test_repeat_count_positional_and_keyword_preserved(self):
+        self.window.repeat_snake_scan(3)
+        self.window.repeat_snake_scan(count=7)
+        self.assertEqual(self.window.counts, [3, 7])
+        self.assertEqual(self.guard.call_count, 2)
+        self.guard.assert_called_with(Command.REPEAT_SCAN)
+
+    def test_internal_type_error_propagates_without_retry(self):
+        error = TypeError('inert callback failure')
+        self.window.objective_error = error
+        with self.assertRaises(TypeError) as caught:
+            self.window.show_pi_scanner_widget()
+        self.assertIs(caught.exception, error)
+        self.assert_objective_calls(1)
+        self.assertEqual(self.bridge._calls_active, 0)
+        self.assertTrue(self.bridge.legacy_daq_cleanup_unverified)
 
 
 if __name__ == '__main__':

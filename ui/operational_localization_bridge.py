@@ -85,6 +85,7 @@ class OperationalLocalizationBridge:
         self.close_pending = False
         self.guards_installed = False
         self.legacy_daq_evidence = LegacyDaqEvidence()
+        self.objective_owner = None
         if getattr(window, '_operational_localization_bridge', None) is not None:
             raise OwnershipError('second_stage_owner_bridge')
         if self.stage is not None and getattr(self.stage, '_localization_bridge_owner', None) is not None:
@@ -98,6 +99,35 @@ class OperationalLocalizationBridge:
 
     def frame_event(self, name):
         self.controller.handle_context_event(FRAME_EVENTS[name])
+
+    def managed_objective(self, widget):
+        owner = self.objective_owner
+        return owner is not None and widget is not None and owner.widget is widget
+
+    def prepare_objective_handoff(self):
+        """V1 never cancels autofocus. acquire() repeats this under the lease lock."""
+        with self.controller.registration.lock:
+            owner = self.objective_owner
+            if owner is not None and not owner.released():
+                raise OwnershipError('managed_objective_' + owner.state.lower())
+
+    def check_objective_admission(self, owner):
+        """Caller holds the transaction lock until its ACTIVE reservation is set."""
+        if owner is not self.objective_owner or not owner.released():
+            raise OwnershipError('objective_not_released')
+        if self.close_pending or self.controller.shutdown_requested:
+            raise OwnershipError('objective_shutdown_pending')
+        runner = getattr(self.window, 'h_only_runner', None)
+        if runner is not None and runner.busy:
+            raise OwnershipError('localization_worker_not_finished')
+        decision = self.controller.ownership.guard(Command.OBJECTIVE_MOVE)
+        if not decision.allowed:
+            raise OwnershipError('; '.join(decision.reasons))
+        # Disabling the hardware joystick is a localization-specific handoff.
+        # Active gamepad/workers and unknown DAQ evidence still block Objective work.
+        reasons = [r for r in self.blockers() if r != 'hardware_joystick_disable_unconfirmed']
+        if reasons:
+            raise OwnershipError('; '.join(reasons))
 
     @property
     def legacy_daq_cleanup_unverified(self):
@@ -181,8 +211,11 @@ class OperationalLocalizationBridge:
         game_worker = getattr(motion, 'workerG', None)
         if game_thread is not None or game_worker is not None:
             reasons.append('gamepad_handoff_required')
-        if getattr(self.window, 'pi_scanner_widget', None) is not None:
+        widget = getattr(self.window, 'pi_scanner_widget', None)
+        if widget is not None and not self.managed_objective(widget):
             reasons.append('objective_daq_autofocus_ownership_unconfirmed')
+        if self.objective_owner is not None and not self.objective_owner.released():
+            reasons.append('managed_objective_' + self.objective_owner.state.lower())
         if self.legacy_daq_cleanup_unverified:
             reasons.append('legacy_DAQ_release_not_attested_fresh_session_required')
             reasons.append('legacy_DAQ_pending_sources:'+repr([
@@ -234,6 +267,7 @@ class OperationalLocalizationBridge:
 
     def acquire(self, settings):
         with self.controller.registration.lock:
+            self.prepare_objective_handoff()
             decision = self.refresh()
             if not decision.allowed:
                 raise OwnershipError('; '.join(decision.reasons))
@@ -345,9 +379,17 @@ class OperationalLocalizationBridge:
         with self.controller.registration.lock:
             if (self.dispatcher.uncertain or self.dispatcher.unresolved) and command not in READ_ONLY:
                 raise OwnershipError('native_stage_execution_unresolved_or_quarantined')
-            decision = self.controller.ownership.guard(command)
-            if not decision.allowed:
-                raise OwnershipError('; '.join(decision.reasons))
+            owner = self.objective_owner
+            objective_stage_call = (owner is not None and owner.executing_here()
+                                    and command in (Command.MANUAL_MOVE, Command.FRAME_CHANGE))
+            if objective_stage_call:
+                owner.check_execution()
+            else:
+                if owner is not None and not owner.released() and command not in READ_ONLY:
+                    raise OwnershipError('managed_objective_' + owner.state.lower())
+                decision = self.controller.ownership.guard(command)
+                if not decision.allowed:
+                    raise OwnershipError('; '.join(decision.reasons))
             self._calls_active += 1
             if frame:
                 self.frame_event(frame)
@@ -360,8 +402,8 @@ class OperationalLocalizationBridge:
     def install_guards(self):
         """Dynamic stage-window callbacks plus the shared driver's command boundary.
 
-        Objective creation is intercepted at the main subclass; an existing
-        objective widget blocks all localization, regardless of visibility.
+        Objective creation is intercepted at the main subclass. Unmanaged widgets
+        remain blockers; a registered managed owner must positively prove release.
         """
         if self.guards_installed:
             return True
@@ -453,6 +495,8 @@ class OperationalLocalizationBridge:
 
     def request_close(self):
         self.close_pending = True
+        if self.objective_owner is not None and not self.objective_owner.released():
+            return False
         if self.dispatcher.uncertain or self.dispatcher.unresolved:
             self.controller.request_cancel()
             return False

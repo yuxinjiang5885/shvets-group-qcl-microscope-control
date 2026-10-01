@@ -52,6 +52,7 @@ class HOnlyRunner(QObject):
             Path(output_dir).mkdir(parents=True,exist_ok=True)
             provenance=runtime_provenance()
             self.phase_trace.record('handoff_begin')
+            self.bridge.prepare_objective_handoff()
             handoff=InputHandoff(self.bridge);handoff.prepare()
             purpose='multi_h' if isinstance(spec,MultiHSpec) else ('hv' if isinstance(spec,HVSpec) else 'h_only')
             if production:purpose='translation_only'

@@ -32,6 +32,18 @@ def hardware_ownership_snapshot(window):
         objective_flags['state'] = ('blocked_or_unconfirmed' if
             any(value is not False for value in objective_flags.values()) else 'no_owner_reported')
         autofocus = getattr(window, 'autofocus_active', False)
+        widget = getattr(window, 'pi_scanner_widget', None)
+        owner = bridge.objective_owner
+        if owner is not None:
+            objective_flags.update(owner.snapshot())
+            objective_flags['managed'] = bridge.managed_objective(widget)
+            if widget is not None and not objective_flags['managed']:
+                objective_flags['state'] = 'blocked_or_unconfirmed'
+                objective_flags['verified_released'] = False
+            autofocus = (None if owner.state == 'UNCERTAIN' else
+                         owner.state in ('ACTIVE', 'RELEASING') and owner.current.operation == 'autofocus')
+        objective_flags['window'] = ('NOT_CREATED' if widget is None else
+            'OPEN' if hasattr(widget, 'isVisible') and widget.isVisible() else 'CLOSED')
         return dict(
             read_only=True, scope='Cached ownership evidence; no instrument readback or acquisition authorization',
             legacy_daq_state=ledger['state'],
@@ -43,7 +55,8 @@ def hardware_ownership_snapshot(window):
                 ('legacy_activity:', 'legacy_thread_state_unknown:', 'legacy_callback_active'))
                 or r == 'legacy_daq_active'],
             objective_owner_state=objective_flags,
-            autofocus_state=('inactive' if autofocus is False else
+            autofocus_state=('unverified' if owner is None and autofocus is False else
+                             'inactive' if autofocus is False else
                              'active' if autofocus is True else 'unknown'),
             session_identity=ledger['session_id'],
             context_generation=controller.registration.context_generation,

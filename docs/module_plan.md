@@ -592,7 +592,9 @@ centering is not required, but capture of both edges is not guaranteed.
 in one session are live validated. Module 9 physical feature relocation is next.
 No multi-H/classifier gate is
 required for production.
-Retain fresh-session objective/DAQ blockers and sole-Python laser ownership.
+Retain blockers for unmanaged Objective widgets and unresolved DAQ evidence, and
+sole-Python laser ownership. Managed Objective V1 permits a visible window after
+verified operation-scoped release; ordinary opening/use no longer requires restart.
 Joystick acknowledgement is not independent readback; laser state/settings still
 require operator confirmation. Marker-scaled coverage is not proof of coverage from any
 marker point: failure to capture both edges fails closed without retries or an
@@ -668,10 +670,48 @@ future precision work, not blockers for this core workflow.
 `75a1c885ec37d1bea59f97e2a01e0b25d9bac485`.
 M8.2a: `b1fb1213ebcebf677eb9bfc49d21a3d7b5cb54d2`.
 
+#### Managed Objective Scanner DAQ Ownership V1 closeout (2026-10-01)
+
+**Status: COMPLETE — SOFTWARE TESTED AND LIVE HARDWARE VALIDATED.** This is a
+Module 8 ownership/workflow prerequisite closeout, not Module 9 implementation.
+The operator supplied the live results; the closeout agent reran software tests
+only. Full behavior/evidence and validation limits are recorded in
+[Managed Objective V1 validation](module8_hardware_orchestration.md#managed-objective-scanner-daq-ownership-v1-closeout-2026-10-01).
+
+- The explicit zero-argument Objective action adapter fixes the Qt Boolean-payload
+  regression. Opening and close/reopen passed live with no TypeError or UI exit.
+- Opening the managed window creates no native NI task: managed=true, OPEN,
+  RELEASED, verified_released=true, native_creation_attempted=false,
+  native_task_created=false, uncertain=false, blockers=[].
+- Acquire Signal, Move To (including repeated generations/tokens), and normal
+  Autofocus completion each confirmed task clear and owner-bound release, followed
+  by successful Locate Marker without restarting the UI.
+- With Objective Scanner left open, H/V localization completed, registration was
+  published, DAQ/idle cleanup passed, and ownership returned to AVAILABLE.
+- During localization, Objective hardware controls were disabled. After verified
+  cleanup they became usable again; a subsequent Acquire Signal cleared normally.
+  Close/reopen created no new DAQ transition, retained release evidence, and a
+  subsequent Locate Marker succeeded. Programmatic denial is software-tested;
+  disabled controls were not bypassed on hardware.
+- Lifecycle: RELEASED -> ACTIVE -> RELEASING -> RELEASED, or UNCERTAIN on
+  unverified failure. Unmanaged widgets, unresolved historical evidence and
+  uncertain cleanup still fail closed. Window visibility is not DAQ activity.
+
+Closeout regression: **252 passed, 0 failed**, offscreen Qt with hardware imports
+explicitly blocked. The legacy UI, instrument/driver code, scan engine and hash
+constants are unchanged. Legacy UI SHA-256 remains
+`fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
+
+Accepted limits: no forced autofocus cancellation or automatic restart;
+Snake/Repeat worker-origin autofocus/fallback Objective creation remains
+unsupported and fail-closed. Rotation remains deferred (production theta=0).
+Module 9 guarded target/MS movement and Module 10 ROI integration remain
+NOT STARTED. The next discussion is Module 9 architecture, not automatic enablement.
+
 ### Module 9 - Feature Selection and Guarded Move
 
 **Purpose** Select a registered feature and safely move to its predicted center.
-**Status** NEXT ACTIVE MODULE — implementation not started. **Dependencies** Modules 5-8.
+**Status** NEXT PLANNING MODULE — implementation not started. **Dependencies** Modules 5-8.
 
 **Inputs** Valid context-bound registration, manually assigned target, current
 stage readback, permitted bounds and operator-verified approach clearance.
@@ -828,10 +868,19 @@ normal FLIP_X display, and repeated Snake Scan -> Auto Location in one session
 with positive source-specific DAQ release. Active/uncertain ownership still blocks.
 Offline tests additionally exercise failure/cancel/quarantine and stale context.
 
+Managed Objective Scanner DAQ Ownership V1 is COMPLETE — SOFTWARE TESTED AND
+LIVE HARDWARE VALIDATED. Opening creates no native DAQ task; Acquire Signal,
+Move To, Autofocus and close/reopen each permit subsequent Locate Marker after
+verified release without restart. The window stays open, hardware controls are
+disabled during localization, and controls return after verified cleanup. The
+zero-argument Qt callback fix is also live validated. Old UI/instrument code is
+unchanged. Unsupported worker autofocus and uncertain ownership remain blocked.
+
 Multi-H / rotation calibration: DEFERRED — OPTIONAL FUTURE CALIBRATION.
 No quantitative physical relocation accuracy is claimed by Module 8.
 
-Next task: Module 9 — Feature Selection and Guarded Move. Single click selects
+Next discussion: plan Module 9 — Feature Selection and Guarded Move; no target
+motion implementation is included in this checkpoint. Single click selects
 and shows predicted XY; double click or explicit Move requests one guarded move.
 Physically validate whether theta=0 translation-only predictions are sufficiently
 accurate across the relevant chip region. Do not duplicate StageRegistration.
