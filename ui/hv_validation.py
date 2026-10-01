@@ -14,6 +14,8 @@ class HVSpec(HOnlySpec):
     round), is explicit and symmetric for negative coordinates; never truncate.
     Rectangular bounds cover approach/reposition/return, including diagonal moves.
     """
+    production_geometry: tuple = ()  # (mode, requested half-span, requested step); diagnostics only.
+
     def __post_init__(self):
         super().__post_init__()
         horizontal = self.scan()

@@ -4,7 +4,8 @@
 MIRcat/Prior/PI connections and stage speed/acceleration/joystick configuration.
 The old module is never imported by the default/offline path. The hardware window
 offers separately confirmed H-only and H+V development scans. Full live
-Locate Marker and target motion remain disabled.
+Locate Marker defaults disabled; --supervised-translation-only permits a reviewed H+V test.
+Target motion remains unavailable.
 """
 import argparse
 import sys
@@ -17,29 +18,30 @@ from ui.operational_localization_bridge import OperationalLocalizationBridge, MA
 from ui.localization_orchestration import OwnershipError, Command
 from ui.stage_command_dispatcher import qt_main_thread_target
 from ui.persistent_prior_owner import PersistentPriorOwner, constructor_with_proxy
+from ui.legacy_daq_tracking import invoke_acquisition
 
 
 class OfflineAutoRelocationWindow(QMainWindow):
     """Safe standalone panel host; does not simulate operational instrument controls."""
-    def __init__(self):
+    def __init__(self, *, developer_mode=False):
         super().__init__()
         self.setWindowTitle('Auto Relocation — OFFLINE ONLY')
         self.resize(1400, 1000)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
-        self.auto_relocation = AutoRelocationWidget()
+        self.auto_relocation = AutoRelocationWidget(developer_mode=developer_mode)
         self.auto_location_scroll=auto_location_scroll(self.auto_relocation)
         self.tabs.addTab(self.auto_location_scroll, 'Auto Relocation')
 
 
-def operational_window_class(base_class=None, *, owner_factory=None):
+def operational_window_class(base_class=None, *, owner_factory=None, translation_launch_enabled=False, developer_mode=False):
     """Lazy subclass, with an injectable inert base for offline contract tests.
 
     Do not call without a fake base during offline validation: importing the
     legacy module loads vendor libraries, and its constructor starts hardware.
     Experimental overrides guard callbacks and defer close while leased.
     The real experimental path injects one persistent-owner proxy before inherited
-    startup. H/H+V owns a separately configured DAQ task; Locate Marker stays disabled.
+    startup. H/H+V owns a separately configured DAQ task; production H+V needs explicit opt-in.
     """
     use_owner = base_class is None or owner_factory is not None
     if base_class is None:
@@ -64,8 +66,9 @@ def operational_window_class(base_class=None, *, owner_factory=None):
                     raise
             else:
                 super().__init__()  # Existing inert UI fixtures only.
+            self.translation_launch_enabled = translation_launch_enabled
             self.prior_owner = owner
-            self.auto_relocation = AutoRelocationWidget()
+            self.auto_relocation = AutoRelocationWidget(developer_mode=developer_mode)
             self.auto_location_scroll=auto_location_scroll(self.auto_relocation)
             self.tabs.addTab(self.auto_location_scroll, 'Auto Location')
             if owner is not None:
@@ -79,12 +82,15 @@ def operational_window_class(base_class=None, *, owner_factory=None):
                 self.localization_bridge = OperationalLocalizationBridge(self, self.auto_relocation.orchestration,
                     submit=self.stage_execution_target.submit)
             self.localization_bridge.install_guards()
+            from ui.hardware_ownership_diagnostics import hardware_ownership_snapshot
+            self.auto_relocation.hardware_diagnostics_provider = lambda: hardware_ownership_snapshot(self)
             self.h_only_runner = None
             if owner is not None:
                 from ui.h_only_controls import HOnlyRunner, HOnlyControls
                 self.h_only_runner = HOnlyRunner(self)
                 self.h_only_controls = HOnlyControls(self)
-                self.auto_relocation.layout().addWidget(self.h_only_controls)
+                self.auto_relocation.layout().insertWidget(4,self.h_only_controls)
+            self.auto_relocation.refresh_hardware_diagnostics()
             self.localization_display_timer = QTimer(self)
             self.localization_display_timer.setInterval(200)
             self.localization_display_timer.timeout.connect(self.auto_relocation.refresh)
@@ -138,9 +144,11 @@ def operational_window_class(base_class=None, *, owner_factory=None):
                 def authorized_callback():
                     if command in (Command.SPECTRUM,Command.REPEAT_SCAN,Command.MULTIWELL,
                                    Command.SNAKE_SCAN,Command.IMAGING):
-                        # Legacy cleanup has no checked release attestation.
-                        # Completion alone cannot prove that its DAQ task is gone.
-                        bridge.legacy_daq_cleanup_unverified = True
+                        return invoke_acquisition(callback,bridge.mark_legacy_daq_uncertain,*args,snake_bridge=bridge,**kwargs)
+                    if command is Command.OBJECTIVE_MOVE:
+                        # Construction itself configures NI; partial construction
+                        # failure must not escape tracking via an unset attribute.
+                        bridge.mark_legacy_daq_uncertain('objective_widget_creation_or_reopen')
                     return callback(*args,**kwargs)
                 return bridge.dispatch(command, authorized_callback)
             except OwnershipError as error:
@@ -160,9 +168,14 @@ def main(argv=None):
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--offline', action='store_true', help='Default: registration-only, no vendor imports')
     modes.add_argument('--hardware', action='store_true', help='Start the original hardware UI plus the offline registration tab')
+    parser.add_argument('--supervised-translation-only', action='store_true',
+        help='Explicit supervised H+V Locate Marker opt-in; no target motion')
+    parser.add_argument('--developer-mode', action='store_true', help='Expose alternative orientation controls')
     args = parser.parse_args(argv)
+    if args.supervised_translation_only and not args.hardware:
+        parser.error('--supervised-translation-only requires --hardware')
     app = QApplication.instance() or QApplication([])
-    window = operational_window_class()() if args.hardware else OfflineAutoRelocationWindow()
+    window = operational_window_class(translation_launch_enabled=args.supervised_translation_only,developer_mode=args.developer_mode)() if args.hardware else OfflineAutoRelocationWindow(developer_mode=args.developer_mode)
     window.show()
     return app.exec()
 

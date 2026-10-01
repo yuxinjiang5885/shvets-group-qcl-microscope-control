@@ -246,6 +246,8 @@ class HOnlyQtTests(unittest.TestCase):
 
     def test_normal_window_scroll_reaches_H_controls(self):
         controls=self.select_fixture_marker()
+        # Development actions are now intentionally collapsed in the MVP UI.
+        self.window.auto_relocation.development_toggle.setChecked(True)
         self.window.resize(1280,720);self.window.show();self.app.processEvents()
         scroll=self.window.auto_location_scroll
         self.assertTrue(scroll.widgetResizable())

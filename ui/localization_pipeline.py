@@ -21,6 +21,8 @@ from experiment.marker_center_refinement import CenterRefinementSettings, refine
 from experiment.marker_stage_registration import build_stage_registration
 from experiment.stage_registration import Orientation
 from ui.registration_state import RegistrationEvidence
+from ui.orientation_diagnostics import orientation_diagnostics
+from ui.runtime_provenance import breadcrumb
 
 
 @dataclass(frozen=True)
@@ -167,7 +169,7 @@ class LocalizationPipelineServices:
     def __init__(self, bridge, handle, spec, output_dir, daq_factory, *, clock=time):
         self.bridge, self.handle, self.spec = bridge, handle, spec
         self.clock, self.daq_factory = clock, daq_factory
-        self.path = Path(output_dir) / handle.run_id
+        self.path = Path(output_dir).resolve() / handle.run_id
         self.stage = BorrowedStageProxy(bridge, handle, spec, clock)
         self.task = None
         self.reader = None
@@ -179,11 +181,26 @@ class LocalizationPipelineServices:
     def movement_attempted(self):
         return self.bridge.movement_attempted
 
-    def prepare(self, settings):
-        if settings.context.frame_id != self.spec.bounds.frame_id or not settings.context.marker_id:
+    @staticmethod
+    def validate_context(settings, frame_id, diagnostic):
+        """Same pure gate for acquisition and no-motion preflight; no devices."""
+        if settings.context.frame_id != frame_id or not settings.context.marker_id:
             raise ValueError('frame_or_marker_not_confirmed')
         if settings.context.orientation is not Orientation.FLIP_X:
-            raise ValueError('existing_Module7_bridge_supports_FLIP_X_only')
+            raise ValueError('existing_Module7_bridge_supports_FLIP_X_only: '
+                             + json.dumps(diagnostic, default=str))
+
+    def prepare(self, settings):
+        breadcrumb(self, 'localization_prepare_enter')
+        diagnostic = orientation_diagnostics(settings.context.orientation, Orientation.FLIP_X,
+            run_id=self.handle.run_id, phase='prepare.orientation_gate')
+        diagnostic.update(prepare_source=str(Path(__file__).resolve()), service_type=type(self).__qualname__,
+                          verified_journals=[str(p.resolve()) for p in self.journals],
+                          initial_H_file_exists=(self.path/'initial_H.jsonl').exists())
+        self.diagnostics['orientation_gate'] = diagnostic
+        if hasattr(self, 'report'):
+            self.report['orientation_gate'] = diagnostic
+        self.validate_context(settings, self.spec.bounds.frame_id, diagnostic)
         self._start_gate()
         self.path.mkdir()  # Parent must exist; never overwrite prior journals.
         (self.path/'run.json').write_text(json.dumps(dict(run_id=self.handle.run_id,
@@ -195,6 +212,7 @@ class LocalizationPipelineServices:
         self.reader = NIReflectionReader(self.task, sample_number=self.spec.daq.samples,
             channel_limits=((-self.spec.daq.clipping_v, self.spec.daq.clipping_v),)*2, clock=self.clock)
         self._start_gate()
+        breadcrumb(self, 'localization_prepare_exit')
 
     def _start_gate(self):
         timeout = self.spec.readback_timeout_s
@@ -210,6 +228,9 @@ class LocalizationPipelineServices:
         progress(dict(phase=name, **data))
 
     def _scan(self, name, settings, checkpoint, progress, *, require_valid_edges=True):
+        breadcrumb(self, name + '_enter')
+        if name == 'profile_H_01':
+            breadcrumb(self, 'profile_1_enter')
         self._phase(name, checkpoint, progress, geometry=asdict(settings))
         path = self.path/(name+'.jsonl')
         def cancelled():
@@ -231,6 +252,7 @@ class LocalizationPipelineServices:
         self.journals.append(path)
         progress(dict(profile_completed=name, journal=str(path), edge=asdict(edge)))
         checkpoint()
+        breadcrumb(self, name + '_complete')
         return saved, edge
 
     def work(self, settings, checkpoint, progress):
@@ -279,6 +301,7 @@ class LocalizationPipelineServices:
         return evidence
 
     def _return(self, checkpoint):
+        breadcrumb(self, 'return_enter')
         target = self.spec.rough_start_xy
         if not self.spec.bounds.contains(target):
             raise ValueError('return_outside_bounds')

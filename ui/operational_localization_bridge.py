@@ -9,6 +9,7 @@ from ui.localization_orchestration import (Activity, Command, GuardDecision,
     OwnershipError, READ_ONLY)
 from ui.registration_state import ContextEvent
 from ui.stage_command_dispatcher import StageCommandDispatcher
+from ui.legacy_daq_tracking import LegacyDaqEvidence
 
 
 MAIN_COMMANDS = {
@@ -83,7 +84,7 @@ class OperationalLocalizationBridge:
         self.movement_attempted = False
         self.close_pending = False
         self.guards_installed = False
-        self.legacy_daq_cleanup_unverified = False
+        self.legacy_daq_evidence = LegacyDaqEvidence()
         if getattr(window, '_operational_localization_bridge', None) is not None:
             raise OwnershipError('second_stage_owner_bridge')
         if self.stage is not None and getattr(self.stage, '_localization_bridge_owner', None) is not None:
@@ -97,6 +98,38 @@ class OperationalLocalizationBridge:
 
     def frame_event(self, name):
         self.controller.handle_context_event(FRAME_EVENTS[name])
+
+    @property
+    def legacy_daq_cleanup_unverified(self):
+        return self.legacy_daq_evidence.uncertain
+
+    @legacy_daq_cleanup_unverified.setter
+    def legacy_daq_cleanup_unverified(self, value):
+        if value is True:
+            self.mark_legacy_daq_uncertain('external_unverified_assignment')
+        elif value is not False or self.legacy_daq_evidence.uncertain:
+            raise OwnershipError('legacy_DAQ_cannot_clear_without_verified_release')
+
+    def mark_legacy_daq_uncertain(self, source, *, owner=None, verifier=None):
+        with self.controller.registration.lock:
+            return self.legacy_daq_evidence.acquired_or_uncertain(source, owner=owner, verifier=verifier)
+
+    def confirm_legacy_daq_release(self, token):
+        """No GUI reset/attest-clean button. Requires an owner-bound verifier.
+
+        Current uninstrumented legacy workers have no verifier and remain blocked
+        even after finished. This hook is for positively instrumented owners only.
+        """
+        with self.controller.registration.lock:
+            if self.controller.active is not None or self._calls_active:
+                raise OwnershipError('legacy_DAQ_release_while_activity_active')
+            if any(reason.startswith(('legacy_activity:', 'legacy_thread_state_unknown:'))
+                   or reason in ('legacy_daq_active','autofocus_active','objective_motion_active',
+                                 'objective_daq_active','objective_ownership_uncertain',
+                                 'objective_daq_autofocus_ownership_unconfirmed')
+                   for reason in self.blockers()):
+                raise OwnershipError('legacy_DAQ_owner_still_active_or_unknown')
+            self.legacy_daq_evidence.confirm_release(token)
 
     def _remember_threads(self):
         motion = getattr(self.window, 'stageMotionWindow', None)
@@ -152,6 +185,8 @@ class OperationalLocalizationBridge:
             reasons.append('objective_daq_autofocus_ownership_unconfirmed')
         if self.legacy_daq_cleanup_unverified:
             reasons.append('legacy_DAQ_release_not_attested_fresh_session_required')
+            reasons.append('legacy_DAQ_pending_sources:'+repr([
+                row['source'] for row in self.legacy_daq_evidence.records.values() if not row['released']]))
         for name in ('autofocus_active','objective_motion_active','objective_daq_active',
                      'objective_ownership_uncertain','legacy_daq_active'):
             if getattr(self.window,name,False) is not False:

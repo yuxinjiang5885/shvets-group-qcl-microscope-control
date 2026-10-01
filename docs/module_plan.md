@@ -45,7 +45,7 @@ the QCL imaging workflow.
 | 5 | GDS-local to stage transform | Orientation, rotation, translation | COMPLETE AT ALGORITHM LEVEL | StageRegistration, StageLayout | 1, 4 |
 | 6 | 1D reflection scan and single-scan edge analysis | Adapters, scans, journals, edges | COMPLETE / HARDWARE VALIDATED within documented limits | ScanResult, EdgeResult | Hardware adapters; geometry supplies width prior |
 | 7 | Automatic square-marker registration | Multi-profile classification, fitting, QC | COMPLETE within documented validation limits | Offline center/angle; qualitative overlay agreement | 4–6 |
-| 8 | Auto Location / Locate Marker | Automatic localization and registered preview | IN PROGRESS; offline shell complete / manually reviewed | UI with QC/invalidation | 3–7 |
+| 8 | Auto Location / Locate Marker | Automatic localization and registered preview | COMPLETE / LIVE VALIDATED | UI with QC/invalidation | 3–7 |
 | 9 | Registered feature navigation | Click prediction / guarded center motion | NOT STARTED | Target prediction and motion/readback outcome | 5–8 |
 | 10 | Scanning ROI / Snake Scan MVP | Width/Height ROI to existing Snake Scan | NOT STARTED | ROI/start preview and guarded scan | 8–9 |
 
@@ -256,8 +256,8 @@ physical localization accuracy is **NOT CALIBRATED**.
 `tests/test_marker_profile_classification.py`,
 `square_marker_profile_classification_check.py`; the five original profile
 journals listed explicitly in the evaluator are preserved as offline evidence.
-The five repetitive `square_marker_rotation_profile_*_check.py` hardware harnesses
-remain local/untracked and are not required to replay classification.
+The five repetitive one-off profile hardware harnesses were removed at Module 8
+closeout; the committed journals and offline evaluators remain available.
 Production rotation: `experiment/marker_rotation.py`,
 `tests/test_marker_rotation.py`, `square_marker_rotation_fit_check.py`.
 Center refinement: `experiment/marker_center_refinement.py`,
@@ -501,13 +501,18 @@ Stage-integration milestone:
 Closeout milestone: `feat(registration): complete Module 7 validation workflow`.
 Record its resulting hash in the next roadmap update; this document is part of that commit.
 
-### Module 8 - Auto Location: complete Locate Marker
+### Module 8 - Auto Location MVP: H/V translation-only Locate Marker
+
+**Status: COMPLETE — LIVE VALIDATED.** Operator-confirmed production and repeated
+Snake Scan -> Auto Location reuse in the same Python session passed. Earlier
+implementation checkpoints below are historical; this closeout status supersedes
+their pending-test wording.
 
 **Purpose** Provide an **Auto Location** main tab alongside Single, Snake scan,
 and Scanning imaging in `qcl_scanning_imaging_autorelocation_ui.py`. Preserve
 existing operational behavior through the experimental subclass/supporting modules;
 `qcl_scanning_imaging_ui.py` must remain byte-identical. The experimental operational
-tab is now labeled Auto Location; registered-preview presentation remains work.
+tab is labeled Auto Location, with approved stage-center annotations on the GDS preview.
 
 **Inputs** Loaded GDS, one operator-selected square gold reference marker,
 manually selected desired features/MS pixels, orientation/frame/sample identity,
@@ -519,17 +524,23 @@ a second gamepad implementation within Auto Location.
 **Normal operator workflow** Load GDS -> select marker and targets -> use existing
 stage/gamepad controls to put the beam at a rough point on the selected marker ->
 confirm rough start and scan envelope -> press **Locate Marker**. The automatic
-chain is rough point -> initial H -> initial V -> planned central H profiles ->
-classification -> midpoint rotation -> center refinement -> StageRegistration.
+chain is rough point -> initial H -> initial V -> measured H/V marker center ->
+theta=0 translation-only StageRegistration -> registered feature preview.
 Intermediate scans normally require no manual execution. A rough point need not
 be the center: scan-envelope planning must accommodate the declared rough-start
 uncertainty or reject inadequate coverage before motion, without an unreviewed
 whole-chip search. Development H-only/H+V validation gates are not the final UX.
 
-**Outputs** A context-bound, approved registration and registered GDS preview.
+**Outputs** A context-bound, approved translation-only registration and registered GDS preview.
 For every selected feature show predicted stage center, with registration state,
 marker center, rotation, orientation, warnings and separate hard failures. All
 predictions delegate to StageRegistration. Selection alone is not motion.
+The production mode is `translation_only`, `rotation_calibrated=False`,
+`assumed_theta_deg=0.0`, orientation FLIP_X, scale=1, no shear. Rotation is an
+explicit assumption, never presented as measured or assigned fake uncertainty.
+Nonzero chip rotation causes target error to increase with marker distance;
+no quantitative physical accuracy is claimed. Module 9 target tests will assess
+whether this MVP approximation is sufficient.
 
 **Key files** `qcl_scanning_imaging_autorelocation_ui.py`,
 `ui/auto_relocation_widget.py`, `ui/registration_state.py`,
@@ -539,30 +550,98 @@ predictions delegate to StageRegistration. Selection alone is not motion.
 See [shell milestone](module8_ui_milestone.md) and
 [ownership/pipeline design](module8_hardware_orchestration.md).
 
-**Dependencies** Modules 3-7, unchanged production scan/analysis/registration APIs.
+**Dependencies** Modules 3-6 manual selection, transform and scan/analysis APIs,
+plus the live-validated H/V ownership path. Module 7 calibration remains optional.
 
 **Current status** Offline shell/lifecycle: **COMPLETE / OFFLINE VALIDATED /
 MANUALLY REVIEWED**. M8.2a ownership/worker/cancellation framework:
 **COMPLETE / OFFLINE VALIDATED**. Fast-track M8.2b-M8.2e pipeline and experimental
-bridge are implemented in the working tree and fake/inert tested, not live validated.
+bridge are offline tested; the production H/V subset and repeated Snake Scan reuse
+are now live validated. Full rotation calibration remains optional/deferred.
 The first supervised live H-only validation **PASSED** (run
 `495ebff7920b4d1296f5e9680afdd2a5`, 71/71 points, valid edges, return and cleanup
 PASS, ownership AVAILABLE, no registration published). The first supervised live
 H+V validation **PASSED**, run `8493cabf1df6424fa2bee5e25e5d8396`: both analyses
 valid, return/cleanup PASS, ownership AVAILABLE, no registration published.
-Supervised multi-H acquisition/classification is implemented and fake/inert
-validated (615 tests); its separate live test is pending. It uses the measured H/V center, existing
-conservative planner/classifier, a larger explicit clearance envelope, separate
-journals and success-only return. Production live rotation/refinement remain
-pending; full live Locate Marker remains disabled.
+The operator subsequently reports successful multi-H acquisition, with classifier
+acceptance too brittle for the current live data. This is useful experimental
+evidence, not a Module 8 MVP blocker; no classifier thresholds are changed.
+The earlier runtime/orientation investigation and preflight remain documented
+under optional development tooling. Production H/V translation-only integration
+and fake tests are implemented; the operator reports successful live H/V,
+return, cleanup, translation-only publication and registered predictions using
+reference sampling. Default hardware startup keeps Locate Marker disabled; a separately
+supervised test requires explicit `--supervised-translation-only` opt-in.
 
-**Remaining work** Review and run supervised multi-H acquisition/classification,
-then separately validate production live rotation/refinement and the full chain.
+**Production sampling policy** Selected square side S determines requested
+half-span = 1.25*S. Step = floor(min(15 um, S/20)) in integer micrometres;
+S < 20 um fails closed at the current 1 um stage resolution. Actual half-span
+rounds outward to a whole step, symmetrically about confirmed rough XY.
+For S=500 um: requested +/-625 um, actual +/-630 um, 15 um step,
+85 points/axis (170 H+V positions). Manual integral steps including 10/20/25 remain.
+V X remains the rounded measured H midpoint. Preview/confirmation covers the
+larger 2D rectangle and return; no automatic extension/retry is allowed.
+Development H-only/H+V retains 10 um validated reference sampling. The new
+production default is 15 um; physical center precision still requires assessment.
+Physical localization accuracy remains uncalibrated and will be assessed in
+Module 9 target tests. Move to a point clearly on the selected marker; exact
+centering is not required, but capture of both edges is not guaranteed.
+
+**Remaining work** No required Module 8 MVP work remains. The operator confirms
+15 um production Auto Location and repeated Snake Scan -> Auto Location reuse
+in one session are live validated. Module 9 physical feature relocation is next.
+No multi-H/classifier gate is
+required for production.
 Retain fresh-session objective/DAQ blockers and sole-Python laser ownership.
 Joystick acknowledgement is not independent readback; laser state/settings still
-require operator confirmation. Finish registered-preview presentation and arbitrary
-rough-point coverage before normal full Locate Marker enablement. A fixed margin
-is not proof of coverage from any marker point. No Module 9/10 implementation here.
+require operator confirmation. Marker-scaled coverage is not proof of coverage from any
+marker point: failure to capture both edges fails closed without retries or an
+expanded search. No Module 9/10 implementation here.
+
+**Tunable production sampling and anchor prior:** Production Scan Settings now
+allows explicit half-span/step override, calculated points, and reset to the
+marker-scaled automatic defaults. Changes require new preview and clearance
+confirmation. Production inspects every generic evaluated candidate using selected
+square width/height +/-100 um and inclusive containment of rough X (H) / rough Y
+(V); exactly one QC-valid match is required. Generic noise, contrast, support and
+background checks remain unchanged; geometry overrides never change marker priors.
+
+Production quality now uses maximum 100 um substrate windows immediately outside
+the uniquely identified marker, truncated at the nearest intervening crossings.
+Both samples of every threshold-transition bracket are excluded from substrate
+and interior quality regions; measured coordinates determine membership. Each
+region still requires at least three samples. Shared generic quality calculations
+retain min_snr=6, contrast, baseline-consistency and all other thresholds.
+Generic Module 6 selection semantics and wide-region outputs remain unchanged.
+Identity ambiguity fails before quality; no ranking or fallback candidates.
+
+The wide-scan failure 402745357b0c4b769431c2ccc138617c still fails generic wide
+SNR (5.35), but passes production local quality offline (SNR 325.26, background
+support 3/3). Historical 10 um H/V scans also pass. The prior local-quality blocker
+is resolved offline and the resulting production local-quality path is live validated.
+No hardware was run during implementation. 15 um
+is now the production default; 10 um is the finer reference.
+Module 9 physical target tests will assess accuracy. Rotation remains deferred.
+
+Normal production displays FLIP_X (default), backed by the canonical enum; only
+--developer-mode exposes alternative orientation selection. Fresh normal startup
+cannot inherit a developer alternative. The stable UI is unchanged.
+
+Experimental Snake/repeat-Snake DAQ tasks now have source-specific cleanup
+attestation. Configure marks potential NI acquisition; release requires all owned
+tasks positively cleared (started tasks also stopped), worker unwind and thread
+completion. Never-acquired workers release without a fictitious NI cleanup event.
+Active scans or any uncertain NI call/cleanup remain blocking. Completed history
+is bounded to 32; confirmed scans do not accumulate pending blockers. DAQ use
+alone does not invalidate registration, but the existing Snake Scan explicitly
+calls set_position to redefine coordinates; preserve that frame invalidation.
+
+**Optional Rotation Calibration / Future Enhancement** Multi-H planning and
+acquisition, profile classification, midpoint rotation, rotation-corrected center,
+second-H refinement if later evidence justifies it, and quantitative localization
+calibration are retained/deferred. They do not block this MVP. H-only, H+V,
+multi-H, preflight/provenance and archived replay remain secondary tools under
+Development / Diagnostics; the normal workflow does not require them.
 
 **Safety/lifecycle contract** One stage-command owner and one DAQ-task owner;
 share the persistent Prior owner's proxy, never create a second COM3 owner. Block legacy
@@ -577,9 +656,11 @@ not automatically a live approved registration.
 
 **Validation / exit criteria** Offline ownership, invalidation, failure/cancel,
 journal and publication tests pass; the stable UI is unchanged; manual selection,
-registered preview and warning display work; the complete Locate Marker chain is
-supervised-hardware validated with documented limits and no duplicate algorithms.
-Module 8 remains **IN PROGRESS**. Target movement belongs to Module 9; ROI scan
+registered preview and warning display work; the operator selects marker/features,
+clicks Locate Marker after preview/confirmation, H/V run automatically, and the
+translation-only registration is published only after return/cleanup. Selected
+feature centers appear in the GDS preview. This chain is operator-confirmed live validated within the documented limits.
+**Exit criteria: SATISFIED. Module 8 COMPLETE — LIVE VALIDATED.** Target movement belongs to Module 9; ROI scan
 launch belongs to Module 10. Quantitative calibration and improved rotation are
 future precision work, not blockers for this core workflow.
 
@@ -587,10 +668,10 @@ future precision work, not blockers for this core workflow.
 `75a1c885ec37d1bea59f97e2a01e0b25d9bac485`.
 M8.2a: `b1fb1213ebcebf677eb9bfc49d21a3d7b5cb54d2`.
 
-### Module 9 - Registered feature navigation
+### Module 9 - Feature Selection and Guarded Move
 
 **Purpose** Select a registered feature and safely move to its predicted center.
-**Status** NOT STARTED. **Dependencies** Modules 5-8.
+**Status** NEXT ACTIVE MODULE — implementation not started. **Dependencies** Modules 5-8.
 
 **Inputs** Valid context-bound registration, manually assigned target, current
 stage readback, permitted bounds and operator-verified approach clearance.
@@ -614,8 +695,10 @@ Supervised navigation on an operator-confirmed physically present feature passes
 with explicit outcome and documented limitations. Controller readback agreement is
 not quantitative optical localization accuracy. The current sample lacks intended
 MS pixels; choose a present landmark or suitable sample for physical checks.
-Quantitative localization calibration/residual targets remain future work, not an
-MVP exit requirement. No automatic multi-target batch movement/imaging.
+Physical relocation-accuracy validation must assess whether translation-only
+registration with assumed theta=0 is sufficiently accurate across the relevant
+chip region. Quantitative calibration remains future work; record observed
+relocation errors and practical limitations without assuming micron accuracy. No automatic multi-target batch movement/imaging.
 
 **Key reuse** `experiment/stage_registration.py`, `experiment/scan_adapters.py`,
 experimental ownership and registration-state modules. No stable-UI edits.
@@ -728,30 +811,32 @@ contain its own final hash. Do not amend completed history just to add that hash
 
 ## Current handoff
 
-Module 6 complete.
-Module 7 complete within documented validation limits.
+Module 6 complete. Module 7 complete within documented validation limits.
+Module 8 COMPLETE — LIVE VALIDATED (operator-confirmed).
 
-Module 8 offline shell complete.
-M8.2a orchestration framework complete and offline validated.
+Production: manual GDS marker/target selection -> existing gamepad positioning
+clearly on marker -> envelope preview/confirmations -> H -> size/anchor identity
+and local 100 um quality -> V -> measured center -> theta=0 translation-only
+StageRegistration -> registered feature predictions. FLIP_X is the production
+default; rotation_calibrated=False. Manual geometry override remains available.
+For a 500 um square: requested half-span 625, actual 630, step15, span1260,
+85 points/axis. Width tolerance100 um and min_snr6 remain unchanged.
 
-Finalized workflow: Auto Location main tab -> manual GDS marker/target selection ->
-existing stage/gamepad rough positioning -> automatic Locate Marker -> registered
-preview (Module 8) -> single-click prediction / double-click guarded feature-center
-motion (Module 9) -> Width/Height ROI preview and existing Snake Scan launch from
-its verified top-left start (Module 10 MVP).
+Live validated: production H/V and transactional publication, nearby-feature
+robustness, size/anchor selection, local quality, tunable geometry, 15 um default,
+normal FLIP_X display, and repeated Snake Scan -> Auto Location in one session
+with positive source-specific DAQ release. Active/uncertain ownership still blocks.
+Offline tests additionally exercise failure/cancel/quarantine and stale context.
 
-Next task:
-Review the supervised multi-H implementation, then perform one separately supervised
-H+V+profiles/classifier validation with fresh-session ownership, laser, live-frame
-and full-sequence clearance confirmation. H-only and H+V live validation passed;
-multi-H hardware validation has not yet occurred. Production live rotation,
-refinement and full Locate Marker remain pending/disabled. After successful
-multi-H/classifier evidence review, separately prepare production rotation validation.
-Preserve stable UI isolation and the finalized Modules 8-10 workflow; no target
-movement or ROI execution is authorized by this update.
+Multi-H / rotation calibration: DEFERRED — OPTIONAL FUTURE CALIBRATION.
+No quantitative physical relocation accuracy is claimed by Module 8.
 
-Profiles 1–5 journals are preserved Module 7 classifier evidence; their repetitive
-hardware harnesses remain untracked. Lower-bar exploratory files remain local abandoned
-experiments; the Y-repeatability harness has no reported execution results and
-remains local diagnostic work.
-No experiment files were deleted, and this roadmap authorizes no hardware motion.
+Next task: Module 9 — Feature Selection and Guarded Move. Single click selects
+and shows predicted XY; double click or explicit Move requests one guarded move.
+Physically validate whether theta=0 translation-only predictions are sufficiently
+accurate across the relevant chip region. Do not duplicate StageRegistration.
+
+Module 10 remains Width/Height feature-centered ROI -> preview -> verified
+top-left start -> reuse existing Snake Scan. No Module 9/10 implementation is
+included in this closeout. Historical harnesses and unused runtime output were
+removed; required journals survive as committed evidence or explicit test fixtures.

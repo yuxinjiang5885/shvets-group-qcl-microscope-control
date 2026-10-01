@@ -192,8 +192,8 @@ this is not a rotation-corrected registration or a calibrated accuracy claim.
 ## Real position-mismatch failure: partial validation
 
 The abandoned lower-bar rotation experiment provides useful failure evidence.
-The local, uncommitted journal
-`lower_bar_y_75aa8b468f6441db966efed8a6277fe0.jsonl` records 68 completed points
+The reviewed lower-bar Y journal (removed as obsolete runtime output during
+Module 8 closeout; this summary is retained) recorded 68 completed points
 and a failed footer: `ValueError: Measured position differs from commanded position`.
 The last two saved Y readbacks are -26532 and -26527 um for commands -26531 and
 -26526 um. The operator reported the next command -26521 um read back -26519 um,

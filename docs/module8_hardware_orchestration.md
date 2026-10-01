@@ -1,3 +1,38 @@
+# Module 8 closeout status
+
+**COMPLETE — LIVE VALIDATED.** The operator confirms production Auto Location,
+Snake Scan, and Auto Location again in the same Python session work successfully,
+including repeated Snake Scan DAQ release attestation. No hardware was executed
+by the closeout agent. Earlier pending/retry procedures below are historical.
+
+Live-validated production includes H/V acquisition, size + rough-point identity,
+nearby-feature robustness, local 100 um quality, tunable geometry, 15 um default,
+canonical FLIP_X normal UI, transactional translation-only registration and
+registered GDS predictions. Offline failure/cancel/quarantine tests complement
+these successful live workflows; they do not claim every fault was tested live.
+
+Defaults: requested half-span=1.25*S; step=floor(min(15,S/20)); coverage rounds
+up to whole steps. S=500 gives requested625, actual630, span1260, step15,
+85 points/axis (170 H+V). Manual overrides remain. Local baseline is at most
+100 um outside each edge, truncated at nearest crossing; width tolerance100 um,
+min_snr6. theta=0, rotation_calibrated=False, FLIP_X(default).
+
+Multi-H/rotation is DEFERRED — OPTIONAL FUTURE CALIBRATION. Module 9 next:
+feature selection/guarded movement and physical relocation-accuracy assessment
+of the translation-only assumption across the chip. Module 10: feature-centered
+Width/Height ROI, preview and existing Snake Scan from its verified top-left.
+
+Cleanup retained all imported diagnostic/calibration modules and regression tests.
+Three required runtime journals were copied byte-for-byte to
+`tests/fixtures/production_marker/` with documented provenance. Tests now require
+those fixtures instead of arbitrary runtime UUID paths. Unused runtime outputs
+and unreferenced one-off hardware harnesses were removed. Committed Module 7
+profile journals and the 20 um vertical reference remain. localization_runs/ is
+ignored for future runtime output. No numerical or hardware policy changes were
+made during closeout. Stable UI remains unchanged.
+
+---
+
 # Module 8 M8.2a: fake-service localization orchestration
 
 The M8.2a baseline below is preserved for context. The M8.2b-e experimental
@@ -1054,3 +1089,514 @@ Multi-H implementation validation: **615 offline/fake tests passed**, including
 SHA256 remains `fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
 No hardware was initialized in this implementation task. Ready for a separately
 supervised multi-H test; no multi-H live result is claimed.
+
+
+## First supervised Multi-H live attempt: failed safely, diagnosis pending
+
+Operator reports `ValueError: existing_Module7_bridge_supports_FLIP_X_only` while
+Auto Location displayed FLIP_X. Reported outcomes: initial H completed, no multi-H
+profiles acquired, no automatic return, cleanup PASS, input restore
+RESTORE_SUCCESS_GAMEPAD_MANUAL_RESTART, ownership AVAILABLE,
+registration_published=False and multi_h_complete=False. Treat this as a reported
+software integration failure, not evidence of hardware failure. No retry was run
+as part of the software investigation.
+
+The exact orientation representation cause is **not yet established**. In commit
+50a8db4, the sole raise is LocalizationPipelineServices.prepare(), before initial H
+and DAQ creation. The selector stores the string 'flip_x', but sync_context()
+converts it to experiment.stage_registration.Orientation.FLIP_X before RunSettings.
+An inert actual-widget check confirms that canonical identity survives this path.
+All H/H+V/Multi-H actions share the same prepare gate; planning has no orientation
+argument or conversion. A naive JSON-to-RegistrationContext reload retains a string,
+but that reload is not used by this live path. It is not a confirmed explanation.
+
+The operator subsequently identified run `792e5087c2f74bab8a0d16316920964d`
+and explicitly confirmed initial H completed before the displayed failure. This
+live timing evidence is retained; the current-source order does not explain it.
+The exact reported directory
+`C:\Users\Discovery\GitHub\Projects\experiments\_147\localization_runs\792e5087c2f74bab8a0d16316920964d`
+was searched and is absent. The working repository/CWD is
+`C:\Users\Discovery\GitHub\Projects\experiments_147`; its `localization_runs`
+contains only the earlier H and H+V runs. Absence here does not disprove the live
+diagnostics. The failed process's traceback and orientation identity remain unknown.
+
+The supervised caller trace is HOnlyControls.start -> HOnlyRunner.start ->
+LocateMarkerQtWorker -> LocateMarkerWorker.run -> MultiHServices.prepare ->
+HVServices.prepare -> HOnlyServices.prepare -> LocalizationPipelineServices.prepare.
+Each superclass receives the same RunSettings/context. Only after prepare returns
+does MultiHServices.work call acquire_initial_center (H then V), plan, profiles,
+and classifier. There is no post-H prepare call in this checkout. InputHandoff.prepare
+is a separate gamepad/joystick operation. Planned H journal path/count fields are
+populated before acquisition, so those fields alone do not establish scan timing.
+
+An inert experimental-window regression exercises constructor_with_proxy, manual
+GDS selection, UI orientation changes, the real Qt runner, H/V acquisition and
+planning. It observes prepare once, then H, V, plan. The private globals are a
+shallow copy retaining module/class identity. Received and expected Orientation
+classes are identical, with equality=True and identity=True. A deliberately injected
+duplicate str-enum demonstrates equality=True/identity=False and safe rejection;
+it is a diagnostic fault fixture, not a reproduced cause in the operational path.
+
+Read-only orientation-gate diagnostics now capture repr/value, type/module/source,
+class/module IDs, equality/identity, loaded Orientation modules, run ID, phase,
+verified journals and initial-H file existence. These are included in the UI report
+and failure reason. If prepare fails before creating a run directory, the report is
+saved exclusively as `<output>/<run-id>_prepare_diagnostics.json`; no scan journal
+is invented or overwritten. No conversion or change from identity to equality was
+applied. Retry remains blocked pending identification of the live discrepancy.
+Validation: 618 offline/fake tests passed; stable UI SHA256 remains
+`fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
+No hardware was initialized, and no files were staged or committed.
+Full live Locate Marker remains disabled; production rotation/refinement pending.
+
+## Runtime provenance and no-motion Multi-H Preflight
+
+The next diagnostic action is **Run Multi-H Preflight (no hardware calls)** in
+Auto Location's supervised development section. This is not Preview Multi-H
+Envelope and not Run Multi-H Validation. The action needs no scan preview,
+clearance checkbox, emission confirmation, or stage readback. It snapshots the
+current UI context/generation, uses the same RunSettings builder as the runner,
+and calls the exact extracted pure context/orientation gate used by prepare.
+The `is Orientation.FLIP_X` gate is unchanged. If a cached preview is available,
+its rough coordinate/frame is included; otherwise rough start is explicitly absent.
+The result is diagnostic validity only, never scan readiness or registration.
+
+It does not construct acquisition services, stop gamepad, disable joystick,
+request a lease, read/move/stop stage, create DAQ, touch laser, write journals,
+or publish registration. It displays selectable JSON and changes no registration
+state. Do not retry scanning on the strength of a successful preflight.
+
+Provenance includes executable, resolved CWD/repository root, read-only bounded
+`git rev-parse HEAD`, ordered sys.path and candidate repo files; loaded module
+names, IDs, resolved paths and disk SHA256; and loaded function code hashes for
+prepare, the shared gate, MultiH prepare/work, and worker run. Disk hashes describe
+current files, not necessarily the source used by an older running process.
+Marshalled runtime-code hashes identify loaded code (within matching Python/path
+environments). Duplicate logical imports and alternate sys.path copies are listed,
+not silently normalized. Orientation diagnostics inspect the actual gate's enum
+reference, including equality versus identity, repr/str/value and class/module IDs.
+
+Supervised-run reports now include in-memory phase breadcrumbs with run ID,
+sequence, wall/monotonic timestamps and thread identity. Events cover runner start,
+handoff, settings creation, ownership, prepare enter/exit, work, H/V enter/complete,
+planner, profile entry, classifier, return and cleanup. Pre-lease events receive
+the acquired run ID when bound. Settings creation actually precedes acquisition;
+the trace records that order. Reports persist on normal completion/failure, including
+pre-prepare failure diagnostics. These are not crash-durable per-event journals.
+
+Artifact audit: the corrected path is
+`C:\Users\Discovery\GitHub\Projects\experiments_147\localization_runs\792e5087c2f74bab8a0d16316920964d`.
+It is absent too. Current production code creates the output parent, exclusively
+creates a run directory, and scan_1d opens each journal exclusively. Cleanup closes
+resources/streams, never deletes/moves run directories or journals. No production
+temporary-directory deletion, failed-candidate pruning, or localization_runs purge
+was found in the experimental entry point, UI modules or scanner. Test temporary
+directories belong only to fixtures. A post-H analysis failure test confirms H
+journal and final failure report retention. No deletion bug was found or fixed;
+the missing historical artifact is not reconstructed and its absence remains unexplained.
+
+Operator diagnostic procedure (not executed here): close the prior experimental
+process safely; use the intended Python environment from the repository root and
+launch `python .\qcl_scanning_imaging_autorelocation_ui.py --hardware` only under
+the existing supervised startup policy (sole Python MIRcat owner, vendor GUI and
+other conflicting hardware applications closed). Startup itself initializes normal
+operational hardware; only the preflight action is hardware-call-free. Load GDS,
+manually select the reference marker and verify current frame/orientation. Do not
+enable emission or position the stage for this diagnostic. Press only **Run Multi-H
+Preflight (no hardware calls)**. Copy the selectable JSON to the review record,
+including executable/CWD/HEAD, all paths/hashes, enum identity and reasons. Stop
+there; do not press any envelope preview or scan-validation button. An already
+running older process cannot gain this action without a controlled restart.
+
+Validation: **626 offline/fake tests passed** (eight new preflight/provenance tests).
+The experimental constructor path verifies zero preflight device calls, canonical
+module identity, duplicate/wrong-gate diagnostics, alternate sys.path detection,
+ordered threaded breadcrumbs and failed-scan evidence retention. Stable UI hash
+is unchanged. **READY TO RUN NO-MOTION MULTI-H PREFLIGHT ON HARDWARE UI: YES**;
+Multi-H scan retry remains blocked pending review of actual-process evidence.
+
+## MVP scope update: production H/V translation-only Locate Marker
+
+This decision supersedes earlier requirements to calibrate rotation before Module 8
+completion. The operator reports multi-H acquisition completed, but classification
+was brittle for current live data. No thresholds are retuned here. Multi-H,
+classifier, rotation, refined center and provenance/preflight remain optional
+Development / Diagnostics tools; their unresolved calibration issues do not block
+the translation-only MVP. The live H-only and H+V evidence above is preserved.
+
+Production now reuses HVServices.acquire_initial_center unchanged: confirmed rough
+point, handoff/lease/DAQ, initial H with finalized journal/valid edges, nearest-integer
+(ties-to-even) V X, initial V with finalized journal/valid edges. The anchor is
+(H midpoint, V midpoint); no second H, profiles, classifier, rotation fit or center
+refinement is called. TranslationServices builds the existing Module 5
+StageRegistration(anchor_x, anchor_y, 0, FLIP_X), verifies success-only return, then
+offers typed TranslationEvidence to the existing worker/controller. Only confirmed
+cleanup and unchanged context/generation permit atomic publication. A safe failed
+candidate retains prior approval; frame changes or uncertain cleanup invalidate it.
+
+Approved metadata: registration_mode=translation_only, rotation_calibrated=False,
+assumed_theta_deg=0.0, scale=1, shear=none. Display: VALID — TRANSLATION ONLY;
+rotation assumed 0° — not calibrated. Warning rotation_assumed_zero_not_calibrated
+remains visible with joystick_command_ack_only and
+laser_operator_confirmation_not_fresh_SDK_readback. No angle uncertainty is invented.
+Target error grows with distance if true chip rotation is nonzero. Physical target
+accuracy remains unmeasured; later Module 9 validation determines sufficiency.
+
+The registered preview keeps its explicit GDS coordinate frame and annotates the
+manually selected marker/target centers with approved stage XY. Predictions use
+the existing marker-local ChipLayout and local_to_stage, never screen coordinates.
+Single-clicking an assigned feature displays its prediction; no click or double-click
+moves hardware. Scene annotations clear on invalidation. No Module 9 or ROI work.
+
+Primary controls are now Locate Marker, Preview Locate Marker Envelope (H+V),
+current identities and confirmations. H-only/H+V/multi-H validation, no-motion
+preflight and archived replay remain in a collapsed Development / Diagnostics
+section. Diagnostic instrumentation was retained, not removed. Default --hardware
+does not enable production Locate Marker. A future explicitly supervised test can
+opt in using --supervised-translation-only; this flag is rejected without --hardware.
+This task executes neither flag against hardware.
+
+### First translation-only Locate Marker procedure (not executed)
+
+1. Close competing stage/DAQ software and the MIRcat vendor GUI. Use the normal
+   supervised startup/clearance precautions and sole Python MIRcat ownership.
+2. From the repository and intended Python environment run:
+   `python .\qcl_scanning_imaging_autorelocation_ui.py --hardware --supervised-translation-only`.
+   This explicitly enables the later supervised production test; normal startup
+   remains gated. Startup initializes operational instruments as before.
+3. Load GDS, manually select the square gold reference and desired features. Set
+   current non-archived frame/sample/input identities and FLIP_X. Use the existing
+   gamepad to put the beam roughly on the selected marker. No new gamepad exists.
+4. Establish laser emission/settings using the operational Python owner: 1500 cm^-1
+   for the validated setup, SR865A 20 mV, 300 us, Advanced 24 dB. Confirm physical
+   emission/wiring; cached SDK flags are not fresh emission/settings verification.
+5. Press Preview Locate Marker Envelope (H+V). For a 500 um marker with 100 um
+   margin, inspect Xrough +/-350 um at Yrough and Yrough +/-350 um at dynamic
+   V X=round(valid H midpoint). Step 10 um, 71 points/axis. The whole rectangle,
+   approaches and return must have physical clearance and permitted stage bounds.
+   An arbitrary point near the marker edge may not capture both edges: no auto retry.
+6. Enter operator note and journal directory; confirm current frame/full clearance,
+   laser emission, sole software ownership, lock-in setup, and the distinct Locate
+   Marker both-axis clearance checkbox. Press Locate Marker once.
+7. Expect input handoff, H then V, original rough-start return, cleanup, ownership
+   AVAILABLE, then VALID — TRANSLATION ONLY. Inspect measured H/V center, assumed
+   angle, retained warnings, separate initial_H/initial_V journals and
+   translation_only_result.json. The selected reference maps to the measured center;
+   selected feature centers show predicted stage XY without motion.
+8. Cancel uses the existing cooperative path; failure/cancellation causes no retry
+   or automatic return and no new approval. Preserve journals/result. With uncertain
+   native/DAQ cleanup, leave motion sources disabled and follow existing supervised
+   quarantine recovery; never force-terminate the owner or open a second session.
+9. Stop after reviewing publication and predictions. Do not test target movement,
+   ROI/Snake Scan, multi-H fallback or calibration. After successful review, plan
+   Module 9 guarded feature-center motion and physical target accuracy checks.
+
+Offline implementation validation: **648 tests passed**, including 22 new
+translation-only tests and retained H/H+V, multi-H, diagnostics and Module 5-7
+regressions. Tests exercise the actual experimental constructor with inert
+Prior/NI, production button/preview, transaction failures, context invalidation,
+warning metadata and registered predictions. Stable UI SHA256 remains
+`fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
+**READY FOR SUPERVISED TRANSLATION-ONLY LOCATE MARKER TEST: YES**. This is
+software readiness only; no production Locate Marker hardware run occurred in
+this task. Module 8 remains incomplete until that separate live test is reviewed.
+
+### Fresh-session legacy DAQ attestation investigation
+
+The subsequent operator report is a genuinely restarted experimental session
+blocked before acquisition by
+`legacy_DAQ_release_not_attested_fresh_session_required`. No legacy acquisition
+or objective widget was reportedly used. That live transition has **not** been
+reproduced from the reviewed startup source; do not attribute it to operator
+activity without evidence. This investigation supersedes the earlier readiness
+claim for that unresolved blocker.
+
+The exact emitter is `OperationalLocalizationBridge.blockers()`, consumed by
+`InputHandoff.prepare()` before input handoff, lease or localization DAQ creation.
+Previously the bridge initialized `legacy_daq_cleanup_unverified=False`.
+The experimental wrapper set it True on entry to six legacy acquisition
+callbacks, with no verified-release path. There is no reviewed startup assignment
+to True. Calling the actual stable `run_experiment()` with an unarmed laser
+reproduces a separate defect: it returns without creating a worker/task, but the
+old wrapper still permanently marked the session dirty.
+
+Startup ownership audit (static inspection only):
+
+- `mainWindow.__init__` constructs `piScanner`, a PI controller object, not an NI
+  task. Ordinary scan tabs, parameters, menus and controls are non-owning.
+- `show_pi_scanner_widget()` lazily constructs `piScanner_widget`; its constructor
+  calls `_setup_daq()` and configures an NI task. Hidden is not equivalent to
+  released. Widget visibility/finished-thread signals do not attest NI cleanup.
+- Single/sweep, repeat, multiwell, snake/repeat-snake and imaging acquisition
+  callbacks create QThreads before running their task-creating workers. None of
+  those acquisition workers is started by the reviewed window constructor.
+- NI task creation occurs in the NI wrapper's configure methods, not because an
+  acquisition parameter object or an NI wrapper module merely exists.
+
+The experimental fix tracks session-scoped acquisition evidence. `never_acquired`
+is clean without needing a release event. Reviewed legacy callbacks are marked
+uncertain immediately before their QThread factory executes; early returns are
+clean. A private globals copy intercepts only this factory. The stable source hash
+and compiled callback code must match the audited source; unknown/changed callbacks
+are conservatively marked at entry. The stable UI and its globals are unchanged.
+Objective-widget entry is marked before construction, including partial failures.
+
+Each transition records a session ID, source and token. Blocked diagnostics include
+pending sources; no-motion preflight includes the full safe ledger snapshot. A
+positive release requires a token-bound owner verifier and no active/unknown
+owner. There is no operator "clear clean" override. Current legacy workers have
+no such verified cleanup signal, so potentially acquired tasks remain blocked
+even when workers finish. Restart creates a new session ledger; it does not claim
+to clear another process's hardware tasks. All other ownership gates still apply.
+
+New inert regression coverage includes fresh production H/V, actual stable
+early-return callback through the experimental wrapper, worker creation, active
+and uncertain ownership, owner-bound release, stale tokens, non-owning PI versus
+NI-owning objective widgets, and session restart. No real hardware was run.
+Validation: **663 offline tests passed**, including 15 focused attestation tests;
+`git diff --check` passed and the stable UI SHA256 remains unchanged.
+
+**READY TO RETRY PRODUCTION LOCATE MARKER: NO** for claiming the reported live
+blocker resolved: the callback-free live dirty transition remains unidentified.
+The no-task callback defect is fixed, and fresh inert production H/V passes.
+Next evidence needed is the pending-source/session provenance if the reported
+fresh-session denial recurs; do not bypass the blocker or infer NI cleanup from
+an idle UI. This task does not authorize or execute a hardware retry.
+
+### Marker-scaled production sampling update
+
+The operator subsequently reports successful live production H -> V -> center,
+theta=0 -> return -> cleanup -> VALID TRANSLATION ONLY publication and registered
+predictions. That success used reference sampling. The new sampling described
+below has not been executed on hardware in this implementation task.
+
+`ui/translation_geometry.py` centralizes production settings and constructs the
+existing immutable `HVSpec`. Side S comes from the manually selected square's
+GDS geometry, not an archived constant. The selection model accepts arbitrary
+positive square sizes; production rejects S<20 um because 1 um stage resolution
+cannot satisfy S/20 sampling.
+
+- Requested half-span: 1.25*S.
+- Integral step: floor(min(25 um, S/20)); never rounded upward for small markers.
+- Actual half-span: ceil(requested half-span / step)*step. Endpoints expand
+  symmetrically, never shrink; point count = 2*actual half-span/step+1.
+- H is centered on confirmed rough X at rough Y. V is centered on rough Y at
+  the nearest-integer measured H midpoint X (unchanged ties-to-even policy).
+- S=500 um gives +/-625 um, 25 um step, 51 points/axis, 102 scan positions total.
+  Around (4200,-26100), H is 3575..4825 and V is -26725..-25475 um.
+- Proposed clearance bounds include the full new rectangle plus existing 1 um
+  tolerance padding. They are not detected travel limits. Inadequate manually
+  entered bounds fail before motion. No runtime expansion beyond approved bounds.
+
+Production ignores the labeled development/reference margin/step fields.
+Development H-only/H+V retains +/-350 um, 10 um / 71-point defaults for S=500 um.
+Preview and run diagnostics report actual span, step and count. Edge analysis,
+expected width/tolerance, measured-coordinate interpolation, return/cleanup and
+translation-only publication rules are unchanged.
+
+Move to a point clearly on the selected marker; exact centering is not required.
+Failure to capture a unique valid edge pair remains fail-closed, without retry.
+25 um is a speed/coverage default and may reduce edge/center precision; no
+quantitative physical accuracy is claimed. 10 um remains validated reference
+sampling. Module 9 physical target tests will assess adequacy.
+
+For the next separately supervised test, follow the production procedure above
+but inspect the NEW larger envelope and 25 um / 51-point settings before
+confirming full 2D clearance. Retain sole Python MIRcat ownership, all laser,
+lock-in, frame confirmations and cancellation/failure precautions. Expect only
+H then V, return, cleanup and translation-only publication. Do not test target
+motion, ROI, multi-H or rotation calibration. This update ran no real hardware.
+
+### Tunable production geometry and rough-anchor candidate policy
+
+Production Scan Settings exposes automatic/override, requested half-span and
+integral step, calculated actual span/counts and Reset to Automatic Defaults.
+Automatic remains 1.25*S and floor(min(25,S/20)); for 500 um, 625/25 gives 51
+points. Override expands half-span using ceil(requested/step)*step: 625/10 ->
+630 and 127 points; 625/20 -> 640 and 65; 625/25 -> 625 and 51. Requests must
+be finite/positive, step integral, have at least nine samples, and leave background
+extent beyond half the marker width. Endpoints remain integral, symmetric and
+within previewed clearance. No runtime expansion/retry. Parameter/marker changes
+clear preview and confirmation. Reset is software-only, leaving registration
+unchanged. H/H+V development reference defaults remain unchanged.
+
+TranslationServices retains scanner/journal verification and generic analysis,
+then inspects ALL evaluated candidates even on generic selection failure. Require
+selected square width/height +/-100 um, inclusive containment of rough X (H) or
+rough Y (V), and ALL generic quality checks. Exactly one eligible candidate
+succeeds; zero returns no_anchor_matching_marker_candidate and multiple returns
+multiple_anchor_matching_marker_candidates. No ranking, nearest-center choice,
+interpolation duplication, or signal-QC waiver is allowed.
+
+Result metadata includes mode/requested/actual geometry, per-axis/total planned
+point counts, measured centers/widths, candidate QC/anchor/size decisions, per-axis
+acquisition/verification/analysis duration, and elapsed service time through DAQ
+cleanup. The latter excludes pre-service input handoff and is labeled accordingly.
+
+Offline runtime journal analysis:
+localization_runs/402745357b0c4b769431c2ccc138617c/initial_H.jsonl reports generic
+no_valid_candidate with three candidates. The only width/anchor match at X=4200
+has edges 3957.3193222053806 and 4469.514230851912 um, width
+512.1949086465311 um and midpoint 4213.416776528646 um. Support counts (16,20,7)
+pass, but contrast 3.5223249947828847 / noise 0.6584503951182552 gives SNR about
+5.35, below 6. It remains rejected as noisy_signal. Other candidate widths are
+168.2038384247653 and 75.66729779712023 um and fail the marker-size/anchor prior.
+
+Successful recovery of this journal conflicts with preserving generic quality
+rules. No threshold was changed to force acceptance. READY TO TEST TUNABLE
+ANCHOR-AWARE PRODUCTION LOCATE MARKER: NO until that specific conflict is reviewed.
+Synthetic nearby-feature selection and fake publication pass, but do not show
+that the real failed scan passes. No hardware/target motion/ROI/rotation work.
+
+### Production local-baseline quality (supersedes the prior SNR blocker)
+
+Marker identity and signal quality are separate: first require exactly one
+GDS-dimension/rough-anchor match, even if generic wide-region quality rejected it.
+Multiple identity matches fail before quality; never rank or try another candidate.
+Then use fixed LOCAL_BACKGROUND_WIDTH_UM=100, independent of marker size, range
+or step. For interpolated edges L/R, nominal substrate is [L-100,L) and
+(R,R+100]. Clip at the nearest previous/next detected crossing, without interpreting
+neighbor semantics. The marker interior remains bounded by L/R.
+
+Membership uses sorted measured coordinates. Exclude BOTH measured samples of
+every threshold crossing bracket from all three quality regions, including marker
+interior, deterministically removing transition samples without changing edge
+interpolation or selected coordinates. Never add distant samples. Each background
+side and the interior require at least three usable points. Specific failures are
+insufficient_local_baseline_support_left/right and insufficient_local_marker_support.
+Finite-data/saturation protection remains. Empty/short windows fail before statistics.
+
+The existing contrast, median-level, first-difference/residual noise and background
+consistency mathematics were factored into evaluate_region_quality, used unchanged
+by generic candidates and production-local regions. min_snr=6, min_contrast=0.01,
+baseline difference fraction=0.25, min_region_points=3 and width tolerance=100 um
+are unchanged. Distant structures outside these windows cannot affect this
+selected candidate's local quality; generic global crossing generation is unchanged.
+
+Failed 25 um journal 402745357b0c4b769431c2ccc138617c, offline:
+- Edges 3957.3193222053806 / 4469.514230851912 um unchanged; midpoint
+  4213.416776528646 um, width 512.1949086465311 um; anchor 4200 contained.
+- Left requested/actual interval [3857.3193222053806,3957.3193222053806).
+  Usable X: 3875,3900,3925 (3 points).
+- Right requested/actual interval (4469.514230851912,4569.514230851912].
+  Usable X: 4500,4525,4550 (3 points). Interior support: 18.
+- Previous crossing: none; next: 4637.718069276677 um. Neither window needs
+  crossing truncation in this journal; both are clipped to the physical 100 um cap.
+- Region medians: 2.5700674295092263 / 5.8664625156860435 /
+  2.542400197667672. Contrast 3.3102287020975947; noise 0.010177181514993016;
+  SNR 325.25986661640735. Baseline difference 0.027667231841554507 is below
+  allowed 0.8275571755243987. Identity TRUE, local quality PASS, reasons empty.
+
+Historical comparisons, unchanged journals: 8493cabf1df6424fa2bee5e25e5d8396
+10 um initial H passes (support 9/48/6, SNR 130.06913185834898); initial V passes
+(9/47/9, SNR 47.104465741482336). The committed 20 um vertical marker journal
+9392a56a0a0e4517b9b897398376ee3b passes (4/23/4, SNR 22.667713670082446).
+Available samples may cover less than a nominal window; no extrapolation occurs.
+
+Diagnostics retain generic wide-region reasons for comparison, separately report
+marker_identity_match / marker_quality_pass, and persist local intervals, neighbors,
+support/coordinates, region medians, contrast/noise/SNR and final reasons.
+Geometry/overrides, ownership, H/V center, theta=0, return/cleanup/publication and
+registered predictions are unchanged. High local SNR is not calibrated center accuracy.
+
+Next supervised procedure: existing --hardware --supervised-translation-only
+startup with sole Python MIRcat ownership and no competing DAQ/stage software;
+select the square marker, establish frame/sample/laser/lock-in confirmations,
+position clearly on marker, leave production automatic defaults, preview full
+2D envelope (500 um: +/-625, step25,51 points), confirm clearance, Locate Marker
+once. Inspect H/V local identity/quality, separate journals, return and cleanup
+before accepting publication. Failure/cancel causes no retry/automatic return;
+uncertain cleanup follows existing quarantine. No target motion/ROI/rotation test.
+This procedure is not executed as part of implementation.
+
+## Production defaults and repeated Snake Scan reuse
+
+Production translation-only Auto Location has now been live validated successfully
+(operator report). This update is implementation/offline validation only.
+
+Automatic requested step is floor(min(15 um, S/20)); the small-marker resolution
+check is retained. Requested half-span is 1.25*S; actual half-span rounds upward
+to a whole number of steps. For S=500 um: requested half-span 625, step 15,
+actual half-span 630, span 1260, 85 positions/axis and 170 nominal H+V positions.
+The UI distinguishes requested from actual coverage. Manual integral overrides
+remain available; 10 um remains a finer reference. Development H/H+V defaults,
+marker identity, local 100 um quality, thresholds and theta=0 are unchanged.
+
+Normal startup displays Orientation: FLIP_X (default), with canonical
+experiment.stage_registration.Orientation.FLIP_X. Alternate controls are hidden.
+The optional --developer-mode flag exposes the existing selector and its context
+invalidation behavior. A normal launch does not inherit hidden alternative state.
+
+### Snake Scan acquisition and release evidence
+
+The old worker_creation:run_snake_scan evidence had no positive release verifier:
+thread completion alone could not clear it. The experimental acquisition boundary
+now instruments run_snake_scan and repeat_snake_scan using private function globals
+and a worker subclass. Neither stable UI nor experiment/routines.py is changed;
+the existing scan engine executes unchanged. Other legacy sources retain their
+independent conservative blockers.
+
+Each worker has a unique acquisition token in the existing LegacyDaqEvidence.
+CREATED is not proof of NI acquisition. MultiAI construction creates a wrapper;
+configure_triggered enters NI task creation and marks ACQUIRED. start_task marks
+ACTIVE. The wrapper observes the existing read_line, stop_task and clear_task.
+Each task belongs to that worker's token, including successive pattern tasks.
+The experimental wrapper forbids reset=True.
+
+Normal completion already stops/clears tasks. A worker-finally path handles any
+remaining owned task on the acquisition thread, then records worker completion.
+A GUI-thread receiver observes actual QThread completion. RELEASE_CONFIRMED
+requires both completions, all owned tasks cleared, and no uncertain NI operation.
+A started task must have successful stop and clear returns. A wrapper that never
+entered configuration needs no NI release. Creating a worker that exits without
+acquiring a task does not permanently poison the session.
+
+Release applies only to the exact token. It cannot release another objective,
+legacy or uncertain source. Completed history is bounded to 32 entries; unresolved
+sources are never pruned. Diagnostics expose lifecycle state, task count, worker/
+thread completion, active acquisition IDs, pending/active sources, last completed
+source and timestamped release attestation, plus production blockers.
+
+A Python-level failure or cooperative unwind can release ownership after verified
+cleanup. The existing Snake engine has no newly added cancellation mechanism:
+no claim is made that a blocking driver call can be cancelled. An unresolved call
+keeps the worker and ownership pending. NI setup/read/stop/clear exceptions retain
+uncertainty even if subsequent cleanup returns; they require existing fresh-session
+or quarantine recovery. No thread termination, concurrent stop, blind reset or
+clear-all attestation is introduced. Failure does not emit the legacy success
+signal that would falsely claim laser emission was disabled; error diagnostics
+explicitly leave laser state unconfirmed.
+
+Autofocus/objective construction inside Snake Scan is separately marked and cannot
+be cleared by the scan-task release. Reuse testing must initially leave autofocus
+and objective paths unused. Independent objective/DAQ uncertainty still blocks.
+
+DAQ usage itself does not invalidate registration. However the existing Snake
+engine calls set_position to redefine and later restore coordinates. Those frame
+changes continue to invalidate registration through the shared proxy; do not reuse
+an old approval across them. Ordinary movement alone remains non-invalidating.
+
+### Offline verification and next supervised check
+
+719 offline/fake tests pass. Focused tests exercise 20 consecutive successful
+acquisitions with empty pending/active sources after every release; 45 releases
+verify bounded history. They cover never-acquired workers, active/uncertain tasks,
+source isolation, NI failures, safe Python-exception cleanup, the actual compiled
+stable callback with inert factories, Qt thread completion, and no false success
+signal on failure. Stable UI SHA256 remains
+fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab.
+
+Next supervised test (not executed here): launch experimental UI with --hardware
+--supervised-translation-only, without --developer-mode. Close competing stage/NI
+applications and the MIRcat vendor GUI; Python remains sole MIRcat software owner.
+Use the already approved laser/lock-in and clearance procedure. Select the marker,
+position clearly on it, and preview automatic 15 um geometry before Auto Location.
+After a successful registration, run one small previously reviewed ordinary Snake
+Scan with autofocus disabled. Wait for worker/thread completion and refresh DAQ
+diagnostics: release confirmed, no pending/active sources, no cleanup uncertainty,
+ownership available. Re-establish laser state (normal Snake disables emission),
+review coordinate-frame identity, reposition on marker, re-preview and reconfirm
+Auto Location. Repeat two more scans and then longer sequences only after review.
+An active scan must block localization. Any uncertain cleanup stops the sequence;
+do not bypass attestation or retry hardware automatically. No target-motion, ROI,
+rotation or new scan engine work is part of this check.

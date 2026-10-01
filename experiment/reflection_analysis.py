@@ -82,21 +82,17 @@ class EdgeResult:
     support_counts: tuple[int, int, int] | None = None
 
 
-def _evaluate_candidate(x, y, above, crossings, k, threshold, settings):
-    first, second = crossings[k:k + 2]
-    start = 0 if k == 0 else crossings[k - 1] + 1
-    end = len(y) if k + 2 == len(crossings) else crossings[k + 2] + 1
-    regions = (y[start:first + 1], y[first + 1:second + 1], y[second + 1:end])
+def evaluate_region_quality(regions, polarity, settings):
+    """Shared unchanged contrast/noise/consistency QC for three nonempty regions."""
     counts = tuple(map(len, regions))
     levels = tuple(map(median, regions))
     baseline = (levels[0] + levels[2]) / 2
     contrast = abs(levels[1] - baseline)
-    local = y[start:end]
+    local = [value for region in regions for value in region]
     noise = median(abs(b - a) for a, b in zip(local, local[1:])) / 0.9538725524
     residual = sqrt(sum((v - level) ** 2 for region, level in zip(regions, levels)
                         for v in region) / len(local))
     noise = max(noise, residual)
-    polarity = "bright" if above[first + 1] else "dark"
     reasons = []
     if any(count < settings.min_region_points for count in counts):
         reasons.append("insufficient_edge_support")
@@ -109,6 +105,18 @@ def _evaluate_candidate(x, y, above, crossings, k, threshold, settings):
         reasons.append("inconsistent_background")
     if noise > 0 and contrast / noise < settings.min_snr:
         reasons.append("noisy_signal")
+
+    return counts, levels, contrast, noise, tuple(reasons)
+
+
+def _evaluate_candidate(x, y, above, crossings, k, threshold, settings):
+    first, second = crossings[k:k + 2]
+    start = 0 if k == 0 else crossings[k - 1] + 1
+    end = len(y) if k + 2 == len(crossings) else crossings[k + 2] + 1
+    regions = (y[start:first + 1], y[first + 1:second + 1], y[second + 1:end])
+    polarity = "bright" if above[first + 1] else "dark"
+    counts, _, contrast, noise, quality_reasons = evaluate_region_quality(regions, polarity, settings)
+    reasons = list(quality_reasons)
 
     def crossing(i):
         return x[i] + (threshold - y[i]) * (x[i + 1] - x[i]) / (y[i + 1] - y[i])

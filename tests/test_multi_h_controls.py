@@ -121,3 +121,86 @@ class MultiHQtTests(unittest.TestCase):
         self.assertIsNone(c.reviewed)
         self.assertIn('full_possible_envelope',c.result.text())
         self.assertEqual(self.backend.calls,[])
+
+    def test_UI_private_globals_orientation_and_exact_prepare_order(self):
+        from experiment.stage_registration import Orientation
+        from ui.localization_pipeline import LocalizationPipelineServices
+        from ui.multi_h_validation import MultiHSpec
+        from test_persistent_prior_owner import InertWindow
+        from ui.persistent_prior_owner import constructor_with_proxy
+        clone=constructor_with_proxy(InertWindow,self.window.stage)
+        for key,value in InertWindow.__init__.__globals__.items():
+            if key!='stageInitializer':self.assertIs(clone.__globals__[key],value)
+        c=self.select_fixture_marker()
+        self.window.auto_relocation.orientation.setCurrentText('FLIP_Y')
+        self.window.auto_relocation.orientation.setCurrentText('FLIP_X')
+        c.fields['note'].setText('identity/order probe');c.fields['output'].setText(self.tmp.name)
+        c.multi_preview_button.click()
+        for check in c.checks:check.setChecked(True)
+        c.multi_clearance.setChecked(True)
+        events=[]
+        prepare=LocalizationPipelineServices.prepare
+        scan=LocalizationPipelineServices._scan
+        plan=MultiHSpec.plan
+        context=self.window.auto_relocation.state.context
+        def preparing(service,settings):
+            events.append('prepare')
+            self.assertIs(settings.context,context)
+            self.assertIs(settings.context.orientation,Orientation.FLIP_X)
+            self.assertEqual(service.journals,[])
+            return prepare(service,settings)
+        def scanning(service,name,*a,**k):
+            result=scan(service,name,*a,**k)
+            events.append(name)
+            return result
+        def planning(spec,center):
+            events.append('plan');return plan(spec,center)
+        with patch.object(LocalizationPipelineServices,'prepare',preparing), \
+             patch.object(LocalizationPipelineServices,'_scan',scanning), \
+             patch.object(MultiHSpec,'plan',planning):
+            c.multi_run_button.click();self.pump(lambda:not self.runner.busy)
+        self.assertEqual(self.controller.machine.state,AcquisitionState.COMPLETE,self.controller.reasons)
+        self.assertEqual(events[:4],['prepare','initial_H','initial_V','plan'])
+        self.assertEqual(events.count('prepare'),1)
+        d=self.runner.services.report['orientation_gate']
+        self.assertEqual(d['actual']['class_id'],id(Orientation))
+        self.assertEqual(d['expected']['class_id'],id(Orientation))
+        self.assertTrue(d['equal']);self.assertTrue(d['identical'])
+        self.assertFalse(d['initial_H_file_exists'])
+        self.assertEqual(d['verified_journals'],[])
+        self.assertEqual(len({m['class_id'] for m in d['orientation_modules']}),1)
+
+    def test_duplicate_enum_diagnosed_not_silently_accepted(self):
+        from enum import Enum
+        from experiment.stage_registration import Orientation
+        duplicate=Enum('Orientation',{'FLIP_X':'flip_x'},type=str,module='inert_duplicate_fixture')
+        self.assertEqual(duplicate.FLIP_X,Orientation.FLIP_X)
+        self.assertIsNot(duplicate.FLIP_X,Orientation.FLIP_X)
+        # Equal str-enums make otherwise identical dataclasses equal; change the
+        # input identity too so set_context actually installs this fault fixture.
+        self.state.set_context(replace(self.state.context,orientation=duplicate.FLIP_X,
+                                       inputs_id='duplicate-identity-probe'))
+        self.runner.start(self.spec,self.confirm,self.tmp.name)
+        self.pump(lambda:not self.runner.busy)
+        r=self.window.auto_relocation.run_display['multi_h_result'];d=r['orientation_gate']
+        self.assertTrue(d['equal']);self.assertFalse(d['identical'])
+        self.assertNotEqual(d['actual']['class_id'],d['expected']['class_id'])
+        self.assertEqual(d['actual']['module'],'inert_duplicate_fixture')
+        self.assertEqual(r['final_state'],'FAILED');self.assertEqual(r['ownership'],'AVAILABLE')
+        self.assertEqual(r['cleanup_status'],'PASS');self.assertEqual(r['return_status'],'NOT_ATTEMPTED')
+        self.assertFalse(r['registration_published']);self.assertEqual(self.backend.calls,[])
+        self.assertFalse(self.runner.services.path.exists())
+        saved=self.runner.services.path.parent/(self.runner.services.handle.run_id+'_prepare_diagnostics.json')
+        self.assertTrue(saved.exists())
+        self.assertIn('inert_duplicate_fixture',str(r['reasons']))
+
+    def test_unsupported_orientation_diagnostics_safe_cleanup(self):
+        from experiment.stage_registration import Orientation
+        self.state.set_context(replace(self.state.context,orientation=Orientation.FLIP_Y))
+        self.runner.start(self.spec,self.confirm,self.tmp.name)
+        self.pump(lambda:not self.runner.busy)
+        r=self.window.auto_relocation.run_display['multi_h_result']
+        self.assertFalse(r['orientation_gate']['equal'])
+        self.assertEqual(r['cleanup_status'],'PASS');self.assertEqual(r['ownership'],'AVAILABLE')
+        self.assertFalse(r['multi_h_complete']);self.assertFalse(r['registration_published'])
+        self.assertEqual(self.backend.calls,[])

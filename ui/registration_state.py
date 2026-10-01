@@ -20,6 +20,7 @@ from experiment.marker_stage_registration import build_stage_registration
 from experiment.stage_registration import Orientation, local_to_stage
 from experiment.reflection_analysis import EdgeSettings, analyze_scan
 from experiment.scan_1d import load_scan
+from ui.translation_registration import TranslationEvidence, build_translation_registration
 
 
 class RegistrationStatus(str, Enum):
@@ -98,6 +99,16 @@ class RegistrationState:
         self.prediction = None
 
     @property
+    def registration_mode(self):
+        if self.registration is None:
+            return None
+        return getattr(self.registration, 'registration_mode', 'rotation_calibrated')
+
+    @property
+    def rotation_calibrated(self):
+        return self.registration is not None and self.registration_mode == 'rotation_calibrated'
+
+    @property
     def approved_registration(self):
         return self.registration
 
@@ -146,6 +157,17 @@ class RegistrationState:
     def accept(self, evidence):
         self.begin()
         self.evidence = evidence
+        if isinstance(evidence, TranslationEvidence):
+            try:
+                if evidence.context != self.context or not self.context.marker_id:
+                    raise ValueError('evidence_context_mismatch')
+                self.registration = build_translation_registration(evidence)
+                self.warnings = self.registration.warnings
+                self.status = RegistrationStatus.VALID
+            except ValueError as error:
+                self.invalidate(str(error), context_changed=False)
+                raise
+            return
         self.warnings = tuple(dict.fromkeys((*evidence.rotation.warnings, *evidence.center.warnings)))
         try:
             if evidence.context != self.context or not self.context.marker_id:
@@ -211,6 +233,28 @@ class RegistrationState:
         self.prediction = TargetPrediction(feature_id, entry.name,
             (pixel.center_gds_x, pixel.center_gds_y), local, tuple(stage))
         return self.prediction
+
+    @_locked
+    def registered_predictions(self):
+        if self.status is not RegistrationStatus.VALID or self.registration is None:
+            return {}
+        assignments = self.assignments
+        if assignments is None or assignments.marker is None:
+            return {}
+        marker = assignments.marker
+        if marker.feature_id != self.context.marker_id:
+            self.invalidate('reference_marker_changed')
+            return {}
+        result = {marker.feature_id: TargetPrediction(marker.feature_id, 'Reference marker',
+            (marker.center_x_um, marker.center_y_um), (0., 0.),
+            tuple(local_to_stage(0., 0., self.registration.registration)))}
+        selected = self.prediction
+        try:
+            for feature_id in assignments.ms_assignments:
+                result[feature_id] = self.predict(feature_id)
+        finally:
+            self.prediction = selected
+        return result
 
 
 def replay_archived_evidence(root):

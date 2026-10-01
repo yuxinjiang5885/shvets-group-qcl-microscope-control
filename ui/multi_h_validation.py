@@ -5,6 +5,7 @@ from statistics import mean
 from experiment.marker_profile_classification import (
     ClassificationSettings, ProfileGeometry, ProfileClass, classify_profiles,
 )
+from ui.runtime_provenance import breadcrumb
 from ui.hv_validation import HVSpec, HVConfirmation, HVServices
 from ui.localization_pipeline import LocalizationSpec, plan_profiles
 
@@ -73,6 +74,7 @@ class MultiHServices(HVServices):
     def work(self, settings, checkpoint, progress):
         center = self.acquire_initial_center(checkpoint, progress)
         self._phase('profile_planning', checkpoint, progress)
+        breadcrumb(self, 'planner_enter')
         ys, scans = self.spec.plan(center)
         self.report.update(planned_profile_y=ys, profile_count=len(ys), profiles=[])
         progress(dict(initial_center=center, planned_profile_y=ys,
@@ -101,6 +103,7 @@ class MultiHServices(HVServices):
             progress(dict(profile_result=diagnostic))
             checkpoint()
         self._phase('profile_classification', checkpoint, progress)
+        breadcrumb(self, 'classifier_enter')
         classified = classify_profiles(tuple(rows), center[1],
             ClassificationSettings(side_um=self.spec.side_um))
         by_id = {row.profile.identifier:row for row in classified.profiles}

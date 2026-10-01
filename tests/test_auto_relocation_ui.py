@@ -180,6 +180,7 @@ window.close()
             self.accept()
 
     def test_orientation_change_invalidates(self):
+        self.widget.developer_mode=True
         self.accept()
         self.widget.orientation.setCurrentText('FLIP_Y')
         self.assertEqual(self.widget.state.status, RegistrationStatus.INVALID)
@@ -220,7 +221,10 @@ window.close()
         self.accept()
         with patch('ui.registration_state.local_to_stage', wraps=local_to_stage) as transform:
             QTest.mouseClick(self.widget.predict_button, Qt.MouseButton.LeftButton)
-            transform.assert_called_once()
+            # Registered-preview refresh also transforms marker/target centers.
+            self.assertTrue(transform.called)
+            self.assertTrue(all(call.args[2] is self.widget.state.registration.registration
+                                for call in transform.call_args_list))
         prediction = self.widget.state.prediction
         expected = local_to_stage(*prediction.marker_local_um, self.widget.state.registration.registration)
         self.assertEqual(prediction.stage_um, tuple(expected))
@@ -393,8 +397,8 @@ window.close()
         worker = LocateMarkerWorker(controller, handle, services)
         worker.run(self.widget.consume_localization_event)
         self.assertEqual(state.status, RegistrationStatus.VALID, controller.reasons)
-        self.assertIn('refined_center', self.widget.acquisition_label.text())
-        self.assertIn('classification', self.widget.acquisition_label.text())
+        self.assertIn('refined_center', self.widget.diagnostics_text.toPlainText())
+        self.assertIn('classification', self.widget.diagnostics_text.toPlainText())
         self.assertIn('COMPLETE', self.widget.acquisition_label.text())
         self.assertFalse(self.widget.locate_button.isEnabled())
 

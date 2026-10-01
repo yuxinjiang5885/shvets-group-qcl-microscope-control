@@ -3,6 +3,8 @@
 Ownership covers cooperating callers in this process. It is not a hardware lock
 against vendor applications or unguarded legacy code. No real backend is supplied.
 """
+from ui.runtime_provenance import breadcrumb
+from ui.translation_registration import TranslationEvidence
 from dataclasses import dataclass
 from enum import Enum
 from queue import SimpleQueue
@@ -272,7 +274,7 @@ class RunSettings:
     def __post_init__(self):
         if (type(self.context_generation) is not int or self.context_generation < 0
                 or not self.expected_rough_start_id.strip()
-                or self.purpose not in ('registration', 'h_only', 'hv', 'multi_h')):
+                or self.purpose not in ('registration', 'translation_only', 'h_only', 'hv', 'multi_h')):
             raise ValueError('invalid_run_settings')
 
 
@@ -370,7 +372,10 @@ class LocalizationController:
             self.checkpoint(handle)
             if handle.settings.purpose in ('h_only', 'hv', 'multi_h'):
                 raise ValueError('H_only_cannot_publish_registration')
-            if (not isinstance(evidence, RegistrationEvidence)
+            if handle.settings.purpose == 'translation_only':
+                if not isinstance(evidence, TranslationEvidence) or evidence.run_id != handle.run_id:
+                    raise ValueError('malformed_translation_candidate')
+            elif (not isinstance(evidence, RegistrationEvidence)
                     or not isinstance(evidence.classification, ClassificationResult)
                     or not isinstance(evidence.rotation, RotationFitResult)
                     or not isinstance(evidence.center, CenterRefinementResult)):
@@ -390,7 +395,9 @@ class LocalizationController:
             self.context_updated()
             self.reasons = tuple(reasons)
             candidate = self.candidate_registration
-            if candidate is not None:
+            if isinstance(candidate, TranslationEvidence):
+                self.warnings = tuple(dict.fromkeys((*candidate.warnings, 'rotation_assumed_zero_not_calibrated')))
+            elif candidate is not None:
                 self.warnings = tuple(dict.fromkeys((*candidate.rotation.warnings, *candidate.center.warnings)))
                 self.reasons += (*candidate.classification.reasons,
                                  *candidate.rotation.reasons, *candidate.center.reasons)
@@ -415,8 +422,10 @@ class LocalizationController:
                     self.registration.publish_candidate(candidate, handle.settings.context_generation)
                     target = AcquisitionState.COMPLETE
                 except Exception as error:
-                    self.reasons += (str(error), *candidate.classification.reasons,
-                                     *candidate.rotation.reasons, *candidate.center.reasons)
+                    self.reasons += (str(error),)
+                    if isinstance(candidate, RegistrationEvidence):
+                        self.reasons += (*candidate.classification.reasons,
+                                         *candidate.rotation.reasons, *candidate.center.reasons)
                     target = AcquisitionState.FAILED
             self.machine.transition(target)
             self.candidate_registration = None
@@ -512,9 +521,11 @@ class LocateMarkerWorker:
             self.controller.checkpoint(self.handle)
             emit('phase_changed', 'prepare')
             touched = True  # prepare can fail after acquiring a partial resource.
+            breadcrumb(self.services, 'services_prepare_enter')
             self.services.prepare(self.handle.settings)
             self.controller.checkpoint(self.handle)
             emit('phase_changed', 'candidate_work')
+            breadcrumb(self.services, 'services_work_enter')
             candidate = self.services.work(self.handle.settings,
                 lambda: self.controller.checkpoint(self.handle), progress)
             if self.handle.settings.purpose in ('h_only', 'hv', 'multi_h'):
@@ -528,6 +539,7 @@ class LocateMarkerWorker:
         except Exception as error:
             reasons = (f'{type(error).__name__}: {error}',)
         finally:
+            breadcrumb(self.services, 'cleanup_enter')
             emit('phase_changed', 'cleanup')
             failures = []
 
