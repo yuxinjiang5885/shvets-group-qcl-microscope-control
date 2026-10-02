@@ -249,6 +249,18 @@ class PersistentPriorOwner:
         _LIVE_OWNERS.discard(self)
         return True
 
+    def retire_quarantined(self):
+        """Stop idle delivery for process exit without claiming native cleanup.
+
+        Never disconnect an uncertain session or terminate a native call. A call
+        still executing must return before normal Qt thread exit can complete.
+        Retain the owner/evidence; this is not recovery or a released session.
+        """
+        self._closing = True
+        self.dispatcher.shutdown()
+        self._thread.quit()
+        return self._thread.wait(int(self.timeout_s * 1000))
+
 
 def constructor_with_proxy(base_class, proxy):
     """Private constructor globals: no global/module monkey patch or UI copy.

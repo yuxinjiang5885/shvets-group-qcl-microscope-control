@@ -86,6 +86,8 @@ class OperationalLocalizationBridge:
         self.guards_installed = False
         self.legacy_daq_evidence = LegacyDaqEvidence()
         self.objective_owner = None
+        self.snake_parent = None
+        self.last_snake_parent = None
         if getattr(window, '_operational_localization_bridge', None) is not None:
             raise OwnershipError('second_stage_owner_bridge')
         if self.stage is not None and getattr(self.stage, '_localization_bridge_owner', None) is not None:
@@ -180,6 +182,9 @@ class OperationalLocalizationBridge:
     def blockers(self):
         """Read Python/Qt lifecycle only; never poll any physical instrument."""
         reasons = []
+        if self.snake_parent is not None:
+            reasons.append('snake_workflow_active' if self.snake_parent.worker_active
+                           else 'snake_workflow_quarantined')
         if self.stage is None or self.window.stage is not self.stage:
             reasons.append('stage_session_missing_or_replaced')
         motion = getattr(self.window, 'stageMotionWindow', None)
@@ -237,7 +242,8 @@ class OperationalLocalizationBridge:
         with self.controller.registration.lock:
             reasons = self.blockers()
             # One composite blocker does not erase separately reported activities.
-            self.controller.report_activity(Activity.FRAME_CHANGE, bool(reasons))
+            if self.snake_parent is None:
+                self.controller.report_activity(Activity.FRAME_CHANGE, bool(reasons))
             return GuardDecision(not reasons, reasons)
 
     def quiesce_gamepad(self, timeout_ms=3000):
@@ -379,6 +385,36 @@ class OperationalLocalizationBridge:
         with self.controller.registration.lock:
             if (self.dispatcher.uncertain or self.dispatcher.unresolved) and command not in READ_ONLY:
                 raise OwnershipError('native_stage_execution_unresolved_or_quarantined')
+            parent = self.snake_parent
+            if parent is not None:
+                if command not in READ_ONLY:
+                    if parent.cleanup_operation is not None:
+                        operation = parent.cleanup_operation
+                        parent.authorize_finalization(operation)
+                        if (command not in (Command.MANUAL_MOVE, Command.FRAME_CHANGE)
+                                or (frame is not None and
+                                    (operation != 'set_position' or frame != 'set_position'))):
+                            raise OwnershipError('snake_cleanup_command_not_authorized')
+                    else:
+                        parent.check(cleanup=parent.cleanup_authorized)
+                    if command not in (Command.MANUAL_MOVE, Command.FRAME_CHANGE, Command.SPECTRUM):
+                        raise OwnershipError('snake_parent_command_not_authorized')
+                    if frame: self.frame_event(frame)
+                    # Native owner serializes stage execution. Do not wait on a
+                    # different Qt thread while retaining this transaction lock.
+                    snake_callback = True
+                else:
+                    snake_callback = False
+            else:
+                snake_callback = False
+            if snake_callback:
+                pass
+            else:
+                return self._dispatch_ordinary(command, callback, *args, frame=frame, **kwargs)
+        return callback(*args, **kwargs)
+
+    def _dispatch_ordinary(self, command, callback, *args, frame=None, **kwargs):
+        with self.controller.registration.lock:
             owner = self.objective_owner
             objective_stage_call = (owner is not None and owner.executing_here()
                                     and command in (Command.MANUAL_MOVE, Command.FRAME_CHANGE))
@@ -474,6 +510,8 @@ class OperationalLocalizationBridge:
                             return self.dispatch(Command.SPECTRUM,_call,*args,**kwargs)
                         except OwnershipError as error:
                             self.last_guard_failure = str(error)
+                            if self.snake_parent is not None:
+                                raise
                             return False  # A rejected Qt callback must not unwind Qt.
                     setattr(laser,name,guarded_laser)
             # Emission-off remains an operator safety action; it cancels the run.
@@ -481,8 +519,12 @@ class OperationalLocalizationBridge:
                 original=getattr(laser,name,None)
                 if callable(original):
                     def laser_off(*args,_call=original,**kwargs):
+                        parent = self.snake_parent
+                        if parent is not None and not parent.executing_here():
+                            parent.request_cancellation()
                         self.controller.request_cancel()
                         return _call(*args,**kwargs)
+                    if name == 'disable': self.snake_laser_disable = original
                     setattr(laser,name,laser_off)
         return True
 
@@ -493,14 +535,35 @@ class OperationalLocalizationBridge:
         else:
             self.controller.registration.invalidate(reason)
 
+    def trace_snake(self, event, **details):
+        parent = self.snake_parent or self.last_snake_parent
+        if parent is not None: parent.trace(event, **details)
+
     def request_close(self):
+        self.trace_snake('close_requested')
         self.close_pending = True
+        if self.snake_parent is not None:
+            parent = self.snake_parent
+            parent.request_cancellation(closing=True)
+            if parent.worker_active:
+                self.trace_snake('close_deferred_reason', reason='snake_worker_or_thread_running')
+                return False
+            # Completed quarantine is not an active worker. The UI uses its
+            # dedicated shutdown path without releasing this reservation.
+            if self.dispatcher.unresolved:
+                self.trace_snake('close_deferred_reason', reason='native_stage_call_unresolved')
+                return False
+            return True
         if self.objective_owner is not None and not self.objective_owner.released():
+            self.trace_snake('close_deferred_reason', reason='objective_not_released')
             return False
         if self.dispatcher.uncertain or self.dispatcher.unresolved:
+            self.trace_snake('close_deferred_reason', reason='stage_dispatcher_uncertain_or_unresolved')
             self.controller.request_cancel()
             return False
-        return self.controller.request_close()
+        allowed = self.controller.request_close()
+        if not allowed: self.trace_snake('close_deferred_reason', reason='localization_active_or_quarantined')
+        return allowed
 
     def continue_close(self, callback):
         if (not self.close_pending or self.dispatcher.uncertain or self.dispatcher.unresolved

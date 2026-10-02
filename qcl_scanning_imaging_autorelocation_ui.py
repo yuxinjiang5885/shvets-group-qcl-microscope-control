@@ -45,6 +45,7 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
     startup. H/H+V owns a separately configured DAQ task; production H+V needs explicit opt-in.
     """
     use_owner = base_class is None or owner_factory is not None
+    live_trace = base_class is None
     if base_class is None:
         from qcl_scanning_imaging_ui import mainWindow
         base_class = mainWindow
@@ -86,6 +87,15 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
                 self.localization_bridge = OperationalLocalizationBridge(self, self.auto_relocation.orchestration,
                     submit=self.stage_execution_target.submit)
             self.localization_bridge.install_guards()
+            if live_trace:
+                try:
+                    from pathlib import Path
+                    from uuid import uuid4
+                    from ui.snake_trace import SnakeTraceWriter
+                    self.localization_bridge.snake_trace_writer = SnakeTraceWriter(
+                        Path.cwd() / 'localization_runs' / ('snake_trace_' + uuid4().hex + '.jsonl'))
+                except Exception as error:
+                    self.localization_bridge.snake_trace_error = str(error)
             from ui.hardware_ownership_diagnostics import hardware_ownership_snapshot
             self.auto_relocation.hardware_diagnostics_provider = lambda: hardware_ownership_snapshot(self)
             self.h_only_runner = None
@@ -105,20 +115,70 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
             runner = getattr(self, 'h_only_runner', None)
             if runner is not None and runner.busy:
                 bridge.request_close()
+                bridge.trace_snake('close_deferred_reason', reason='localization_runner_busy')
                 event.ignore()
                 return
             if bridge is not None and not bridge.request_close():
                 event.ignore()
                 self.auto_relocation.refresh()
                 return
+            parent = bridge.snake_parent if bridge is not None else None
+            if parent is not None and parent.completed:
+                bridge.trace_snake('shutdown_begin', path='completed_quarantine')
+                # Terminal quarantine is not running acquisition. Do not invoke
+                # the legacy close handler's unbounded PI/laser calls or guarded
+                # stage disconnect, and do not attest release to permit exit.
+                import logging
+                logging.getLogger(__name__).warning('Snake shutdown: workflow=%s, uncertain=%s; see Snake breadcrumbs',
+                                                   parent.workflow_outcome, parent.uncertain)
+                stop = getattr(getattr(self, 'stageMotionWindow', None), 'stop_gamepad', None)
+                try:
+                    bridge.trace_snake('gamepad_shutdown_begin')
+                    if callable(stop) and not stop():
+                        bridge.trace_snake('close_deferred_reason', reason='gamepad_still_stopping')
+                        event.ignore()
+                        return
+                    bridge.trace_snake('gamepad_shutdown_complete')
+                    owner = self.prior_owner
+                    if owner is not None:
+                        bridge.trace_snake('prior_shutdown_begin', uncertain=owner.uncertain)
+                        safe = owner.shutdown() if not owner.uncertain else False
+                        if not safe:
+                            bridge.trace_snake('prior_retirement_begin')
+                            if not owner.retire_quarantined():
+                                bridge.trace_snake('close_deferred_reason', reason='prior_native_execution_pending')
+                                event.ignore()  # Native call has not returned; never terminate it.
+                                return
+                        bridge.trace_snake('prior_shutdown_complete', native_cleanup_verified=safe)
+                except Exception as error:
+                    bridge.trace_snake('close_deferred_reason', reason='shutdown_exception', error=str(error))
+                    event.ignore()
+                    self.auto_relocation.failures_label.setText('Shutdown unconfirmed: ' + str(error))
+                    return
+                bridge.dispatcher.shutdown()
+                bridge.trace_snake('legacy_shutdown_skipped', reason='completed_quarantine_policy')
+                self.localization_display_timer.stop()
+                widget = getattr(self, 'pi_scanner_widget', None)
+                if bridge.managed_objective(widget):
+                    widget.ownership_timer.stop()
+                    widget.hide()
+                event.accept()
+                bridge.trace_snake('close_accepted')
+                return
             if bridge is not None:
                 active = [r for r in bridge.blockers() if r.startswith(('legacy_activity:',
                           'legacy_thread_state_unknown:', 'legacy_callback_active'))]
                 if active:
+                    bridge.trace_snake('close_deferred_reason', reason='legacy_activity', blockers=tuple(active))
                     event.ignore()
                     return
             try:
+                if bridge is not None:
+                    bridge.trace_snake('shutdown_begin', path='normal')
+                    bridge.trace_snake('legacy_shutdown_begin')
                 super().closeEvent(event)  # Stops gamepad; proxy disconnect owns cleanup.
+                if bridge is not None:
+                    bridge.trace_snake('legacy_shutdown_complete', accepted=event.isAccepted())
                 widget = getattr(self, 'pi_scanner_widget', None)
                 if bridge is not None and event.isAccepted() and bridge.managed_objective(widget):
                     widget.close()
@@ -127,7 +187,12 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
                         event.ignore()
                 if bridge is not None and event.isAccepted() and not bridge.dispatcher.shutdown():
                     event.ignore()
+                if bridge is not None:
+                    bridge.trace_snake('close_accepted' if event.isAccepted() else 'close_deferred_reason',
+                                       reason=None if event.isAccepted() else 'legacy_or_owner_shutdown_unconfirmed')
             except Exception as error:
+                if bridge is not None:
+                    bridge.trace_snake('close_deferred_reason', reason='normal_shutdown_exception', error=str(error))
                 event.ignore()
                 self.auto_relocation.failures_label.setText('Shutdown unconfirmed: ' + str(error))
 
@@ -151,9 +216,6 @@ def operational_window_class(base_class=None, *, owner_factory=None, translation
                 def authorized_callback():
                     if command in (Command.SPECTRUM,Command.REPEAT_SCAN,Command.MULTIWELL,
                                    Command.SNAKE_SCAN,Command.IMAGING):
-                        if (name in ('run_snake_scan', 'repeat_snake_scan') and
-                                getattr(getattr(self, 'pi_scanner', None), 'autofocus_on_imaging', False)):
-                            raise OwnershipError('worker_origin_autofocus_unsupported_in_V1; disable Autofocus on Imaging')
                         return invoke_acquisition(callback,bridge.mark_legacy_daq_uncertain,*args,snake_bridge=bridge,**kwargs)
                     if command is Command.OBJECTIVE_MOVE:
                         # Construction itself configures NI; partial construction

@@ -37,14 +37,18 @@ def hardware_ownership_snapshot(window):
         if owner is not None:
             objective_flags.update(owner.snapshot())
             objective_flags['managed'] = bridge.managed_objective(widget)
+            objective_flags['snake_parent_reserved'] = bridge.snake_parent is not None
             if widget is not None and not objective_flags['managed']:
                 objective_flags['state'] = 'blocked_or_unconfirmed'
                 objective_flags['verified_released'] = False
             autofocus = (None if owner.state == 'UNCERTAIN' else
-                         owner.state in ('ACTIVE', 'RELEASING') and owner.current.operation == 'autofocus')
+                         owner.state in ('ACTIVE', 'RELEASING') and owner.current.operation in
+                         ('autofocus', 'snake_autofocus'))
         objective_flags['window'] = ('NOT_CREATED' if widget is None else
             'OPEN' if hasattr(widget, 'isVisible') and widget.isVisible() else 'CLOSED')
         return dict(
+            snake_workflow=(bridge.snake_parent or bridge.last_snake_parent).snapshot()
+                if (bridge.snake_parent or bridge.last_snake_parent) else None,
             read_only=True, scope='Cached ownership evidence; no instrument readback or acquisition authorization',
             legacy_daq_state=ledger['state'],
             legacy_daq_cleanup_unverified=bridge.legacy_daq_cleanup_unverified,

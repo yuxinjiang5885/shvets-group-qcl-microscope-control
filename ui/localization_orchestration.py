@@ -43,6 +43,7 @@ class CancellationToken:
 
 
 class Activity(str, Enum):
+    SNAKE_WORKFLOW = 'snake_workflow'
     SCAN = 'existing_scan'
     REPEAT = 'repeat_scan'
     MULTIWELL = 'multiwell'

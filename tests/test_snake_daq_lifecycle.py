@@ -10,16 +10,10 @@ from ui.snake_daq_lifecycle import SnakeDaqLifecycle,snake_worker_factory
 from ui.hardware_ownership_diagnostics import hardware_ownership_snapshot
 
 
-class NI:
-    def __init__(self,fail=None):self.calls=[];self.fail=fail
-    def call(self,name):
-        self.calls.append(name)
-        if self.fail==name:raise TimeoutError(name)
-    def configure_triggered(self,*a):self.call('configure')
-    def start_task(self):self.call('start')
-    def read_line(self,*a):self.call('read');return [1,2]
-    def stop_task(self):self.call('stop')
-    def clear_task(self):self.call('clear')
+from test_checked_snake_daq import make_factory, RAW_TASKS
+from ui.checked_snake_daq import SnakeDaqError
+
+NI = make_factory
 
 
 class LifecycleTests(unittest.TestCase):
@@ -30,8 +24,8 @@ class LifecycleTests(unittest.TestCase):
     def scope(self):return SnakeDaqLifecycle(self.bridge,'run_snake_scan')
 
     def task(self,scope,fail=None):
-        raw=NI(fail);task=scope.task_factory(lambda:raw)
-        task.configure_triggered();task.start_task()
+        raw=NI(fail);task=scope.task_factory(raw, [b'Dev1/ai0', b'Dev1/ai1'])
+        task.configure_triggered(b'/Dev1/PFI0',2,100000);task.start_task()
         return task,raw
 
     def test_twenty_scans_allow_localization_after_each_cleanup(self):
@@ -56,7 +50,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse(self.bridge.legacy_daq_evidence.ever_acquired)
 
     def test_wrapper_created_not_configured_no_native_cleanup_needed(self):
-        scope=self.scope();raw=NI();scope.task_factory(lambda:raw)
+        scope=self.scope();raw=NI();scope.task_factory(raw, [b'Dev1/ai0', b'Dev1/ai1'])
         scope.finish_worker();scope.attest_thread_done()
         self.assertEqual(raw.calls,[]);self.assertTrue(scope.released())
 
@@ -72,16 +66,17 @@ class LifecycleTests(unittest.TestCase):
         scope.attest_thread_done()  # not enough without worker/cleanup
         self.assertTrue(self.bridge.legacy_daq_cleanup_unverified)
 
-    def test_native_failures_stay_blocked_even_after_cleanup(self):
+    def test_native_failures_distinguish_release_from_operation_failure(self):
         for failure in ('configure','start','read','stop','clear'):
             with self.subTest(failure=failure):
-                scope=self.scope();raw=NI(failure);task=scope.task_factory(lambda:raw)
+                scope=self.scope();raw=NI(failure);task=scope.task_factory(raw, [b'Dev1/ai0', b'Dev1/ai1'])
                 try:
-                    task.configure_triggered();task.start_task();task.read_line(2);task.stop_task();task.clear_task()
-                except TimeoutError:pass
+                    task.configure_triggered(b'/Dev1/PFI0',2,100000);task.start_task();task.read_line(2);task.stop_task();task.clear_task()
+                except SnakeDaqError:pass
                 scope.finish_worker();scope.attest_thread_done()
-                self.assertTrue(self.bridge.legacy_daq_cleanup_unverified)
-                self.assertEqual(scope.state,'RELEASE_UNCERTAIN')
+                self.assertEqual(self.bridge.legacy_daq_cleanup_unverified, failure=='clear')
+                self.assertEqual(scope.state,'RELEASE_UNCERTAIN' if failure=='clear' else 'RELEASE_CONFIRMED')
+                self.assertIsNotNone(scope.error)
 
     def test_one_release_cannot_clear_other_uncertain_source(self):
         self.bridge.mark_legacy_daq_uncertain('objective_unknown')
@@ -100,10 +95,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.state.context_generation,before)
 
 
-_raw_tasks=[]
-def MultiAI(*args):
-    raw=NI();_raw_tasks.append(raw);return raw
-
+_raw_tasks=RAW_TASKS
+MultiAI=make_factory()
 
 class FakeSnake(QObject):
     finished=pyqtSignal()
@@ -113,13 +106,13 @@ class FakeSnake(QObject):
     def run(self):self.scan();self.finished.emit()
     def scan(self):
         task=MultiAI(['fakeX','fakeY'])
-        task.configure_triggered();task.start_task();task.read_line(2)
+        task.configure_triggered(b'/Dev1/PFI0',2,100000);task.start_task();task.read_line(2)
         task.stop_task();task.clear_task()
 
 
 class FailedSnake(FakeSnake):
     def scan(self):
-        task=MultiAI(['fakeX','fakeY']);task.configure_triggered();task.start_task()
+        task=MultiAI(['fakeX','fakeY']);task.configure_triggered(b'/Dev1/PFI0',2,100000);task.start_task()
         raise ValueError('python processing failure')
 
 
@@ -155,6 +148,10 @@ class WorkerIntegrationTests(unittest.TestCase):
         qtwindow.tabSnakeButtons={'Start':[MagicMock()]}
         qtwindow.stageMotionWindow.disable_stage_inputs=lambda:True
         qtwindow.pi_scanner=object();qtwindow.laser=object();qtwindow.wlUnits='invcm'
+        from test_snake_autofocus_service import install_laser
+        install_laser(bridge,qtwindow)
+        qtwindow.stage.busy=lambda:'0'
+        qtwindow.stage.get_position=lambda:(0.,0.)
         qtwindow.snakeBrowser=SimpleNamespace(scans=[])
         qtwindow.statusbar=MagicMock()
         for name in ('lock_controls','update_scanning_imaging_plot_patterns','update_scan_progress_from_snakeScan',
@@ -168,7 +165,7 @@ class WorkerIntegrationTests(unittest.TestCase):
         while scope.state!='RELEASE_CONFIRMED' and monotonic()<deadline:
             app.processEvents();sleep(.001)
         self.assertEqual(scope.state,'RELEASE_CONFIRMED',scope.error)
-        self.assertEqual(len(bridge.legacy_daq_evidence.records),1)
+        self.assertEqual(len(bridge.legacy_daq_evidence.records),2)
         self.assertFalse(bridge.legacy_daq_cleanup_unverified)
         qtwindow.deleteLater();app.processEvents()
 
@@ -189,6 +186,6 @@ class WorkerIntegrationTests(unittest.TestCase):
         self.assertTrue(thread.wait(2000))
         self.assertEqual(scope.state,'RELEASE_CONFIRMED',scope.error)
         self.assertFalse(bridge.legacy_daq_cleanup_unverified)
-        self.assertEqual(_raw_tasks[-1].calls,['configure','start','read','stop','clear'])
+        self.assertEqual(_raw_tasks[-1].calls[-5:],['attribute','start','read','stop','clear'])
         self.assertIs(FakeSnake.scan.__globals__['MultiAI'],MultiAI)
         thread.deleteLater();qtwindow.deleteLater();app.processEvents()

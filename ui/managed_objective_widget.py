@@ -1,7 +1,8 @@
 """Lazy experimental Objective adapter; hardware imports occur only on live open."""
 import numpy as np
 from types import FunctionType
-from PyQt6.QtCore import QThread, QTimer
+from PyQt6.QtCore import QThread, QTimer, pyqtSlot
+from PyQt6.QtWidgets import QPushButton
 
 from ui.localization_orchestration import Activity, OwnershipError
 from ui.objective_daq_lifecycle import ObjectiveDaqLifecycle
@@ -51,6 +52,9 @@ def managed_objective_class(base_class):
             stage_view = _HardwareView(stage, owner)
             owner.run('initialize', lambda: super(ManagedObjectiveWidget, self).__init__(
                 scanner_view, stage_instance=stage_view))
+            self.cancel_snake_button = QPushButton('Cancel Snake workflow', self)
+            self.cancel_snake_button.clicked.connect(self.cancel_snake)
+            self.layout.addWidget(self.cancel_snake_button)
             self.ownership_timer = QTimer(self)
             self.ownership_timer.setInterval(200)
             self.ownership_timer.timeout.connect(self.refresh_ownership)
@@ -119,11 +123,74 @@ def managed_objective_class(base_class):
             return self._invoke('move_stage_to_target', super().move_stage_to_target)
 
         def _update_autofocus_on_imaging(self, state):
-            # Worker autofocus is unsupported, not silently redirected to a GUI widget.
             if state:
-                self.autofocus_on_imaging_checkbox.setChecked(False)
-                self.append_text_signal.emit('Autofocus on Imaging is unsupported in managed V1.')
-            self.piScanner.autofocus_on_imaging = False
+                try:
+                    self.objective_owner.bridge.check_objective_admission(self.objective_owner)
+                    self.snake_autofocus_settings()
+                except Exception as error:
+                    self.autofocus_on_imaging_checkbox.setChecked(False)
+                    self.append_text_signal.emit('Autofocus on Imaging unavailable: '+str(error))
+                    return
+            self.piScanner.autofocus_on_imaging = bool(state)
+
+        def snake_autofocus_settings(self):
+            from ui.snake_autofocus_service import SnakeAutofocusSettings
+            if QThread.currentThread() != self.thread():
+                raise OwnershipError('settings_snapshot_requires_GUI_thread')
+            return SnakeAutofocusSettings(float(self.target_x_textbox.text()),
+                float(self.target_y_textbox.text()), float(self.autofocus_range_min.text()),
+                float(self.autofocus_range_max.text()), float(self.autofocus_step.text()),
+                self.rangemin, self.rangemax)
+
+        def cancel_snake(self):
+            parent = self.objective_owner.bridge.snake_parent
+            if parent is not None: parent.request_cancellation()
+
+        @pyqtSlot(object)
+        def receive_snake_autofocus_telemetry(self, event):
+            """GUI-only display; never ownership evidence or a hardware action."""
+            from ui.snake_workflow import SnakeAutofocusTelemetry
+            try:
+                bridge = self.objective_owner.bridge
+                if (QThread.currentThread() != self.thread()
+                        or not isinstance(event, SnakeAutofocusTelemetry)
+                        or getattr(bridge.window, 'pi_scanner_widget', None) is not self
+                        or not bridge.managed_objective(self)):
+                    return
+                parent = bridge.snake_parent or getattr(bridge, 'last_snake_parent', None)
+                if (parent is None or parent.token != event.parent_token
+                        or parent.generation != event.parent_generation):
+                    return
+                current = self.objective_owner.current
+                if (current is not None and current.generation > event.child_generation
+                        and current.operation != 'snake_autofocus'):
+                    return
+                # One worker's queued signals retain order across wavelengths.
+                # Last completed parent accepts trailing events until a newer run
+                # or manual operation supersedes it. Hidden widgets remain valid.
+                units = {'invcm': 'cm^-1', 'um': 'µm'}.get(event.units, event.units)
+                context = f'requested wavelength {event.requested_wavelength} {units}'
+                if event.qcl is not None: context += f' | QCL {event.qcl}'
+                if event.kind == 'start':
+                    text = f'Snake autofocus start | {context}'
+                elif event.kind == 'point' and event.point is not None:
+                    text = (f'Snake autofocus | {context} | PI {event.point.position:g} µm'
+                            f' | Signal {event.point.signal:.6g} V')
+                elif event.kind == 'result' and event.result is not None:
+                    result = event.result
+                    if (result.outcome == 'SUCCESS' and result.cleanup_verified
+                            and result.stage_restored and result.pi_verified):
+                        text = (f'Snake autofocus complete | {context}'
+                                f' | Best PI {result.best_position:g} µm'
+                                f' | Best signal {result.best_signal:.6g} V')
+                    else:
+                        text = f'Snake autofocus failed | {context} | {result.outcome}: {result.detail}'
+                else:
+                    return
+                self.append_text_signal.emit(text)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception('Snake autofocus display failed')
 
         def refresh_ownership(self):
             owner = self.objective_owner
@@ -136,9 +203,19 @@ def managed_objective_class(base_class):
             for name in ('button', 'move_button', 'acquire_pos_button', 'autofocus_button',
                          'acquire_stage_pos_button', 'move_stage_button'):
                 getattr(self, name).setEnabled(enabled)
-            self.autofocus_on_imaging_checkbox.setEnabled(False)
-            if self.autofocus_on_imaging_checkbox.isChecked():
-                self._update_autofocus_on_imaging(True)
+            try:
+                self.snake_autofocus_settings()
+                valid = True
+            except (ValueError, RuntimeError): valid = False
+            self.autofocus_on_imaging_checkbox.setEnabled(enabled and valid)
+            parent = owner.bridge.snake_parent
+            self.cancel_snake_button.setEnabled(parent is not None and parent.worker_active)
+            trace_parent = parent or owner.bridge.last_snake_parent
+            if trace_parent is not None:
+                state = (trace_parent.token, enabled, self.cancel_snake_button.isEnabled())
+                if getattr(self, '_snake_controls_trace', None) != state:
+                    self._snake_controls_trace = state
+                    trace_parent.trace('controls_refresh', hardware_enabled=enabled, cancel_enabled=state[2])
 
         def closeEvent(self, event):
             if not self.objective_owner.released():

@@ -702,11 +702,184 @@ explicitly blocked. The legacy UI, instrument/driver code, scan engine and hash
 constants are unchanged. Legacy UI SHA-256 remains
 `fbf8bdf5238d04ad3e95649c38bcdfc9ce4b02be65bf844034972fecdfcffaab`.
 
-Accepted limits: no forced autofocus cancellation or automatic restart;
-Snake/Repeat worker-origin autofocus/fallback Objective creation remains
-unsupported and fail-closed. Rotation remains deferred (production theta=0).
+Accepted manual Objective V1 limits: no forced autofocus cancellation or automatic
+restart. Worker-origin autofocus was unsupported at that live-validated checkpoint;
+the Managed Snake Autofocus section below records its later software implementation.
+Unmanaged fallback remains blocked. Rotation remains deferred (production theta=0).
 Module 9 guarded target/MS movement and Module 10 ROI integration remain
 NOT STARTED. The next discussion is Module 9 architecture, not automatic enablement.
+
+#### Checked Snake Imaging DAQ Release V1
+
+Implementation notes below retain historical software-test counts. Current
+hardware-validation status is consolidated in the checkpoint section below;
+no hardware was operated by the checkpoint agent.
+
+**Status: HARDWARE VALIDATED THROUGH SNAKE IMAGING.**
+
+The experimental adapter checks native configure/start/read/stop/clear outcomes
+before the legacy methods discard them. Resource release is separate from
+acquisition success. Stop failure does not skip clear; failed or unknown clear
+blocks attestation. Verified imaging DAQ release is required before future
+Objective autofocus can use the same NI channels.
+
+Regression: **266 passed, 0 failed**, with hardware imports blocked and offscreen
+Qt. No legacy UI, routines, instrument drivers or hash constants changed.
+This prerequisite alone did not implement Managed Snake Autofocus or a parent
+reservation. Module 9 remains NOT STARTED. See the checked Snake release section in
+`docs/module8_hardware_orchestration.md` for implementation details.
+
+#### Managed Snake Autofocus V1
+
+**Status: HARDWARE VALIDATED — NORMAL EXECUTION PATH.**
+
+The experimental UI snapshots immutable focus settings on the GUI thread and
+runs a non-GUI autofocus service synchronously in the existing Snake/Repeat
+worker QThread. A Snake parent reservation in the existing ownership registry
+covers the whole run. Objective child authority is bound to parent generation,
+worker identity and AUTOFOCUS phase. Checked imaging-task clear is required
+before autofocus, and verified child cleanup/result/stage restoration is required
+before imaging. Manual Objective and localization remain blocked across task-free
+gaps until verified parent completion, including thread completion.
+
+Ordinary Snake and Repeat retain their per-wavelength/per-pattern timing, data
+ordering and timestamps. No worker QWidget access or unmanaged fallback is used.
+Cooperative cancellation prevents continuation and performs checked cleanup;
+uncertainty retains the reservation. No forced thread termination or auto-restart.
+
+**296 software-only tests passed, 0 failed**, with hardware imports blocked.
+The preexisting checked-DAQ prerequisite remains intact. Legacy UI, routines,
+instrument drivers and hash constants are unchanged. Manual Objective retains
+its existing algorithm/lifecycle; production localization regressions pass.
+Normal Snake/Repeat execution is hardware validated; post-fix real failure recovery remains pending.
+Module 9 remains NOT STARTED and paused; no target-motion code was added.
+
+#### Managed Snake Autofocus Telemetry
+
+Status: **HARDWARE VALIDATED**.
+
+Previously acquired per-point signals now travel through immutable data events,
+a worker QObject signal and an explicit queued GUI slot to Objective Signal
+Output. The worker never accesses QWidget. Start, point and final messages show
+requested wavelength context (not independent wavelength verification).
+`AutofocusResult.best_signal` retains the measurement selected with best position.
+Final success text follows verified Objective cleanup. Telemetry is
+non-authoritative; delivery failures cannot change autofocus or ownership results.
+Parent token/generation filtering rejects obsolete runs; hidden widgets remain
+usable and replaced/deleted receivers are safely ignored/disconnected.
+
+Software regression: **303 passed, 0 failed**, offscreen Qt with hardware imports
+blocked. Ownership, DAQ handoff, manual Objective behavior and legacy source are
+unchanged by this telemetry addition. No hardware was run. Module 9 remains paused.
+
+#### Snake Failure Finalization / Recovery
+
+Status: **SOFTWARE IMPLEMENTED AND SOFTWARE TESTED. NORMAL SUCCESS PATH HARDWARE
+VALIDATED. REAL POST-FIX FAILURE RECOVERY HARDWARE VALIDATION PENDING**.
+
+Snake now reports workflow outcome (RUNNING/SUCCESS/FAILED/CANCELLED), worker
+activity and hardware safety separately. Completed failures are inactive even
+when the parent reservation remains quarantined. Named cleanup-only operations
+collect stage, coordinate-frame, laser and DAQ evidence independently; no new
+motion/acquisition is authorized. Scope DAQ release can be attested while parent
+safety remains unresolved. Existing PI-failure quarantine is retained; a failed
+operation with fully verified cleanup can release only under the existing policy.
+
+Completed quarantine no longer inherently prevents application close. The new
+UI uses bounded owner shutdown/idle-thread retirement without claiming uncertain
+hardware was released. Native calls still executing are never force-terminated;
+exit must defer until they return. Primary failures, cleanup failures and close
+requests remain distinct. PI mismatch diagnostics include phase, target, actual,
+delta, tolerance and timing/counts. That checkpoint retained single-qPOS acceptance;
+the bounded confirmation follow-up below supersedes that acceptance rule only.
+
+**392 software-only tests passed, 0 failed**, offscreen with hardware imports
+blocked. No legacy source changes, hardware execution, commit or push. Module 9
+remains NOT STARTED.
+
+#### PI bounded readback confirmation and Snake failure/shutdown tracing
+
+PI confirmation and structured diagnostics: **HARDWARE VALIDATED**.
+Tracing: **SOFTWARE IMPLEMENTED AND SOFTWARE TESTED; HARDWARE SUCCESS-PATH TRACING
+OBSERVED; FAILURE/CLOSE HARDWARE VALIDATION PENDING**.
+
+After qONT reports true, managed Snake autofocus now observes qPOS within a
+400 ms window, polling at 10 ms, and requires two consecutive readings within
+the unchanged 0.1 um tolerance. Sweep points and final-best use the same helper.
+Each transport timeout is capped to the remaining window; late results cannot
+pass. No repeated MOV, unconditional settling delay, driver changes, ownership
+changes or DAQ handoff changes. Persistent mismatch remains PI_READBACK_FAILURE.
+Success/failure diagnostics retain phase, read counts, timing, final delta and
+confirmation samples; minimum_delta_seen_um is the minimum absolute error.
+
+Timestamped Snake breadcrumbs now cover child release, independent cleanup,
+worker/thread finalization, control changes, close decisions and shutdown steps.
+The latest 512 events appear in Snake diagnostics. Live UI additionally queues
+best-effort JSONL journals under localization_runs/snake_trace_<session>.jsonl;
+the absolute path, dropped count and writer errors are exposed in diagnostics.
+File I/O occurs only on a diagnostic daemon thread. No hardware reads, GUI wait
+or authority is introduced; disk/queue failures cannot affect the workflow.
+Forced process termination may lose queued tail events; inspect the last persisted
+begin/result pair after restart. Offline/inert windows do not enable journals.
+
+**407 software-only tests passed, 0 failed**, including actual QThread failure,
+GUI heartbeat and completed-quarantine close. Normal-path hardware validation is recorded below;
+real post-fix failure/close validation remains pending. Module 9 remains NOT STARTED — DEFERRED.
+
+#### Managed Snake hardware-validation checkpoint
+
+Operator-reported supervised validation completed on the existing QCL system;
+the checkpoint agent did not run hardware. Current roadmap numbering is retained:
+Module 6 provides reflection acquisition/edge analysis, Module 8 is production
+Locate Marker (previously hardware validated), and Module 9 guarded target movement
+remains **NOT STARTED — DEFERRED**. This closeout does not implement Module 9.
+
+Managed Objective V1 is **HARDWARE VALIDATED**: open, Acquire Signal, Move To,
+manual Autofocus, subsequent Locate Marker, ownership-based control disabling
+during localization/Snake and restoration afterward, and Objective close/reopen.
+Operation-scoped DAQ release is verified; legacy UI and instrument drivers remain
+unchanged. Snake imaging configure/start/read/stop/clear is hardware validated
+through normal imaging, not arbitrary hardware fault injection.
+
+Validated order: GUI settings snapshot -> Snake worker -> parent reservation ->
+wavelength tune -> managed Objective child autofocus -> verified Objective release
+-> imaging DAQ -> verified imaging cleanup -> next wavelength/pattern -> final
+cleanup/release. Autofocus runs once per wavelength per pattern/repetition without
+worker QWidget reads. Telemetry displays requested wavelength, QCL, PI position,
+signal and best PI/signal through queued GUI delivery.
+
+| Hardware validation | Result | Observed evidence |
+|---|---|---|
+| Single wavelength Snake + Autofocus | PASS | COMPLETE / SUCCESS; inactive worker/native execution; VERIFIED_RELEASED; Objective/imaging DAQ released; stage/frame/laser verified; worker/thread finished |
+| Two-wavelength Snake, 1500 and 1600 cm^-1 | PASS | Two autofocus child releases and two checked imaging tasks; complete cleanup; SUCCESS / VERIFIED_RELEASED |
+| Repeat Snake, 2 wavelengths x 2 patterns | PASS | repeat_snake_scan; four autofocus operations and four imaging tasks; all child releases and configure/start/read/stop/clear checks passed; no operation failures; parent released and controls restored |
+
+Single-wavelength confirmation example: target approximately 52.956856 um;
+consecutive read deltas approximately -0.031112 and -0.011184 um. Both passed the
+unchanged 0.1 um tolerance. Two-wavelength best focus was about 52.96 um at
+1500 cm^-1 and 54.96 um at 1600 cm^-1. Repeat values were 52.948/52.944 um and
+54.945/54.941 um respectively. The approximately 2 um wavelength-dependent offset
+and good repeatability are observations in this tested configuration/run, not a
+general physical conclusion.
+
+Confirmation was introduced after a real final_best mismatch: target 52.973608 um,
+actual 53.085436 um, delta 0.111828 um, tolerance 0.1 um, qONT true and one immediate
+qPOS. The threshold excess was only 0.011828 um. This motivated observation-based
+settling confirmation, not a tolerance increase or repeated MOV.
+
+Failure finalization separates RUNNING/SUCCESS/FAILED/CANCELLED from resource
+safety VERIFIED_RELEASED/UNCERTAIN/QUARANTINED and worker/native activity.
+Normal success is hardware validated. Real post-fix persistent-failure recovery
+and failure/close shutdown remain **PENDING NATURAL FAILURE**; no such failure
+was deliberately reproduced. Success-path tracing was observed. Best-effort
+JSONL diagnostics remain ignored runtime data and are not checkpoint evidence.
+
+Final checkpoint validation: **407 targeted regression tests passed** and **847
+full software-discovery tests passed**, with **0 failures, 0 errors, 0 skips**.
+Both runs used offscreen Qt, Python -B, bytecode suppression and explicit
+hardware-import blocking. Protected legacy source and UI SHA-256 are unchanged.
+Only intended source/tests/documentation enter the checkpoint; ignored runtime
+logs and scan data remain excluded. No hardware was run during closeout.
 
 ### Module 9 - Feature Selection and Guarded Move
 
@@ -874,12 +1047,16 @@ Move To, Autofocus and close/reopen each permit subsequent Locate Marker after
 verified release without restart. The window stays open, hardware controls are
 disabled during localization, and controls return after verified cleanup. The
 zero-argument Qt callback fix is also live validated. Old UI/instrument code is
-unchanged. Unsupported worker autofocus and uncertain ownership remain blocked.
+unchanged. Managed Snake Autofocus V1 normal execution, telemetry and PI confirmation
+are hardware validated; real post-fix failure/close validation remains pending.
+Unmanaged fallback and uncertain ownership remain blocked.
 
 Multi-H / rotation calibration: DEFERRED — OPTIONAL FUTURE CALIBRATION.
 No quantitative physical relocation accuracy is claimed by Module 8.
 
-Next discussion: plan Module 9 — Feature Selection and Guarded Move; no target
+Current checkpoint: normal Managed Snake Autofocus validation complete. Observe recovery
+only if a failure occurs naturally; do not induce hardware faults. Module 9 remains deferred.
+Later discussion: plan Module 9 — Feature Selection and Guarded Move; no target
 motion implementation is included in this checkpoint. Single click selects
 and shows predicted XY; double click or explicit Move requests one guarded move.
 Physically validate whether theta=0 translation-only predictions are sufficiently

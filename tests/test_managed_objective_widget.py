@@ -74,6 +74,157 @@ class InertPI:
 
 
 class ManagedObjectiveWidgetTests(unittest.TestCase):
+    def test_actual_thread_failure_heartbeat_and_close_breadcrumbs(self):
+        from time import monotonic, sleep
+        from PyQt6.QtCore import QThread, QTimer
+        from test_snake_autofocus_service import Stage, SETTINGS, install_laser, scan_class, scan_parameters
+        from test_snake_failure_finalization import MismatchPI
+        from ui.snake_workflow import SnakeWorkflow
+        from ui.snake_daq_lifecycle import snake_worker_factory
+        widget=self.open()
+        stage=Stage();self.window.stage=self.bridge.stage=self.window.stageMotionWindow.stage=stage
+        self.window.pi_scanner.pidevice=MismatchPI()
+        install_laser(self.bridge,self.window)
+        self.bridge.guards_installed=False;self.bridge.install_guards()
+        parent=SnakeWorkflow(self.bridge,'snakeScan',SETTINGS)
+        parameters,outputs=scan_parameters(self.window,patterns=1,wavelengths=(1658,))
+        thread=QThread();self.window.threadRun=thread
+        worker=snake_worker_factory(scan_class('snakeScan',outputs),self.bridge,thread,'snakeScan',parent=parent)
+        worker.parameters=parameters
+        ticks=[];timer=QTimer();timer.timeout.connect(lambda:ticks.append(1));timer.start(1)
+        worker.moveToThread(thread);thread.started.connect(worker.run);thread.start()
+        deadline=monotonic()+5
+        while not parent.completed and monotonic()<deadline:
+            self.app.processEvents();sleep(.002)
+        self.assertTrue(thread.wait(2000));self.assertTrue(parent.completed)
+        self.assertTrue(ticks);timer.stop()
+        widget.refresh_ownership()
+        self.assertFalse(widget.button.isEnabled())
+        self.assertFalse(widget.cancel_snake_button.isEnabled())
+        self.assertEqual(parent.primary_failure['outcome'],'PI_READBACK_FAILURE')
+        self.assertEqual(outputs,[])
+        events=[e['event'] for e in parent.snapshot()['breadcrumbs']]
+        for event in ('autofocus_failure_received','worker_failure_recorded',
+                      'worker_cleanup_begin','objective_child_release_verified',
+                      'snake_daq_cleanup_begin','snake_daq_cleanup_complete',
+                      'stage_final_verification_begin','stage_final_verification_result',
+                      'frame_restore_begin','frame_restore_result','laser_cleanup_begin',
+                      'laser_cleanup_result','worker_done','thread_quit_requested',
+                      'thread_finished','parent_finalize_begin','parent_terminal_outcome',
+                      'parent_safety_state','parent_reference_retained_or_cleared','controls_refresh'):
+            self.assertIn(event,events)
+        self.assertLess(events.index('thread_finished'),events.index('parent_terminal_outcome'))
+        self.window.show()
+        with self.assertLogs('qcl_scanning_imaging_autorelocation_ui',level='WARNING'):
+            self.assertTrue(self.window.close())
+        records=parent.snapshot()['breadcrumbs'];events=[e['event'] for e in records]
+        for event in ('close_requested','shutdown_begin','legacy_shutdown_skipped','close_accepted'):
+            self.assertIn(event,events)
+        self.assertEqual(records[-1]['event'],'close_accepted')
+        self.assertFalse(records[-1]['snake_thread_running'])
+        self.assertEqual(parent.primary_failure['outcome'],'PI_READBACK_FAILURE')
+        self.assertFalse(self.bridge.legacy_daq_evidence.records[parent.token]['released'])
+        self.assertEqual([e['sequence'] for e in records],sorted(e['sequence'] for e in records))
+        self.assertTrue(all(e['run_id']==parent.token and 'monotonic_ns' in e for e in records))
+        thread.deleteLater();self.app.processEvents()
+
+    def test_completed_safe_failure_controls_and_normal_close(self):
+        from ui.snake_workflow import SnakeWorkflow
+        from ui.snake_daq_lifecycle import SnakeDaqLifecycle
+        from test_snake_autofocus_service import SETTINGS
+        from ui.snake_autofocus_service import AutofocusFailure
+        widget=self.open()
+        parent=SnakeWorkflow(self.bridge,'failed',SETTINGS)
+        scope=SnakeDaqLifecycle(self.bridge,'failed');parent.scope=scope
+        scope.worker_done=True
+        parent.stage_verified=parent.laser_verified=parent.frame_restored=True
+        parent.record_failure(AutofocusFailure('DAQ_READ_FAILURE'))
+        parent.finish_thread()
+        self.assertEqual(parent.workflow_outcome,'FAILED')
+        self.assertTrue(parent.released())
+        widget.refresh_ownership()
+        self.assertTrue(widget.button.isEnabled())
+        self.assertFalse(widget.cancel_snake_button.isEnabled())
+        self.window.show();self.assertTrue(self.window.close())
+        events=[e['event'] for e in parent.snapshot()['breadcrumbs']]
+        self.assertIn('legacy_shutdown_begin',events)
+        self.assertIn('legacy_shutdown_complete',events)
+        self.assertIn('close_accepted',events)
+
+    def test_completed_quarantine_controls_and_close(self):
+        from ui.snake_workflow import SnakeWorkflow
+        from test_snake_autofocus_service import SETTINGS
+        widget=self.open()
+        parent=SnakeWorkflow(self.bridge,'failed',SETTINGS)
+        parent.completed=True;parent.uncertain=True;parent.workflow_outcome='FAILED'
+        parent.primary_failure={'outcome':'PI_READBACK_FAILURE'}
+        calls=[]
+        self.window.prior_owner=SimpleNamespace(uncertain=True,
+            retire_quarantined=lambda:calls.append('retire') or True,
+            shutdown=lambda:(_ for _ in ()).throw(AssertionError('uncertain native cleanup')))
+        widget.refresh_ownership()
+        self.assertFalse(widget.cancel_snake_button.isEnabled())
+        self.assertFalse(widget.button.isEnabled())
+        widget.cancel_snake()
+        self.assertFalse(parent.cancellation.is_cancelled())
+        self.window.show()
+        with self.assertLogs('qcl_scanning_imaging_autorelocation_ui',level='WARNING'):
+            self.assertTrue(self.window.close())
+        self.assertEqual(calls,['retire'])
+        self.assertIs(self.bridge.snake_parent,parent)
+        self.assertEqual(parent.primary_failure['outcome'],'PI_READBACK_FAILURE')
+        self.assertFalse(parent.cancellation.is_cancelled())
+        self.assertFalse(self.bridge.legacy_daq_evidence.records[parent.token]['released'])
+        self.assertFalse(widget.isVisible())
+
+    def test_snake_telemetry_queued_hidden_reopen_and_stale_filter(self):
+        from dataclasses import replace
+        from PyQt6.QtCore import QThread
+        from ui.snake_workflow import SnakeWorkflow, SnakeAutofocusTelemetry
+        from ui.snake_autofocus_service import AutofocusPoint, AutofocusResult
+        from ui.snake_daq_lifecycle import snake_worker_factory
+        from test_snake_autofocus_service import SETTINGS, scan_class
+        widget=self.open()
+        parent=SnakeWorkflow(self.bridge,'telemetry',SETTINGS)
+        thread=QThread()
+        worker=snake_worker_factory(scan_class('snakeScan',[]),self.bridge,thread,'telemetry',parent=parent)
+        event=SnakeAutofocusTelemetry('start',parent.token,parent.generation,'child',
+                                     widget.objective_owner.generation,1658,'invcm',1)
+        observed=[]
+        widget.append_text_signal.connect(lambda text:observed.append((text,QThread.currentThread())))
+        # Emission from a foreign thread cannot invoke the GUI slot synchronously.
+        sender=Thread(target=lambda:worker.autofocus_progress.emit(event))
+        sender.start();sender.join()
+        self.assertEqual(observed,[])
+        self.app.processEvents()
+        self.assertEqual(len(observed),1)
+        self.assertIs(observed[0][1],self.app.thread())
+        self.assertIn('requested wavelength 1658 cm^-1',widget.textbox.toPlainText())
+        widget.close()
+        worker.autofocus_progress.emit(replace(event,kind='point',point=AutofocusPoint(1,55.,3.421)))
+        self.app.processEvents()
+        self.assertIn('Signal 3.421 V',widget.textbox.toPlainText())
+        widget.show()
+        result=AutofocusResult('SUCCESS',55.,True,True,True,best_signal=3.421)
+        worker.autofocus_progress.emit(replace(event,kind='result',result=result))
+        self.app.processEvents()
+        self.assertIn('Best signal 3.421 V',widget.textbox.toPlainText())
+        count=len(observed)
+        worker.autofocus_progress.emit(replace(event,parent_generation='stale'))
+        self.app.processEvents();self.assertEqual(len(observed),count)
+        self.window.pi_scanner_widget=object()
+        worker.autofocus_progress.emit(event)
+        self.app.processEvents();self.assertEqual(len(observed),count)
+        self.window.pi_scanner_widget=widget
+        self.assertTrue(widget.objective_owner.released())
+        self.assertEqual(self.ni.calls,[])
+        # A deleted receiver is disconnected by Qt; no worker-side QWidget call.
+        from PyQt6 import sip
+        widget.ownership_timer.stop();sip.delete(widget)
+        worker.autofocus_progress.emit(event);self.app.processEvents()
+        self.window.pi_scanner_widget=None;self.bridge.objective_owner.widget=None
+        worker.deleteLater();thread.deleteLater()
+
     @classmethod
     def setUpClass(cls):
         cls.app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -311,7 +462,34 @@ class ManagedObjectiveWidgetTests(unittest.TestCase):
         self.assertIs(self.window.run_snake_scan(), False)
         self.assertEqual(self.window.snake_calls, 0)
         self.assertEqual(self.bridge.legacy_daq_evidence.records, {})
-        self.assertIn('unsupported_in_V1', self.window.auto_relocation.failures_label.text())
+        self.assertIn('unreviewed_snake_autofocus_callback', self.window.auto_relocation.failures_label.text())
+
+    def test_snake_settings_snapshot_and_whole_workflow_controls(self):
+        from ui.snake_workflow import SnakeWorkflow
+        widget=self.open()
+        widget.target_x_textbox.setText('30')
+        widget.target_y_textbox.setText('40')
+        widget.refresh_ownership()
+        self.assertTrue(widget.autofocus_on_imaging_checkbox.isEnabled())
+        widget.autofocus_on_imaging_checkbox.setChecked(True)
+        settings=widget.snake_autofocus_settings()
+        parent=SnakeWorkflow(self.bridge,'test',settings)
+        widget.target_x_textbox.setText('99')
+        self.assertEqual(settings.absolute_target_x,30.)
+        widget.refresh_ownership()
+        self.assertFalse(widget.autofocus_button.isEnabled())
+        self.assertFalse(widget.autofocus_on_imaging_checkbox.isEnabled())
+        self.assertTrue(widget.cancel_snake_button.isEnabled())
+        self.assertIs(widget.acquire_data(),False)
+        parent.abort_launch()
+        widget.refresh_ownership()
+        self.assertTrue(widget.autofocus_button.isEnabled())
+
+    def test_invalid_snake_settings_rejected_without_native_creation(self):
+        widget=self.open()
+        widget.autofocus_step.setText('0')
+        with self.assertRaises(RuntimeError):widget.snake_autofocus_settings()
+        self.assertEqual(self.ni.calls,[])
 
     def test_diagnostics_separate_window_and_verified_release(self):
         widget = self.open()

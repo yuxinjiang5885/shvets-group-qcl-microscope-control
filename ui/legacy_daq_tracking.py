@@ -84,11 +84,25 @@ def invoke_acquisition(callback, mark_uncertain, *args, snake_bridge=None, **kwa
         except (OSError,ValueError,StopIteration,SyntaxError):
             pass
     if not reviewed:
+        if snake_bridge is not None and getattr(function, '__name__', '') in ('run_snake_scan','repeat_snake_scan'):
+            if getattr(getattr(callback.__self__, 'pi_scanner', None), 'autofocus_on_imaging', False):
+                raise OwnershipError('unreviewed_snake_autofocus_callback')
         mark_uncertain('unreviewed_callback:'+getattr(callback,'__name__',repr(callback)))
         return callback(*args,**kwargs)
     namespace = dict(function.__globals__)
     original = namespace['QThread']
     snake = snake_bridge is not None and function.__name__ in ('run_snake_scan','repeat_snake_scan')
+    parent = None
+    if snake:
+        from ui.snake_workflow import SnakeWorkflow
+        settings = None
+        if getattr(getattr(callback.__self__, 'pi_scanner', None), 'autofocus_on_imaging', False):
+            widget = getattr(callback.__self__, 'pi_scanner_widget', None)
+            if not snake_bridge.managed_objective(widget):
+                raise OwnershipError('managed_objective_required_for_snake_autofocus')
+            try: settings = widget.snake_autofocus_settings()
+            except Exception as error: raise OwnershipError('invalid_snake_autofocus_settings: '+str(error)) from error
+        parent = SnakeWorkflow(snake_bridge, function.__name__, settings)
     created_threads=[]
     def thread_factory(*a,**k):
         if not snake:mark_uncertain('worker_creation:'+function.__name__)
@@ -99,7 +113,12 @@ def invoke_acquisition(callback, mark_uncertain, *args, snake_bridge=None, **kwa
         from ui.snake_daq_lifecycle import snake_worker_factory
         name='snakeScan' if function.__name__=='run_snake_scan' else 'repeatSnakeScan'
         base=namespace[name]
-        namespace[name]=lambda:snake_worker_factory(base,snake_bridge,created_threads[-1],function.__name__)
+        namespace[name]=lambda:snake_worker_factory(base,snake_bridge,created_threads[-1],function.__name__,parent=parent)
     private = FunctionType(function.__code__,namespace,function.__name__,function.__defaults__,function.__closure__)
     private.__kwdefaults__ = function.__kwdefaults__
-    return private(callback.__self__,*args,**kwargs)
+    try:
+        return private(callback.__self__,*args,**kwargs)
+    finally:
+        if parent is not None and parent.scope is None:
+            # Admission/parameter early return: no worker or native DAQ was created.
+            parent.abort_launch()
